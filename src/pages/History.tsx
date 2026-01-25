@@ -4,6 +4,7 @@ import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
 import { ShiftType } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
+import { Edit, Trash2, Download, Filter, X } from 'lucide-react';
 
 export function History() {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export function History() {
   };
 
   const handleExport = () => {
-    exportToCsv(filteredShifts, 'historico_turnos');
+    exportToCsv(filteredShifts, 'shift_history');
   };
 
   const getPerformanceClass = (performance: number) => {
@@ -44,11 +45,18 @@ export function History() {
     return 'performance-red';
   };
 
+  const clearFilters = () => {
+    setFilterDate('');
+    setFilterShift('');
+  };
+
+  const hasFilters = filterDate || filterShift;
+
   return (
     <>
       <Header
-        title="Histórico de Turnos"
-        subtitle={`${filteredShifts.length} turno(s) encontrado(s)`}
+        title="Shift History"
+        subtitle={`${filteredShifts.length} shift(s) found`}
       />
 
       <div className="flex-1 overflow-auto p-6">
@@ -56,7 +64,10 @@ export function History() {
         <div className="card p-4 mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div>
-              <label className="label">Filtrar por Data</label>
+              <label className="label flex items-center gap-1">
+                <Filter size={14} />
+                Filter by Date
+              </label>
               <input
                 type="date"
                 value={filterDate}
@@ -66,24 +77,27 @@ export function History() {
             </div>
 
             <div>
-              <label className="label">Filtrar por Turno</label>
+              <label className="label">Filter by Shift</label>
               <select
                 value={filterShift}
                 onChange={e => setFilterShift(e.target.value as ShiftType | '')}
                 className="select-field w-36"
               >
-                <option value="">Todos</option>
-                <option value="Day">Day</option>
-                <option value="Night">Night</option>
+                <option value="">All Shifts</option>
+                <option value="Day">☀️ Day</option>
+                <option value="Night">🌙 Night</option>
               </select>
             </div>
 
-            <button
-              onClick={() => { setFilterDate(''); setFilterShift(''); }}
-              className="btn-secondary"
-            >
-              Limpar Filtros
-            </button>
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="btn-secondary"
+              >
+                <X size={16} />
+                Clear Filters
+              </button>
+            )}
 
             <div className="ml-auto">
               <button
@@ -91,7 +105,8 @@ export function History() {
                 disabled={filteredShifts.length === 0}
                 className="btn-success"
               >
-                📥 Exportar CSV
+                <Download size={16} />
+                Export CSV
               </button>
             </div>
           </div>
@@ -100,14 +115,15 @@ export function History() {
         {/* Table */}
         {filteredShifts.length === 0 ? (
           <div className="card p-12 text-center">
-            <p className="text-[hsl(var(--muted-foreground))]">
-              Nenhum turno encontrado.
+            <div className="text-6xl mb-4">📋</div>
+            <p className="text-[hsl(var(--muted-foreground))] mb-4">
+              No shifts found.
             </p>
             <button
               onClick={() => navigate('/planner')}
-              className="btn-primary mt-4"
+              className="btn-primary"
             >
-              Registrar Primeiro Turno
+              Register First Shift
             </button>
           </div>
         ) : (
@@ -115,18 +131,18 @@ export function History() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Data</th>
-                  <th>Turno</th>
-                  <th>Linha</th>
-                  <th>Líder</th>
-                  <th>Produto</th>
+                  <th>Date</th>
+                  <th>Shift</th>
+                  <th>Line</th>
+                  <th>Leader</th>
+                  <th>Product</th>
                   <th>SKU</th>
-                  <th>Meta</th>
-                  <th>Real</th>
+                  <th>Target</th>
+                  <th>Actual</th>
                   <th>Performance</th>
-                  <th>Paradas</th>
-                  <th>Observações</th>
-                  <th>Ações</th>
+                  <th>Downtime</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,15 +155,15 @@ export function History() {
                           ? 'bg-[hsl(40,95%,90%)] text-[hsl(40,80%,30%)]'
                           : 'bg-[hsl(220,40%,90%)] text-[hsl(220,60%,35%)]'
                       }`}>
-                        {shift.shift}
+                        {shift.shift === 'Day' ? '☀️ Day' : '🌙 Night'}
                       </span>
                     </td>
                     <td>{shift.productionLine}</td>
                     <td>{shift.lineLeader}</td>
                     <td>{shift.product || '-'}</td>
                     <td>{shift.sku || '-'}</td>
-                    <td className="text-right">{shift.productionTarget.toLocaleString()}</td>
-                    <td className="text-right">{shift.realProduction.toLocaleString()}</td>
+                    <td className="text-right font-medium">{shift.productionTarget.toLocaleString()}</td>
+                    <td className="text-right font-medium">{shift.realProduction.toLocaleString()}</td>
                     <td>
                       <span className={getPerformanceClass(shift.performance)}>
                         {shift.performance.toFixed(1)}%
@@ -161,15 +177,21 @@ export function History() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleEdit(shift.id)}
-                          className="text-[hsl(var(--primary))] hover:underline text-sm"
+                          className="p-1.5 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
+                          title="Edit"
                         >
-                          Editar
+                          <Edit size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(shift.id)}
-                          className="text-[hsl(var(--destructive))] hover:underline text-sm"
+                          className={`p-1.5 rounded transition-colors ${
+                            confirmDelete === shift.id
+                              ? 'bg-[hsl(var(--destructive))] text-white'
+                              : 'text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10'
+                          }`}
+                          title={confirmDelete === shift.id ? 'Confirm delete?' : 'Delete'}
                         >
-                          {confirmDelete === shift.id ? 'Confirmar?' : 'Excluir'}
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>

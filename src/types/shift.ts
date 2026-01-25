@@ -1,16 +1,25 @@
 export type ShiftType = 'Day' | 'Night';
 
 export type DowntimeReason = 
-  | 'Maquinário quebrado'
-  | 'Falta de matéria-prima'
-  | 'Espera de bateria'
-  | 'Setup'
-  | 'Outros';
+  | 'machine_breakdown' 
+  | 'lack_of_material' 
+  | 'battery_waiting' 
+  | 'setup' 
+  | 'other';
+
+export const DOWNTIME_REASON_LABELS: Record<DowntimeReason, string> = {
+  machine_breakdown: 'Machine Breakdown',
+  lack_of_material: 'Lack of Raw Material',
+  battery_waiting: 'Battery Waiting',
+  setup: 'Setup',
+  other: 'Other',
+};
 
 export interface Downtime {
   id: string;
   reason: DowntimeReason;
   duration: number; // in minutes
+  notes?: string;
 }
 
 export interface ShiftReport {
@@ -45,9 +54,9 @@ export interface ShiftFormData {
 }
 
 export const DOWNTIME_REASONS: DowntimeReason[] = [
-  'Maquinário quebrado',
-  'Falta de matéria-prima',
-  'Espera de bateria',
-  'Setup',
-  'Outros'
+  'machine_breakdown',
+  'lack_of_material',
+  'battery_waiting',
+  'setup',
+  'other'
 ];
