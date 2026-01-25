@@ -31,6 +31,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       ...data,
       performance: calculatePerformance(data.realProduction, data.productionTarget),
       totalDowntime: calculateTotalDowntime(data.downtimes),
+      isArchived: false,
       createdAt: now,
       updatedAt: now,
     };

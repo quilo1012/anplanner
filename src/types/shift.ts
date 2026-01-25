@@ -36,6 +36,9 @@ export interface ShiftReport {
   observations: string;
   downtimes: Downtime[];
   totalDowntime: number; // total minutes
+  monitoringPhoto?: string; // base64 encoded image
+  photoFilename?: string; // original filename
+  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +54,8 @@ export interface ShiftFormData {
   realProduction: number;
   observations: string;
   downtimes: Downtime[];
+  monitoringPhoto?: string;
+  photoFilename?: string;
 }
 
 export const DOWNTIME_REASONS: DowntimeReason[] = [

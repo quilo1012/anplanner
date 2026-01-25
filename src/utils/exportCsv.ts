@@ -17,12 +17,13 @@ export function exportToCsv(shifts: ShiftReport[], filename: string): void {
     'Line Leader',
     'Product',
     'SKU',
-    'Target',
-    'Actual',
+    'Planned Quantity',
+    'Actual Production',
     'Performance (%)',
     'Total Downtime (min)',
     'Downtime Details',
-    'Notes',
+    'Comments',
+    'Photo Filename',
   ];
 
   const rows = shifts.map(shift => {
@@ -43,6 +44,7 @@ export function exportToCsv(shifts: ShiftReport[], filename: string): void {
       shift.totalDowntime.toString(),
       downtimeDetails,
       shift.observations || '',
+      shift.photoFilename || '',
     ];
   });
 
