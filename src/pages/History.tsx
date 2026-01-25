@@ -2,19 +2,24 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ShiftType } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
-import { Edit, Trash2, Download, Filter, X, Image, Calendar } from 'lucide-react';
+import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock } from 'lucide-react';
 
 export function History() {
   const navigate = useNavigate();
   const { shifts, deleteShift } = useShifts();
+  const { hasRole } = useAuth();
   
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
   const [filterShift, setFilterShift] = useState<ShiftType | ''>('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+
+  const canEdit = hasRole(['supervisor', 'admin']);
+  const canDelete = hasRole(['supervisor', 'admin']);
 
   const filteredShifts = useMemo(() => {
     return shifts.filter(shift => {
@@ -26,10 +31,12 @@ export function History() {
   }, [shifts, filterFromDate, filterToDate, filterShift]);
 
   const handleEdit = (id: string) => {
+    if (!canEdit) return;
     navigate(`/planner?edit=${id}`);
   };
 
   const handleDelete = (id: string) => {
+    if (!canDelete) return;
     if (confirmDelete === id) {
       deleteShift(id);
       setConfirmDelete(null);
@@ -132,6 +139,14 @@ export function History() {
           </div>
         </div>
 
+        {/* Permission notice for operators */}
+        {!canEdit && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-700">
+            <Lock size={16} />
+            <span>Editing and deleting shifts requires Supervisor or Admin access.</span>
+          </div>
+        )}
+
         {/* Table */}
         {filteredShifts.length === 0 ? (
           <div className="card p-12 text-center">
@@ -163,7 +178,7 @@ export function History() {
                   <th>Downtime</th>
                   <th>Photo</th>
                   <th>Notes</th>
-                  <th>Actions</th>
+                  {(canEdit || canDelete) && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -207,28 +222,34 @@ export function History() {
                     <td className="max-w-[150px] truncate" title={shift.observations}>
                       {shift.observations || '-'}
                     </td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(shift.id)}
-                          className="p-1.5 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
-                          title="Edit"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(shift.id)}
-                          className={`p-1.5 rounded transition-colors ${
-                            confirmDelete === shift.id
-                              ? 'bg-[hsl(var(--destructive))] text-white'
-                              : 'text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10'
-                          }`}
-                          title={confirmDelete === shift.id ? 'Confirm delete?' : 'Delete'}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
+                    {(canEdit || canDelete) && (
+                      <td>
+                        <div className="flex gap-2">
+                          {canEdit && (
+                            <button
+                              onClick={() => handleEdit(shift.id)}
+                              className="p-1.5 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDelete(shift.id)}
+                              className={`p-1.5 rounded transition-colors ${
+                                confirmDelete === shift.id
+                                  ? 'bg-[hsl(var(--destructive))] text-white'
+                                  : 'text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10'
+                              }`}
+                              title={confirmDelete === shift.id ? 'Confirm delete?' : 'Delete'}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

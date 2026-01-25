@@ -4,8 +4,9 @@ import { Header } from '@/components/Header';
 import { DowntimeForm } from '@/components/DowntimeForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { useShifts } from '@/contexts/ShiftContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ShiftFormData, ShiftType, Downtime } from '@/types/shift';
-import { Save, RotateCcw, X, User, ClipboardCheck } from 'lucide-react';
+import { Save, RotateCcw, X, User, ClipboardCheck, Lock } from 'lucide-react';
 
 const initialFormData: ShiftFormData = {
   date: new Date().toISOString().split('T')[0],
@@ -28,9 +29,13 @@ export function Planner() {
   const editId = searchParams.get('edit');
 
   const { addShift, updateShift, getShiftById } = useShifts();
+  const { user, hasRole } = useAuth();
   const [formData, setFormData] = useState<ShiftFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isOperator = user?.role === 'operator';
+  const canReview = hasRole(['supervisor', 'admin']);
 
   useEffect(() => {
     if (editId) {
@@ -133,7 +138,7 @@ export function Planner() {
     <>
       <Header
         title={editId ? 'Edit Shift' : 'New Shift Report'}
-        subtitle="Record production data for the shift"
+        subtitle={isOperator ? 'Enter planned production data' : 'Record and review production data'}
       />
 
       <div className="flex-1 overflow-auto p-6">
@@ -268,72 +273,82 @@ export function Planner() {
           </div>
 
           {/* Supervisor Review Section */}
-          <div className="card p-6 border-l-4 border-l-[hsl(var(--primary))]">
+          <div className={`card p-6 border-l-4 ${canReview ? 'border-l-[hsl(var(--primary))]' : 'border-l-gray-300'}`}>
             <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4 flex items-center gap-2 text-lg">
-              <ClipboardCheck size={20} className="text-[hsl(var(--primary))]" />
+              <ClipboardCheck size={20} className={canReview ? 'text-[hsl(var(--primary))]' : 'text-gray-400'} />
               Supervisor Review
+              {!canReview && (
+                <span className="ml-auto flex items-center gap-1 text-sm font-normal text-[hsl(var(--muted-foreground))]">
+                  <Lock size={14} />
+                  Supervisor access required
+                </span>
+              )}
             </h3>
             <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
               Production results and observations reviewed by the supervisor
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label htmlFor="realProduction" className="label">Actual Production</label>
-                <input
-                  type="number"
-                  id="realProduction"
-                  name="realProduction"
-                  value={formData.realProduction || ''}
+            <div className={`${!canReview ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label htmlFor="realProduction" className="label">Actual Production</label>
+                  <input
+                    type="number"
+                    id="realProduction"
+                    name="realProduction"
+                    value={formData.realProduction || ''}
+                    onChange={handleChange}
+                    min="0"
+                    placeholder="0"
+                    className="input-field"
+                    disabled={!canReview}
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Performance</label>
+                  <div className={`input-field font-bold text-lg ${
+                    parseFloat(performance) >= 90 ? 'text-[hsl(var(--success))] bg-[hsl(145,65%,95%)]' :
+                    parseFloat(performance) >= 75 ? 'text-[hsl(40,80%,35%)] bg-[hsl(40,95%,95%)]' :
+                    'text-[hsl(var(--destructive))] bg-[hsl(0,85%,95%)]'
+                  }`}>
+                    {performance}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Observations */}
+              <div className="mb-6">
+                <label htmlFor="observations" className="label">Comments / Observations</label>
+                <textarea
+                  id="observations"
+                  name="observations"
+                  value={formData.observations}
                   onChange={handleChange}
-                  min="0"
-                  placeholder="0"
-                  className="input-field"
+                  rows={3}
+                  placeholder="Additional notes about the shift..."
+                  className="input-field resize-none"
+                  maxLength={500}
+                  disabled={!canReview}
                 />
               </div>
 
-              <div>
-                <label className="label">Performance</label>
-                <div className={`input-field font-bold text-lg ${
-                  parseFloat(performance) >= 90 ? 'text-[hsl(var(--success))] bg-[hsl(145,65%,95%)]' :
-                  parseFloat(performance) >= 75 ? 'text-[hsl(40,80%,35%)] bg-[hsl(40,95%,95%)]' :
-                  'text-[hsl(var(--destructive))] bg-[hsl(0,85%,95%)]'
-                }`}>
-                  {performance}%
-                </div>
+              {/* Downtime Section */}
+              <div className="mb-6 p-4 bg-[hsl(var(--muted))] rounded-lg">
+                <DowntimeForm
+                  downtimes={formData.downtimes}
+                  onChange={handleDowntimesChange}
+                />
               </div>
-            </div>
 
-            {/* Observations */}
-            <div className="mb-6">
-              <label htmlFor="observations" className="label">Comments / Observations</label>
-              <textarea
-                id="observations"
-                name="observations"
-                value={formData.observations}
-                onChange={handleChange}
-                rows={3}
-                placeholder="Additional notes about the shift..."
-                className="input-field resize-none"
-                maxLength={500}
-              />
-            </div>
-
-            {/* Downtime Section */}
-            <div className="mb-6 p-4 bg-[hsl(var(--muted))] rounded-lg">
-              <DowntimeForm
-                downtimes={formData.downtimes}
-                onChange={handleDowntimesChange}
-              />
-            </div>
-
-            {/* Photo Upload */}
-            <div className="p-4 bg-[hsl(var(--muted))] rounded-lg">
-              <PhotoUpload
-                photo={formData.monitoringPhoto}
-                filename={formData.photoFilename}
-                onChange={handlePhotoChange}
-              />
+              {/* Photo Upload */}
+              <div className="p-4 bg-[hsl(var(--muted))] rounded-lg">
+                <PhotoUpload
+                  photo={formData.monitoringPhoto}
+                  filename={formData.photoFilename}
+                  onChange={handlePhotoChange}
+                />
+              </div>
             </div>
           </div>
 
@@ -346,7 +361,7 @@ export function Planner() {
                 className="btn-primary flex-1"
               >
                 <Save size={18} />
-                {isSubmitting ? 'Saving...' : editId ? 'Update Shift' : 'Archive Shift'}
+                {isSubmitting ? 'Saving...' : editId ? 'Update Shift' : (canReview ? 'Archive Shift' : 'Save Planned Shift')}
               </button>
               <button
                 type="button"
