@@ -4,6 +4,7 @@ import { Header } from '@/components/Header';
 import { DowntimeForm } from '@/components/DowntimeForm';
 import { useShifts } from '@/contexts/ShiftContext';
 import { ShiftFormData, ShiftType, Downtime } from '@/types/shift';
+import { Save, RotateCcw, X } from 'lucide-react';
 
 const initialFormData: ShiftFormData = {
   date: new Date().toISOString().split('T')[0],
@@ -69,16 +70,16 @@ export function Planner() {
     const newErrors: Record<string, string> = {};
 
     if (!formData.date) {
-      newErrors.date = 'Data é obrigatória';
+      newErrors.date = 'Date is required';
     }
     if (!formData.productionLine.trim()) {
-      newErrors.productionLine = 'Linha de Produção é obrigatória';
+      newErrors.productionLine = 'Production Line is required';
     }
     if (!formData.lineLeader.trim()) {
-      newErrors.lineLeader = 'Líder da Linha é obrigatório';
+      newErrors.lineLeader = 'Line Leader is required';
     }
     if (!formData.productionTarget || formData.productionTarget <= 0) {
-      newErrors.productionTarget = 'Meta deve ser maior que 0';
+      newErrors.productionTarget = 'Target must be greater than 0';
     }
 
     setErrors(newErrors);
@@ -118,121 +119,128 @@ export function Planner() {
   return (
     <>
       <Header
-        title={editId ? 'Editar Turno' : 'Novo Turno'}
-        subtitle="Registre os dados de produção do turno"
+        title={editId ? 'Edit Shift' : 'New Shift'}
+        subtitle="Record production data for the shift"
       />
 
       <div className="flex-1 overflow-auto p-6">
-        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
           <div className="card p-6 space-y-6">
             {/* Basic Info Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="date" className="label">
-                  Data <span className="text-[hsl(var(--destructive))]">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className={`input-field ${errors.date ? 'border-[hsl(var(--destructive))]' : ''}`}
-                />
-                {errors.date && (
-                  <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.date}</p>
-                )}
-              </div>
+            <div>
+              <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4 flex items-center gap-2">
+                📋 Basic Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="date" className="label">
+                    Date <span className="text-[hsl(var(--destructive))]">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    value={formData.date}
+                    onChange={handleChange}
+                    className={`input-field ${errors.date ? 'border-[hsl(var(--destructive))]' : ''}`}
+                  />
+                  {errors.date && (
+                    <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.date}</p>
+                  )}
+                </div>
 
-              <div>
-                <label htmlFor="shift" className="label">Turno</label>
-                <select
-                  id="shift"
-                  name="shift"
-                  value={formData.shift}
-                  onChange={handleChange}
-                  className="select-field"
-                >
-                  <option value="Day">Day (Dia)</option>
-                  <option value="Night">Night (Noite)</option>
-                </select>
-              </div>
+                <div>
+                  <label htmlFor="shift" className="label">Shift</label>
+                  <select
+                    id="shift"
+                    name="shift"
+                    value={formData.shift}
+                    onChange={handleChange}
+                    className="select-field"
+                  >
+                    <option value="Day">☀️ Day Shift</option>
+                    <option value="Night">🌙 Night Shift</option>
+                  </select>
+                </div>
 
-              <div>
-                <label htmlFor="productionLine" className="label">
-                  Linha de Produção <span className="text-[hsl(var(--destructive))]">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="productionLine"
-                  name="productionLine"
-                  value={formData.productionLine}
-                  onChange={handleChange}
-                  placeholder="Ex: Linha 1, Linha A"
-                  className={`input-field ${errors.productionLine ? 'border-[hsl(var(--destructive))]' : ''}`}
-                  maxLength={50}
-                />
-                {errors.productionLine && (
-                  <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.productionLine}</p>
-                )}
-              </div>
+                <div>
+                  <label htmlFor="productionLine" className="label">
+                    Production Line <span className="text-[hsl(var(--destructive))]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="productionLine"
+                    name="productionLine"
+                    value={formData.productionLine}
+                    onChange={handleChange}
+                    placeholder="e.g., Line 1, Line A"
+                    className={`input-field ${errors.productionLine ? 'border-[hsl(var(--destructive))]' : ''}`}
+                    maxLength={50}
+                  />
+                  {errors.productionLine && (
+                    <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.productionLine}</p>
+                  )}
+                </div>
 
-              <div>
-                <label htmlFor="lineLeader" className="label">
-                  Líder da Linha <span className="text-[hsl(var(--destructive))]">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="lineLeader"
-                  name="lineLeader"
-                  value={formData.lineLeader}
-                  onChange={handleChange}
-                  placeholder="Nome do líder"
-                  className={`input-field ${errors.lineLeader ? 'border-[hsl(var(--destructive))]' : ''}`}
-                  maxLength={100}
-                />
-                {errors.lineLeader && (
-                  <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.lineLeader}</p>
-                )}
-              </div>
+                <div>
+                  <label htmlFor="lineLeader" className="label">
+                    Line Leader <span className="text-[hsl(var(--destructive))]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="lineLeader"
+                    name="lineLeader"
+                    value={formData.lineLeader}
+                    onChange={handleChange}
+                    placeholder="Leader name"
+                    className={`input-field ${errors.lineLeader ? 'border-[hsl(var(--destructive))]' : ''}`}
+                    maxLength={100}
+                  />
+                  {errors.lineLeader && (
+                    <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.lineLeader}</p>
+                  )}
+                </div>
 
-              <div>
-                <label htmlFor="product" className="label">Produto</label>
-                <input
-                  type="text"
-                  id="product"
-                  name="product"
-                  value={formData.product}
-                  onChange={handleChange}
-                  placeholder="Nome do produto"
-                  className="input-field"
-                  maxLength={100}
-                />
-              </div>
+                <div>
+                  <label htmlFor="product" className="label">Product Name</label>
+                  <input
+                    type="text"
+                    id="product"
+                    name="product"
+                    value={formData.product}
+                    onChange={handleChange}
+                    placeholder="Product name"
+                    className="input-field"
+                    maxLength={100}
+                  />
+                </div>
 
-              <div>
-                <label htmlFor="sku" className="label">SKU</label>
-                <input
-                  type="text"
-                  id="sku"
-                  name="sku"
-                  value={formData.sku}
-                  onChange={handleChange}
-                  placeholder="Código SKU"
-                  className="input-field"
-                  maxLength={50}
-                />
+                <div>
+                  <label htmlFor="sku" className="label">SKU</label>
+                  <input
+                    type="text"
+                    id="sku"
+                    name="sku"
+                    value={formData.sku}
+                    onChange={handleChange}
+                    placeholder="SKU code"
+                    className="input-field"
+                    maxLength={50}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Production Section */}
             <div className="border-t border-[hsl(var(--border))] pt-6">
-              <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Produção</h3>
+              <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4 flex items-center gap-2">
+                🏭 Production Data
+              </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label htmlFor="productionTarget" className="label">
-                    Meta de Produção <span className="text-[hsl(var(--destructive))]">*</span>
+                    Production Target <span className="text-[hsl(var(--destructive))]">*</span>
                   </label>
                   <input
                     type="number"
@@ -250,7 +258,7 @@ export function Planner() {
                 </div>
 
                 <div>
-                  <label htmlFor="realProduction" className="label">Produção Real</label>
+                  <label htmlFor="realProduction" className="label">Actual Production</label>
                   <input
                     type="number"
                     id="realProduction"
@@ -265,10 +273,10 @@ export function Planner() {
 
                 <div>
                   <label className="label">Performance</label>
-                  <div className={`input-field font-semibold ${
-                    parseFloat(performance) >= 90 ? 'text-[hsl(var(--success))]' :
-                    parseFloat(performance) >= 75 ? 'text-[hsl(40,80%,35%)]' :
-                    'text-[hsl(var(--destructive))]'
+                  <div className={`input-field font-bold text-lg ${
+                    parseFloat(performance) >= 90 ? 'text-[hsl(var(--success))] bg-[hsl(145,65%,95%)]' :
+                    parseFloat(performance) >= 75 ? 'text-[hsl(40,80%,35%)] bg-[hsl(40,95%,95%)]' :
+                    'text-[hsl(var(--destructive))] bg-[hsl(0,85%,95%)]'
                   }`}>
                     {performance}%
                   </div>
@@ -286,14 +294,14 @@ export function Planner() {
 
             {/* Observations */}
             <div className="border-t border-[hsl(var(--border))] pt-6">
-              <label htmlFor="observations" className="label">Observações</label>
+              <label htmlFor="observations" className="label">Notes</label>
               <textarea
                 id="observations"
                 name="observations"
                 value={formData.observations}
                 onChange={handleChange}
                 rows={3}
-                placeholder="Observações adicionais sobre o turno..."
+                placeholder="Additional notes about the shift..."
                 className="input-field resize-none"
                 maxLength={500}
               />
@@ -306,14 +314,16 @@ export function Planner() {
                 disabled={isSubmitting}
                 className="btn-primary flex-1"
               >
-                {isSubmitting ? 'Salvando...' : editId ? 'Atualizar Turno' : 'Salvar Turno'}
+                <Save size={18} />
+                {isSubmitting ? 'Saving...' : editId ? 'Update Shift' : 'Save Shift'}
               </button>
               <button
                 type="button"
                 onClick={handleReset}
                 className="btn-secondary"
               >
-                Limpar
+                <RotateCcw size={18} />
+                Reset
               </button>
               {editId && (
                 <button
@@ -321,7 +331,8 @@ export function Planner() {
                   onClick={() => navigate('/history')}
                   className="btn-secondary"
                 >
-                  Cancelar
+                  <X size={18} />
+                  Cancel
                 </button>
               )}
             </div>
