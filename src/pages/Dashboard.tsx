@@ -1,16 +1,32 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
 import { ShiftReport, ShiftType } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
 import { PerformanceChart } from '@/components/PerformanceChart';
 import { PerformanceTrendChart } from '@/components/PerformanceTrendChart';
+import { LinePerformanceChart } from '@/components/LinePerformanceChart';
+import { LeaderPerformanceChart } from '@/components/LeaderPerformanceChart';
 import { StatCard } from '@/components/StatCard';
-import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock } from 'lucide-react';
+import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Factory } from 'lucide-react';
 import factoryImage from '@/assets/factory-line.jpg';
 
 interface ShiftRanking {
   shift: ShiftType;
+  avgPerformance: number;
+  totalShifts: number;
+  metTargets: number;
+}
+
+interface LineRanking {
+  line: string;
+  avgPerformance: number;
+  totalShifts: number;
+  metTargets: number;
+}
+
+interface LeaderRanking {
+  leader: string;
   avgPerformance: number;
   totalShifts: number;
   metTargets: number;
@@ -23,8 +39,11 @@ interface TrendAlert {
   avgPerformance: number;
 }
 
+type ViewTab = 'shift' | 'line' | 'leader';
+
 export function Dashboard() {
   const { shifts } = useShifts();
+  const [activeTab, setActiveTab] = useState<ViewTab>('shift');
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -44,7 +63,7 @@ export function Dashboard() {
     return { totalToday, avgPerformance, allTimeAvg, totalDowntime };
   }, [shifts, today]);
 
-  const rankings = useMemo((): ShiftRanking[] => {
+  const shiftRankings = useMemo((): ShiftRanking[] => {
     const byShift: Record<ShiftType, ShiftReport[]> = { Day: [], Night: [] };
     
     shifts.forEach(s => {
@@ -61,6 +80,43 @@ export function Dashboard() {
 
       return { shift, avgPerformance, totalShifts, metTargets };
     });
+  }, [shifts]);
+
+  const lineRankings = useMemo((): LineRanking[] => {
+    const byLine: Record<string, ShiftReport[]> = {};
+    
+    shifts.forEach(s => {
+      if (!byLine[s.productionLine]) byLine[s.productionLine] = [];
+      byLine[s.productionLine].push(s);
+    });
+
+    return Object.entries(byLine)
+      .map(([line, lineShifts]) => ({
+        line,
+        avgPerformance: lineShifts.reduce((sum, s) => sum + s.performance, 0) / lineShifts.length,
+        totalShifts: lineShifts.length,
+        metTargets: lineShifts.filter(s => s.performance >= 95).length,
+      }))
+      .sort((a, b) => b.avgPerformance - a.avgPerformance);
+  }, [shifts]);
+
+  const leaderRankings = useMemo((): LeaderRanking[] => {
+    const byLeader: Record<string, ShiftReport[]> = {};
+    
+    shifts.forEach(s => {
+      if (!s.lineLeader) return;
+      if (!byLeader[s.lineLeader]) byLeader[s.lineLeader] = [];
+      byLeader[s.lineLeader].push(s);
+    });
+
+    return Object.entries(byLeader)
+      .map(([leader, leaderShifts]) => ({
+        leader,
+        avgPerformance: leaderShifts.reduce((sum, s) => sum + s.performance, 0) / leaderShifts.length,
+        totalShifts: leaderShifts.length,
+        metTargets: leaderShifts.filter(s => s.performance >= 95).length,
+      }))
+      .sort((a, b) => b.avgPerformance - a.avgPerformance);
   }, [shifts]);
 
   const trendAlerts = useMemo((): TrendAlert[] => {
@@ -123,7 +179,7 @@ export function Dashboard() {
       />
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Hero Section with Factory Image */}
+        {/* Hero Section */}
         <div className="relative h-48 rounded-xl overflow-hidden">
           <img 
             src={factoryImage} 
@@ -166,70 +222,175 @@ export function Dashboard() {
           />
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Bar Chart */}
-          <div className="card p-6">
-            <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">
-              Day vs Night Performance
-            </h3>
-            <PerformanceChart shifts={shifts} />
+        {/* Performance View Tabs */}
+        <div className="card">
+          <div className="p-4 border-b border-[hsl(var(--border))]">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setActiveTab('shift')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                  activeTab === 'shift' 
+                    ? 'bg-[hsl(var(--primary))] text-white' 
+                    : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'
+                }`}
+              >
+                <Clock size={16} />
+                By Shift
+              </button>
+              <button
+                onClick={() => setActiveTab('line')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                  activeTab === 'line' 
+                    ? 'bg-[hsl(var(--primary))] text-white' 
+                    : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'
+                }`}
+              >
+                <Factory size={16} />
+                By Line
+              </button>
+              <button
+                onClick={() => setActiveTab('leader')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                  activeTab === 'leader' 
+                    ? 'bg-[hsl(var(--primary))] text-white' 
+                    : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'
+                }`}
+              >
+                <Users size={16} />
+                By Leader
+              </button>
+            </div>
           </div>
 
-          {/* Line Chart */}
-          <div className="card p-6">
-            <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">
-              Performance Trend (Last 7 Days)
-            </h3>
-            <PerformanceTrendChart shifts={shifts} />
+          <div className="p-4">
+            {activeTab === 'shift' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Day vs Night Performance</h3>
+                  <PerformanceChart shifts={shifts} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {shiftRankings.map(ranking => (
+                    <div
+                      key={ranking.shift}
+                      className={`p-5 rounded-xl border-2 ${
+                        ranking.shift === 'Day'
+                          ? 'bg-gradient-to-br from-[hsl(40,95%,97%)] to-[hsl(40,90%,92%)] border-[hsl(40,80%,70%)]'
+                          : 'bg-gradient-to-br from-[hsl(220,40%,97%)] to-[hsl(220,35%,92%)] border-[hsl(220,40%,75%)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-bold">
+                          {ranking.shift === 'Day' ? '☀️ Day' : '🌙 Night'}
+                        </h4>
+                        <span className={`text-xl font-bold ${getPerformanceClass(ranking.avgPerformance)}`}>
+                          {ranking.avgPerformance.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-white/50 rounded p-2 text-center">
+                          <p className="text-[hsl(var(--muted-foreground))]">Shifts</p>
+                          <p className="font-bold">{ranking.totalShifts}</p>
+                        </div>
+                        <div className="bg-white/50 rounded p-2 text-center">
+                          <p className="text-[hsl(var(--muted-foreground))]">≥95%</p>
+                          <p className="font-bold">{ranking.metTargets}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'line' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Performance by Line</h3>
+                  <LinePerformanceChart shifts={shifts} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Line Rankings</h3>
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {lineRankings.map((ranking, idx) => (
+                      <div
+                        key={ranking.line}
+                        className="flex items-center justify-between p-3 bg-[hsl(var(--muted))] rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                            idx === 1 ? 'bg-gray-300 text-gray-700' :
+                            idx === 2 ? 'bg-amber-600 text-white' :
+                            'bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <span className="font-medium">{ranking.line}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-[hsl(var(--muted-foreground))]">
+                            {ranking.totalShifts} shifts
+                          </span>
+                          <span className={`font-bold ${getPerformanceClass(ranking.avgPerformance)}`}>
+                            {ranking.avgPerformance.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'leader' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Performance by Leader</h3>
+                  <LeaderPerformanceChart shifts={shifts} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Leader Rankings</h3>
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {leaderRankings.map((ranking, idx) => (
+                      <div
+                        key={ranking.leader}
+                        className="flex items-center justify-between p-3 bg-[hsl(var(--muted))] rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                            idx === 1 ? 'bg-gray-300 text-gray-700' :
+                            idx === 2 ? 'bg-amber-600 text-white' :
+                            'bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <span className="font-medium">{ranking.leader}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-[hsl(var(--muted-foreground))]">
+                            {ranking.totalShifts} shifts
+                          </span>
+                          <span className={`font-bold ${getPerformanceClass(ranking.avgPerformance)}`}>
+                            {ranking.avgPerformance.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Shift Ranking */}
-        <div className="card">
-          <div className="p-4 border-b border-[hsl(var(--border))] flex justify-between items-center">
-            <h2 className="font-semibold text-[hsl(var(--foreground))]">
-              Shift Performance Ranking
-            </h2>
-            <button onClick={handleExportRanking} className="btn-secondary text-sm">
-              📥 Export CSV
-            </button>
-          </div>
-          
-          <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {rankings.map(ranking => (
-                <div
-                  key={ranking.shift}
-                  className={`p-5 rounded-xl border-2 transition-all hover:shadow-lg ${
-                    ranking.shift === 'Day'
-                      ? 'bg-gradient-to-br from-[hsl(40,95%,97%)] to-[hsl(40,90%,92%)] border-[hsl(40,80%,70%)]'
-                      : 'bg-gradient-to-br from-[hsl(220,40%,97%)] to-[hsl(220,35%,92%)] border-[hsl(220,40%,75%)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-xl">
-                      {ranking.shift === 'Day' ? '☀️ Day Shift' : '🌙 Night Shift'}
-                    </h3>
-                    <span className={`text-2xl font-bold ${getPerformanceClass(ranking.avgPerformance)}`}>
-                      {ranking.avgPerformance.toFixed(1)}%
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-white/50 rounded-lg p-3">
-                      <p className="text-[hsl(var(--muted-foreground))]">Total Shifts</p>
-                      <p className="font-bold text-lg text-[hsl(var(--foreground))]">{ranking.totalShifts}</p>
-                    </div>
-                    <div className="bg-white/50 rounded-lg p-3">
-                      <p className="text-[hsl(var(--muted-foreground))]">Targets Met (≥95%)</p>
-                      <p className="font-bold text-lg text-[hsl(var(--foreground))]">{ranking.metTargets}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Trend Chart */}
+        <div className="card p-6">
+          <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">
+            Performance Trend (Last 7 Days)
+          </h3>
+          <PerformanceTrendChart shifts={shifts} />
         </div>
 
         {/* Trend Alerts */}
@@ -278,10 +439,13 @@ export function Dashboard() {
         {/* Recent Shifts */}
         {shifts.length > 0 && (
           <div className="card">
-            <div className="p-4 border-b border-[hsl(var(--border))]">
+            <div className="p-4 border-b border-[hsl(var(--border))] flex justify-between items-center">
               <h2 className="font-semibold text-[hsl(var(--foreground))]">
                 Recent Shifts
               </h2>
+              <button onClick={handleExportRanking} className="btn-secondary text-sm">
+                📥 Export CSV
+              </button>
             </div>
             
             <div className="table-container">
