@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { ShiftReport, ShiftFormData } from '@/types/shift';
+import { ShiftReport, ShiftFormData, StructuredDowntime } from '@/types/shift';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface ShiftContextType {
@@ -17,8 +17,13 @@ function calculatePerformance(real: number, target: number): number {
   return (real / target) * 100;
 }
 
-function calculateTotalDowntime(downtimes: { duration: number }[]): number {
-  return downtimes.reduce((total, d) => total + d.duration, 0);
+function calculateTotalDowntime(
+  legacyDowntimes: { duration: number }[],
+  structuredDowntimes?: StructuredDowntime[]
+): number {
+  const legacyTotal = legacyDowntimes.reduce((total, d) => total + d.duration, 0);
+  const structuredTotal = structuredDowntimes?.reduce((total, d) => total + d.duration, 0) || 0;
+  return legacyTotal + structuredTotal;
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
@@ -30,7 +35,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       id: `shift-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...data,
       performance: calculatePerformance(data.realProduction, data.productionTarget),
-      totalDowntime: calculateTotalDowntime(data.downtimes),
+      totalDowntime: calculateTotalDowntime(data.downtimes, data.structuredDowntimes),
       isArchived: false,
       createdAt: now,
       updatedAt: now,
@@ -46,7 +51,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
               ...shift,
               ...data,
               performance: calculatePerformance(data.realProduction, data.productionTarget),
-              totalDowntime: calculateTotalDowntime(data.downtimes),
+              totalDowntime: calculateTotalDowntime(data.downtimes, data.structuredDowntimes),
               updatedAt: new Date().toISOString(),
             }
           : shift

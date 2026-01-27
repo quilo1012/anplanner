@@ -5,7 +5,7 @@ import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShiftType } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
-import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock } from 'lucide-react';
+import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock, Factory, Users } from 'lucide-react';
 
 export function History() {
   const navigate = useNavigate();
@@ -15,20 +15,38 @@ export function History() {
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
   const [filterShift, setFilterShift] = useState<ShiftType | ''>('');
+  const [filterLine, setFilterLine] = useState('');
+  const [filterLeader, setFilterLeader] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
 
   const canEdit = hasRole(['supervisor', 'admin']);
   const canDelete = hasRole(['supervisor', 'admin']);
 
+  // Get unique lines and leaders for filter dropdowns
+  const { uniqueLines, uniqueLeaders } = useMemo(() => {
+    const lines = new Set<string>();
+    const leaders = new Set<string>();
+    shifts.forEach(s => {
+      if (s.productionLine) lines.add(s.productionLine);
+      if (s.lineLeader) leaders.add(s.lineLeader);
+    });
+    return {
+      uniqueLines: Array.from(lines).sort(),
+      uniqueLeaders: Array.from(leaders).sort(),
+    };
+  }, [shifts]);
+
   const filteredShifts = useMemo(() => {
     return shifts.filter(shift => {
       if (filterFromDate && shift.date < filterFromDate) return false;
       if (filterToDate && shift.date > filterToDate) return false;
       if (filterShift && shift.shift !== filterShift) return false;
+      if (filterLine && shift.productionLine !== filterLine) return false;
+      if (filterLeader && shift.lineLeader !== filterLeader) return false;
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [shifts, filterFromDate, filterToDate, filterShift]);
+  }, [shifts, filterFromDate, filterToDate, filterShift, filterLine, filterLeader]);
 
   const handleEdit = (id: string) => {
     if (!canEdit) return;
@@ -59,9 +77,11 @@ export function History() {
     setFilterFromDate('');
     setFilterToDate('');
     setFilterShift('');
+    setFilterLine('');
+    setFilterLeader('');
   };
 
-  const hasFilters = filterFromDate || filterToDate || filterShift;
+  const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader;
 
   return (
     <>
@@ -83,7 +103,7 @@ export function History() {
                 type="date"
                 value={filterFromDate}
                 onChange={e => setFilterFromDate(e.target.value)}
-                className="input-field w-44"
+                className="input-field w-40"
               />
             </div>
 
@@ -96,7 +116,7 @@ export function History() {
                 type="date"
                 value={filterToDate}
                 onChange={e => setFilterToDate(e.target.value)}
-                className="input-field w-44"
+                className="input-field w-40"
               />
             </div>
 
@@ -108,11 +128,45 @@ export function History() {
               <select
                 value={filterShift}
                 onChange={e => setFilterShift(e.target.value as ShiftType | '')}
-                className="select-field w-36"
+                className="select-field w-32"
               >
-                <option value="">All Shifts</option>
+                <option value="">All</option>
                 <option value="Day">☀️ Day</option>
                 <option value="Night">🌙 Night</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="label flex items-center gap-1">
+                <Factory size={14} />
+                Line
+              </label>
+              <select
+                value={filterLine}
+                onChange={e => setFilterLine(e.target.value)}
+                className="select-field w-36"
+              >
+                <option value="">All Lines</option>
+                {uniqueLines.map(line => (
+                  <option key={line} value={line}>{line}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="label flex items-center gap-1">
+                <Users size={14} />
+                Leader
+              </label>
+              <select
+                value={filterLeader}
+                onChange={e => setFilterLeader(e.target.value)}
+                className="select-field w-40"
+              >
+                <option value="">All Leaders</option>
+                {uniqueLeaders.map(leader => (
+                  <option key={leader} value={leader}>{leader}</option>
+                ))}
               </select>
             </div>
 
@@ -122,7 +176,7 @@ export function History() {
                 className="btn-secondary"
               >
                 <X size={16} />
-                Clear Filters
+                Clear
               </button>
             )}
 
@@ -139,7 +193,7 @@ export function History() {
           </div>
         </div>
 
-        {/* Permission notice for operators */}
+        {/* Permission notice */}
         {!canEdit && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-700">
             <Lock size={16} />

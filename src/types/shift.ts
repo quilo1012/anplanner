@@ -1,5 +1,8 @@
+import { StructuredDowntime, DowntimeCategory, DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from './downtime';
+
 export type ShiftType = 'Day' | 'Night';
 
+// Legacy downtime type (kept for backward compatibility)
 export type DowntimeReason = 
   | 'machine_breakdown' 
   | 'lack_of_material' 
@@ -18,13 +21,13 @@ export const DOWNTIME_REASON_LABELS: Record<DowntimeReason, string> = {
 export interface Downtime {
   id: string;
   reason: DowntimeReason;
-  duration: number; // in minutes
+  duration: number;
   notes?: string;
 }
 
 export interface ShiftReport {
   id: string;
-  date: string; // YYYY-MM-DD format
+  date: string;
   shift: ShiftType;
   productionLine: string;
   lineLeader: string;
@@ -32,12 +35,13 @@ export interface ShiftReport {
   sku: string;
   productionTarget: number;
   realProduction: number;
-  performance: number; // percentage
+  performance: number;
   observations: string;
   downtimes: Downtime[];
-  totalDowntime: number; // total minutes
-  monitoringPhoto?: string; // base64 encoded image
-  photoFilename?: string; // original filename
+  structuredDowntimes?: StructuredDowntime[];
+  totalDowntime: number;
+  monitoringPhoto?: string;
+  photoFilename?: string;
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -54,6 +58,7 @@ export interface ShiftFormData {
   realProduction: number;
   observations: string;
   downtimes: Downtime[];
+  structuredDowntimes?: StructuredDowntime[];
   monitoringPhoto?: string;
   photoFilename?: string;
 }
@@ -65,3 +70,6 @@ export const DOWNTIME_REASONS: DowntimeReason[] = [
   'setup',
   'other'
 ];
+
+export type { StructuredDowntime, DowntimeCategory };
+export { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY };
