@@ -92,21 +92,21 @@ export function Admin() {
         subtitle="Manage users, roles, and system settings"
       />
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="max-w-4xl mx-auto">
           {/* User Management */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="card p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
                 <Users size={24} className="text-[hsl(var(--primary))]" />
-                <h2 className="text-xl font-semibold text-[hsl(var(--foreground))]">
+                <h2 className="text-lg sm:text-xl font-semibold text-[hsl(var(--foreground))]">
                   User Management
                 </h2>
               </div>
               {!isAdding && !editingId && (
                 <button
                   onClick={handleStartAdding}
-                  className="btn-primary"
+                  className="btn-primary w-full sm:w-auto"
                 >
                   <Plus size={18} />
                   Add User
@@ -120,7 +120,7 @@ export function Admin() {
                 <h3 className="font-medium text-[hsl(var(--foreground))] mb-4">
                   {editingId ? 'Edit User' : 'Add New User'}
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="label">Name</label>
                     <input
@@ -184,8 +184,48 @@ export function Admin() {
               </form>
             )}
 
-            {/* Users List */}
-            <div className="table-container">
+            {/* Users List - Mobile Cards */}
+            <div className="sm:hidden space-y-3">
+              {users.map(u => (
+                <div key={u.id} className="p-4 bg-[hsl(var(--muted))] rounded-lg">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-medium">{u.name}</p>
+                      <p className="text-sm text-[hsl(var(--muted-foreground))]">{u.email}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${ROLE_COLORS[u.role]}`}>
+                      <Shield size={12} />
+                      {ROLE_LABELS[u.role]}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-[hsl(var(--border))]">
+                    <button
+                      onClick={() => startEdit(u)}
+                      className="btn-secondary flex-1 text-sm py-2"
+                    >
+                      <Edit size={14} />
+                      Edit
+                    </button>
+                    {u.id !== currentUser?.id && (
+                      <button
+                        onClick={() => handleDelete(u.id)}
+                        className={`flex-1 text-sm py-2 rounded-md flex items-center justify-center gap-1 ${
+                          confirmDelete === u.id
+                            ? 'bg-[hsl(var(--destructive))] text-white'
+                            : 'btn-secondary text-[hsl(var(--destructive))]'
+                        }`}
+                      >
+                        <Trash2 size={14} />
+                        {confirmDelete === u.id ? 'Confirm' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Users List - Desktop Table */}
+            <div className="hidden sm:block table-container">
               <table className="table">
                 <thead>
                   <tr>
@@ -242,23 +282,23 @@ export function Admin() {
           </div>
 
           {/* Role Permissions Info */}
-          <div className="card p-6 mt-6">
+          <div className="card p-4 sm:p-6 mt-4 sm:mt-6">
             <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4 flex items-center gap-2">
               <Shield size={20} className="text-[hsl(var(--primary))]" />
               Role Permissions
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-blue-800 mb-2">Operator</h4>
-                <ul className="text-sm text-blue-700 space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-800 mb-2 text-sm sm:text-base">Operator</h4>
+                <ul className="text-xs sm:text-sm text-blue-700 space-y-1">
                   <li>• View Dashboard</li>
                   <li>• Create shifts (Product + Planned Qty)</li>
                   <li>• View History</li>
                 </ul>
               </div>
-              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <h4 className="font-medium text-purple-800 mb-2">Supervisor</h4>
-                <ul className="text-sm text-purple-700 space-y-1">
+              <div className="p-3 sm:p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <h4 className="font-medium text-purple-800 mb-2 text-sm sm:text-base">Supervisor</h4>
+                <ul className="text-xs sm:text-sm text-purple-700 space-y-1">
                   <li>• All Operator permissions</li>
                   <li>• Review & complete shifts</li>
                   <li>• Add production results</li>
@@ -266,9 +306,9 @@ export function Admin() {
                   <li>• Edit/Delete all shifts</li>
                 </ul>
               </div>
-              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                <h4 className="font-medium text-red-800 mb-2">Administrator</h4>
-                <ul className="text-sm text-red-700 space-y-1">
+              <div className="p-3 sm:p-4 bg-red-50 rounded-lg border border-red-200">
+                <h4 className="font-medium text-red-800 mb-2 text-sm sm:text-base">Administrator</h4>
+                <ul className="text-xs sm:text-sm text-red-700 space-y-1">
                   <li>• All Supervisor permissions</li>
                   <li>• Manage users</li>
                   <li>• Assign roles</li>

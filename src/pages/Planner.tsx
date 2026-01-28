@@ -4,10 +4,12 @@ import { Header } from '@/components/Header';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { ExcelUpload } from '@/components/ExcelUpload';
+import { ProductSearch } from '@/components/ProductSearch';
+import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShiftFormData, ShiftType, Downtime, StructuredDowntime } from '@/types/shift';
-import { Save, RotateCcw, X, User, ClipboardCheck, Lock, FileSpreadsheet, TrendingUp, Factory, Users } from 'lucide-react';
+import { Save, RotateCcw, X, User, ClipboardCheck, Lock, FileSpreadsheet, TrendingUp, Factory, Users, Package } from 'lucide-react';
 
 const initialFormData: ShiftFormData = {
   date: new Date().toISOString().split('T')[0],
@@ -36,6 +38,7 @@ export function Planner() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
+  const [showProductUpload, setShowProductUpload] = useState(false);
 
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
@@ -97,6 +100,13 @@ export function Planner() {
     setFormData(prev => ({ ...prev, structuredDowntimes: downtimes }));
   };
 
+  const handleProductSelect = (sku: string, product?: { sku: string; name: string }) => {
+    setFormData(prev => ({
+      ...prev,
+      sku,
+      product: product?.name || prev.product,
+    }));
+  };
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
     setFormData(prev => ({ 
       ...prev, 
@@ -186,15 +196,25 @@ export function Planner() {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* Excel Upload Button */}
+          {/* Action Buttons */}
           {canReview && (
-            <div className="flex justify-end">
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowProductUpload(true)}
+                className="btn-secondary"
+              >
+                <Package size={18} />
+                <span className="hidden sm:inline">Import Products</span>
+                <span className="sm:hidden">Products</span>
+              </button>
               <button
                 onClick={() => setShowExcelUpload(true)}
                 className="btn-secondary"
               >
                 <FileSpreadsheet size={18} />
-                Import Production Plan
+                <span className="hidden sm:inline">Import Production Plan</span>
+                <span className="sm:hidden">Plan</span>
               </button>
             </div>
           )}
@@ -210,7 +230,7 @@ export function Planner() {
                 Basic shift information entered by the production operator
               </p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="date" className="label">
                     Date <span className="text-[hsl(var(--destructive))]">*</span>
@@ -295,17 +315,29 @@ export function Planner() {
                 </div>
 
                 <div>
-                  <label htmlFor="sku" className="label">SKU</label>
-                  <input
-                    type="text"
-                    id="sku"
-                    name="sku"
-                    value={formData.sku}
-                    onChange={handleChange}
-                    placeholder="SKU code"
-                    className="input-field"
-                    maxLength={50}
-                  />
+                  <label htmlFor="sku" className="label flex items-center gap-2">
+                    <Package size={14} />
+                    SKU
+                    {canReview && <span className="text-xs text-[hsl(var(--muted-foreground))]">(autocomplete)</span>}
+                  </label>
+                  {canReview ? (
+                    <ProductSearch
+                      value={formData.sku}
+                      onChange={handleProductSelect}
+                      placeholder="Type SKU to search..."
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      id="sku"
+                      name="sku"
+                      value={formData.sku}
+                      onChange={handleChange}
+                      placeholder="SKU code"
+                      className="input-field"
+                      maxLength={50}
+                    />
+                  )}
                 </div>
 
                 <div>
@@ -329,9 +361,8 @@ export function Planner() {
               </div>
             </div>
 
-            {/* Stats Cards */}
             {canReview && (lineStats || leaderStats) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {lineStats && (
                   <div className="card p-4 flex items-center gap-4">
                     <div className="p-3 bg-[hsl(var(--muted))] rounded-lg">
@@ -396,7 +427,7 @@ export function Planner() {
               </p>
               
               <div className={`${!canReview ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                   <div>
                     <label htmlFor="realProduction" className="label">Actual Production</label>
                     <input
@@ -502,6 +533,14 @@ export function Planner() {
         <ExcelUpload
           onImport={handleExcelImport}
           onClose={() => setShowExcelUpload(false)}
+        />
+      )}
+
+      {/* Product CSV Upload Modal */}
+      {showProductUpload && (
+        <ProductCsvUpload
+          onClose={() => setShowProductUpload(false)}
+          onSuccess={() => setShowProductUpload(false)}
         />
       )}
     </>

@@ -39,15 +39,15 @@ export function StatCard({
   };
 
   return (
-    <div className="card p-5 hover:shadow-md transition-shadow duration-200">
+    <div className="card p-3 sm:p-5 hover:shadow-md transition-shadow duration-200">
       <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">{title}</p>
-          <p className={`text-3xl font-bold mt-2 ${getValueColor()}`}>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-[hsl(var(--muted-foreground))] truncate">{title}</p>
+          <p className={`text-xl sm:text-3xl font-bold mt-1 sm:mt-2 ${getValueColor()}`}>
             {value}
           </p>
           {(subtitle || trend) && (
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-1 sm:mt-2">
               {trend && (
                 <div className="flex items-center gap-1">
                   {getTrendIcon()}
@@ -63,13 +63,13 @@ export function StatCard({
                 </div>
               )}
               {subtitle && (
-                <span className="text-xs text-[hsl(var(--muted-foreground))]">{subtitle}</span>
+                <span className="text-xs text-[hsl(var(--muted-foreground))] truncate">{subtitle}</span>
               )}
             </div>
           )}
         </div>
         {icon && (
-          <div className="p-3 bg-[hsl(var(--muted))] rounded-lg">
+          <div className="p-2 sm:p-3 bg-[hsl(var(--muted))] rounded-lg flex-shrink-0 ml-2">
             {icon}
           </div>
         )}
