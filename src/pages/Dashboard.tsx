@@ -178,24 +178,24 @@ export function Dashboard() {
         subtitle={`Overview - ${formatDate(today)}`}
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Hero Section */}
-        <div className="relative h-48 rounded-xl overflow-hidden">
+        <div className="relative h-32 sm:h-48 rounded-xl overflow-hidden">
           <img 
             src={factoryImage} 
             alt="Production Line" 
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--sidebar-bg))]/90 to-transparent flex items-center">
-            <div className="p-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Production Overview</h2>
-              <p className="text-white/80">Monitor real-time performance and track your production goals</p>
+            <div className="p-4 sm:p-8">
+              <h2 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Production Overview</h2>
+              <p className="text-white/80 text-sm sm:text-base hidden sm:block">Monitor real-time performance and track your production goals</p>
             </div>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             title="Today's Shifts"
             value={stats.totalToday}
@@ -224,7 +224,7 @@ export function Dashboard() {
 
         {/* Performance View Tabs */}
         <div className="card">
-          <div className="p-4 border-b border-[hsl(var(--border))]">
+          <div className="p-3 sm:p-4 border-b border-[hsl(var(--border))]">
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setActiveTab('shift')}
@@ -262,28 +262,28 @@ export function Dashboard() {
             </div>
           </div>
 
-          <div className="p-4">
+          <div className="p-3 sm:p-4">
             {activeTab === 'shift' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Day vs Night Performance</h3>
                   <PerformanceChart shifts={shifts} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {shiftRankings.map(ranking => (
                     <div
                       key={ranking.shift}
-                      className={`p-5 rounded-xl border-2 ${
+                      className={`p-3 sm:p-5 rounded-xl border-2 ${
                         ranking.shift === 'Day'
                           ? 'bg-gradient-to-br from-[hsl(40,95%,97%)] to-[hsl(40,90%,92%)] border-[hsl(40,80%,70%)]'
                           : 'bg-gradient-to-br from-[hsl(220,40%,97%)] to-[hsl(220,35%,92%)] border-[hsl(220,40%,75%)]'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-bold">
+                      <div className="flex items-center justify-between mb-2 sm:mb-3">
+                        <h4 className="font-bold text-sm sm:text-base">
                           {ranking.shift === 'Day' ? '☀️ Day' : '🌙 Night'}
                         </h4>
-                        <span className={`text-xl font-bold ${getPerformanceClass(ranking.avgPerformance)}`}>
+                        <span className={`text-lg sm:text-xl font-bold ${getPerformanceClass(ranking.avgPerformance)}`}>
                           {ranking.avgPerformance.toFixed(1)}%
                         </span>
                       </div>
@@ -304,7 +304,7 @@ export function Dashboard() {
             )}
 
             {activeTab === 'line' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Performance by Line</h3>
                   <LinePerformanceChart shifts={shifts} />
@@ -344,7 +344,7 @@ export function Dashboard() {
             )}
 
             {activeTab === 'leader' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Performance by Leader</h3>
                   <LeaderPerformanceChart shifts={shifts} />

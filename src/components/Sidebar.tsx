@@ -18,7 +18,7 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="w-60 min-h-screen bg-[hsl(var(--sidebar-bg))] text-[hsl(var(--sidebar-foreground))] flex flex-col">
+    <aside className="w-60 min-h-screen bg-[hsl(var(--sidebar-bg))] text-[hsl(var(--sidebar-foreground))] flex flex-col fixed lg:static h-screen">
       <div className="p-5 border-b border-[hsl(var(--sidebar-hover))]">
         <div className="flex items-center gap-3">
           <img src={logo} alt="Applied Nutrition" className="h-10 w-auto bg-white rounded p-1" />

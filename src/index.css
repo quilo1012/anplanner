@@ -125,4 +125,28 @@
   .performance-green {
     @apply bg-[hsl(145,65%,92%)] text-[hsl(145,65%,30%)] font-semibold px-2 py-1 rounded;
   }
+
+  /* Mobile responsive utilities */
+  @keyframes slide-in {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.2s ease-out;
+  }
+
+  /* Responsive table */
+  .table-responsive {
+    @apply w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
+  }
+
+  /* Mobile-friendly cards */
+  .card-mobile {
+    @apply p-4 sm:p-6;
+  }
 }
