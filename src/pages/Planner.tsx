@@ -105,8 +105,10 @@ export function Planner() {
     }));
   };
 
-  const handleExcelImport = (entries: ShiftFormData[]) => {
-    entries.forEach(entry => addShift(entry));
+  const handleExcelImport = async (entries: ShiftFormData[]) => {
+    for (const entry of entries) {
+      await addShift(entry);
+    }
     setShowExcelUpload(false);
     navigate('/history');
   };
@@ -139,7 +141,7 @@ export function Planner() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validate()) return;
@@ -148,9 +150,9 @@ export function Planner() {
 
     try {
       if (editId) {
-        updateShift(editId, formData);
+        await updateShift(editId, formData);
       } else {
-        addShift(formData);
+        await addShift(formData);
       }
       navigate('/history');
     } catch (error) {

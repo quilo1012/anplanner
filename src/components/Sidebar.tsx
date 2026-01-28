@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, ClipboardEdit, History, Users, LogOut, Settings } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { ROLE_LABELS } from '@/types/auth';
+import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import logo from '@/assets/applied-nutrition-logo.png';
 
 export function Sidebar() {
