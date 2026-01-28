@@ -1,58 +1,220 @@
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { User, UserRole, LoginCredentials, DEFAULT_USERS } from '@/types/auth';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { supabase } from '@/integrations/supabase/client';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+
+export type UserRole = 'operator' | 'supervisor' | 'admin';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  createdAt: string;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  users: (User & { password: string })[];
+  users: User[];
   isAuthenticated: boolean;
-  login: (credentials: LoginCredentials) => { success: boolean; error?: string };
-  logout: () => void;
+  isLoading: boolean;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
+  signup: (credentials: LoginCredentials & { name: string }) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   hasRole: (roles: UserRole | UserRole[]) => boolean;
   canEdit: (createdByRole?: UserRole) => boolean;
-  addUser: (user: Omit<User, 'id' | 'createdAt'> & { password: string }) => void;
-  updateUser: (id: string, data: Partial<User & { password?: string }>) => void;
-  deleteUser: (id: string) => void;
+  addUser: (userData: { name: string; email: string; password: string; role: UserRole }) => Promise<{ success: boolean; error?: string }>;
+  updateUser: (id: string, data: Partial<{ name: string; email: string; role: UserRole }>) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  refreshUsers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useLocalStorage<(User & { password: string })[]>('app-users', DEFAULT_USERS);
-  const [currentUserId, setCurrentUserId] = useLocalStorage<string | null>('current-user-id', null);
   const [user, setUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load user on mount
-  useEffect(() => {
-    if (currentUserId) {
-      const foundUser = users.find(u => u.id === currentUserId);
-      if (foundUser) {
-        const { password, ...userData } = foundUser;
-        setUser(userData);
-      } else {
-        setCurrentUserId(null);
+  // Fetch user profile and role from database
+  const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
+    try {
+      // Fetch profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        return null;
       }
+
+      // Fetch role
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', supabaseUser.id)
+        .maybeSingle();
+
+      if (roleError) {
+        console.error('Error fetching role:', roleError);
+      }
+
+      if (profile) {
+        return {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          role: (roleData?.role as UserRole) || 'operator',
+          createdAt: profile.created_at,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      return null;
     }
-  }, [currentUserId, users]);
-
-  const login = (credentials: LoginCredentials): { success: boolean; error?: string } => {
-    const foundUser = users.find(
-      u => u.email.toLowerCase() === credentials.email.toLowerCase() && u.password === credentials.password
-    );
-
-    if (foundUser) {
-      const { password, ...userData } = foundUser;
-      setUser(userData);
-      setCurrentUserId(foundUser.id);
-      return { success: true };
-    }
-
-    return { success: false, error: 'Invalid email or password' };
   };
 
-  const logout = () => {
+  // Fetch all users (admin only)
+  const refreshUsers = async () => {
+    try {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        return;
+      }
+
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+
+      if (rolesError) {
+        console.error('Error fetching roles:', rolesError);
+      }
+
+      const roleMap = new Map(roles?.map(r => [r.user_id, r.role as UserRole]) || []);
+
+      const usersWithRoles: User[] = (profiles || []).map(p => ({
+        id: p.id,
+        email: p.email,
+        name: p.name,
+        role: roleMap.get(p.id) || 'operator',
+        createdAt: p.created_at,
+      }));
+
+      setUsers(usersWithRoles);
+    } catch (error) {
+      console.error('Error refreshing users:', error);
+    }
+  };
+
+  // Initialize auth state
+  useEffect(() => {
+    // Set up auth state listener BEFORE checking session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          const userData = await fetchUserData(session.user);
+          setUser(userData);
+          if (userData?.role === 'admin') {
+            await refreshUsers();
+          }
+        } else {
+          setUser(null);
+          setUsers([]);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    // Check initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const userData = await fetchUserData(session.user);
+        setUser(userData);
+        if (userData?.role === 'admin') {
+          await refreshUsers();
+        }
+      }
+      setIsLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const login = async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        const userData = await fetchUserData(data.user);
+        setUser(userData);
+        if (userData?.role === 'admin') {
+          await refreshUsers();
+        }
+        return { success: true };
+      }
+
+      return { success: false, error: 'Login failed' };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
+  const signup = async (credentials: LoginCredentials & { name: string }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            name: credentials.name,
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        return { success: true };
+      }
+
+      return { success: false, error: 'Signup failed' };
+    } catch (error) {
+      console.error('Signup error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    setCurrentUserId(null);
+    setUsers([]);
   };
 
   const hasRole = (roles: UserRole | UserRole[]): boolean => {
@@ -63,33 +225,115 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canEdit = (createdByRole?: UserRole): boolean => {
     if (!user) return false;
-    // Admins can edit everything
     if (user.role === 'admin') return true;
-    // Supervisors can edit operator and supervisor content
     if (user.role === 'supervisor') return true;
-    // Operators can only edit their own content
     return user.role === 'operator';
   };
 
-  const addUser = (userData: Omit<User, 'id' | 'createdAt'> & { password: string }) => {
-    const newUser = {
-      ...userData,
-      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date().toISOString(),
-    };
-    setUsers(prev => [...prev, newUser]);
+  const addUser = async (userData: { name: string; email: string; password: string; role: UserRole }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      // Create user via Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            name: userData.name,
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        // Update role if not operator (default)
+        if (userData.role !== 'operator') {
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .update({ role: userData.role })
+            .eq('user_id', data.user.id);
+
+          if (roleError) {
+            console.error('Error updating role:', roleError);
+          }
+        }
+
+        await refreshUsers();
+        return { success: true };
+      }
+
+      return { success: false, error: 'Failed to create user' };
+    } catch (error) {
+      console.error('Add user error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
   };
 
-  const updateUser = (id: string, data: Partial<User & { password?: string }>) => {
-    setUsers(prev =>
-      prev.map(u => (u.id === id ? { ...u, ...data } : u))
-    );
+  const updateUser = async (id: string, data: Partial<{ name: string; email: string; role: UserRole }>) => {
+    try {
+      // Update profile
+      if (data.name || data.email) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            ...(data.name && { name: data.name }),
+            ...(data.email && { email: data.email }),
+          })
+          .eq('id', id);
+
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        }
+      }
+
+      // Update role
+      if (data.role) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .update({ role: data.role })
+          .eq('user_id', id);
+
+        if (roleError) {
+          console.error('Error updating role:', roleError);
+        }
+      }
+
+      await refreshUsers();
+
+      // Update current user if editing self
+      if (id === user?.id) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          const userData = await fetchUserData(currentUser);
+          setUser(userData);
+        }
+      }
+    } catch (error) {
+      console.error('Update user error:', error);
+    }
   };
 
-  const deleteUser = (id: string) => {
-    // Prevent deleting yourself
+  const deleteUser = async (id: string) => {
     if (id === user?.id) return;
-    setUsers(prev => prev.filter(u => u.id !== id));
+
+    try {
+      // Delete from profiles (will cascade to user_roles via auth.users)
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting user:', error);
+      }
+
+      await refreshUsers();
+    } catch (error) {
+      console.error('Delete user error:', error);
+    }
   };
 
   return (
@@ -98,13 +342,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         users,
         isAuthenticated: !!user,
+        isLoading,
         login,
+        signup,
         logout,
         hasRole,
         canEdit,
         addUser,
         updateUser,
         deleteUser,
+        refreshUsers,
       }}
     >
       {children}
@@ -119,3 +366,16 @@ export function useAuth() {
   }
   return context;
 }
+
+// Re-export types for compatibility
+export const ROLE_LABELS: Record<UserRole, string> = {
+  operator: 'Operator',
+  supervisor: 'Supervisor',
+  admin: 'Administrator',
+};
+
+export const ROLE_COLORS: Record<UserRole, string> = {
+  operator: 'bg-blue-100 text-blue-800',
+  supervisor: 'bg-purple-100 text-purple-800',
+  admin: 'bg-red-100 text-red-800',
+};

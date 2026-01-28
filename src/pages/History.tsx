@@ -53,10 +53,10 @@ export function History() {
     navigate(`/planner?edit=${id}`);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!canDelete) return;
     if (confirmDelete === id) {
-      deleteShift(id);
+      await deleteShift(id);
       setConfirmDelete(null);
     } else {
       setConfirmDelete(id);

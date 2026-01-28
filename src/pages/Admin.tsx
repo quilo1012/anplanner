@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Header } from '@/components/Header';
-import { useAuth } from '@/contexts/AuthContext';
-import { User, UserRole, ROLE_LABELS, ROLE_COLORS } from '@/types/auth';
-import { Plus, Edit, Trash2, Save, X, Users, Shield } from 'lucide-react';
+import { useAuth, User, UserRole, ROLE_LABELS, ROLE_COLORS } from '@/contexts/AuthContext';
+import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2 } from 'lucide-react';
 
 export function Admin() {
   const { users, user: currentUser, addUser, updateUser, deleteUser } = useAuth();
@@ -24,46 +23,66 @@ export function Admin() {
     setEditingId(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError('');
 
-    if (editingId) {
-      updateUser(editingId, {
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        ...(formData.password ? { password: formData.password } : {}),
-      });
-    } else {
-      addUser({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        role: formData.role,
-      });
+    try {
+      if (editingId) {
+        await updateUser(editingId, {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+        });
+      } else {
+        const result = await addUser({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+        });
+        if (!result.success) {
+          setSubmitError(result.error || 'Failed to create user');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      resetForm();
+    } catch (error) {
+      setSubmitError('An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    resetForm();
   };
 
-  const startEdit = (user: User & { password: string }) => {
+  const startEdit = (userToEdit: User) => {
     setFormData({
-      name: user.name,
-      email: user.email,
+      name: userToEdit.name,
+      email: userToEdit.email,
       password: '',
-      role: user.role,
+      role: userToEdit.role,
     });
-    setEditingId(user.id);
+    setEditingId(userToEdit.id);
     setIsAdding(false);
+    setSubmitError('');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirmDelete === id) {
-      deleteUser(id);
+      await deleteUser(id);
       setConfirmDelete(null);
     } else {
       setConfirmDelete(id);
     }
+  };
+
+  const handleStartAdding = () => {
+    setIsAdding(true);
+    setSubmitError('');
   };
 
   return (
@@ -86,7 +105,7 @@ export function Admin() {
               </div>
               {!isAdding && !editingId && (
                 <button
-                  onClick={() => setIsAdding(true)}
+                  onClick={handleStartAdding}
                   className="btn-primary"
                 >
                   <Plus size={18} />
@@ -147,12 +166,17 @@ export function Admin() {
                     </select>
                   </div>
                 </div>
+                {submitError && (
+                  <div className="mb-4 p-3 bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 rounded text-sm text-[hsl(var(--destructive))]">
+                    {submitError}
+                  </div>
+                )}
                 <div className="flex gap-2">
-                  <button type="submit" className="btn-primary">
-                    <Save size={16} />
+                  <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                     {editingId ? 'Update' : 'Create'}
                   </button>
-                  <button type="button" onClick={resetForm} className="btn-secondary">
+                  <button type="button" onClick={resetForm} className="btn-secondary" disabled={isSubmitting}>
                     <X size={16} />
                     Cancel
                   </button>
