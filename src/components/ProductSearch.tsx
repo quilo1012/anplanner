@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Package, Loader2 } from 'lucide-react';
+import { Search, Package, Loader2, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface Product {
   id: string;
@@ -23,6 +24,8 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [skuNotFound, setSkuNotFound] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -49,10 +52,13 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
     const searchProducts = async () => {
       if (query.length < 2) {
         setResults([]);
+        setSkuNotFound(false);
+        setHasSearched(false);
         return;
       }
 
       setIsLoading(true);
+      setHasSearched(true);
       try {
         const { data, error } = await supabase
           .from('products')
@@ -67,6 +73,16 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
         }
 
         setResults(data || []);
+        
+        // Check if exact SKU match exists
+        const exactMatch = data?.find(p => p.sku.toLowerCase() === query.toLowerCase());
+        setSkuNotFound(!exactMatch && query.length >= 2);
+        
+        if (exactMatch && !selectedProduct) {
+          // Auto-select if exact match
+          setSelectedProduct(exactMatch);
+          onChange(exactMatch.sku, exactMatch);
+        }
       } catch (error) {
         console.error('Error searching products:', error);
       } finally {
@@ -83,12 +99,14 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
     setQuery(newValue);
     setIsOpen(true);
     setSelectedProduct(null);
+    setSkuNotFound(false);
     onChange(newValue);
   };
 
   const handleSelectProduct = (product: Product) => {
     setQuery(product.sku);
     setSelectedProduct(product);
+    setSkuNotFound(false);
     setIsOpen(false);
     onChange(product.sku, product);
   };
@@ -111,7 +129,7 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
           onFocus={handleFocus}
           disabled={disabled}
           placeholder={placeholder}
-          className="input-field pl-9 pr-8"
+          className={`input-field pl-9 pr-8 ${skuNotFound && hasSearched && !isOpen ? 'border-[hsl(var(--warning))]' : ''}`}
           maxLength={50}
         />
         {isLoading && (
@@ -119,12 +137,25 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
         )}
       </div>
 
+      {/* SKU not found warning */}
+      {skuNotFound && hasSearched && !isOpen && !selectedProduct && query.length >= 2 && (
+        <div className="mt-2 p-2 bg-[hsl(40,95%,90%)] border border-[hsl(40,80%,70%)] rounded-md flex items-center gap-2">
+          <AlertTriangle size={14} className="text-[hsl(var(--warning-foreground))] flex-shrink-0" />
+          <span className="text-sm text-[hsl(var(--warning-foreground))]">
+            SKU not found in product database
+          </span>
+          <Badge variant="outline" className="ml-auto text-xs bg-[hsl(var(--background))]">
+            Manual entry allowed
+          </Badge>
+        </div>
+      )}
+
       {/* Selected product info */}
       {selectedProduct && (
-        <div className="mt-2 p-2 bg-[hsl(var(--muted))] rounded-md text-sm">
+        <div className="mt-2 p-2 bg-[hsl(145,65%,95%)] border border-[hsl(145,50%,80%)] rounded-md text-sm">
           <div className="flex items-center gap-2">
-            <Package size={14} className="text-[hsl(var(--primary))]" />
-            <span className="font-medium">{selectedProduct.name}</span>
+            <Package size={14} className="text-[hsl(var(--success))]" />
+            <span className="font-medium text-[hsl(var(--success))]">{selectedProduct.name}</span>
           </div>
           {selectedProduct.description && (
             <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1 line-clamp-2">
@@ -160,10 +191,16 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
         </div>
       )}
 
-      {/* No results */}
+      {/* No results message */}
       {isOpen && query.length >= 2 && results.length === 0 && !isLoading && (
-        <div className="absolute z-50 w-full mt-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-md shadow-lg p-3 text-sm text-[hsl(var(--muted-foreground))]">
-          No products found for "{query}"
+        <div className="absolute z-50 w-full mt-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-md shadow-lg p-3">
+          <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+            <AlertTriangle size={14} className="text-[hsl(40,80%,45%)]" />
+            <span>No products found for "<strong>{query}</strong>"</span>
+          </div>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+            You can still enter the product name manually
+          </p>
         </div>
       )}
     </div>

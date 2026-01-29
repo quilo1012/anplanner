@@ -51,9 +51,21 @@
     @apply border-border;
   }
 
+  html {
+    /* Fallback background to prevent white flash */
+    background-color: hsl(210, 15%, 97%);
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
 }
 
