@@ -10,252 +10,169 @@ import { LeaderPerformanceChart } from '@/components/LeaderPerformanceChart';
 import { StatCard } from '@/components/StatCard';
 import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Factory } from 'lucide-react';
 import factoryImage from '@/assets/factory-line.jpg';
-
 interface ShiftRanking {
   shift: ShiftType;
   avgPerformance: number;
   totalShifts: number;
   metTargets: number;
 }
-
 interface LineRanking {
   line: string;
   avgPerformance: number;
   totalShifts: number;
   metTargets: number;
 }
-
 interface LeaderRanking {
   leader: string;
   avgPerformance: number;
   totalShifts: number;
   metTargets: number;
 }
-
 interface TrendAlert {
   productionLine: string;
   shift: ShiftType;
   consecutiveCount: number;
   avgPerformance: number;
 }
-
 type ViewTab = 'shift' | 'line' | 'leader';
-
 export function Dashboard() {
-  const { shifts } = useShifts();
+  const {
+    shifts
+  } = useShifts();
   const [activeTab, setActiveTab] = useState<ViewTab>('shift');
-
   const today = new Date().toISOString().split('T')[0];
-
   const stats = useMemo(() => {
     const todayShifts = shifts.filter(s => s.date === today);
     const totalToday = todayShifts.length;
-    const avgPerformance = totalToday > 0
-      ? todayShifts.reduce((sum, s) => sum + s.performance, 0) / totalToday
-      : 0;
-
-    const allTimeAvg = shifts.length > 0
-      ? shifts.reduce((sum, s) => sum + s.performance, 0) / shifts.length
-      : 0;
-
+    const avgPerformance = totalToday > 0 ? todayShifts.reduce((sum, s) => sum + s.performance, 0) / totalToday : 0;
+    const allTimeAvg = shifts.length > 0 ? shifts.reduce((sum, s) => sum + s.performance, 0) / shifts.length : 0;
     const totalDowntime = shifts.reduce((sum, s) => sum + s.totalDowntime, 0);
-
-    return { totalToday, avgPerformance, allTimeAvg, totalDowntime };
+    return {
+      totalToday,
+      avgPerformance,
+      allTimeAvg,
+      totalDowntime
+    };
   }, [shifts, today]);
-
   const shiftRankings = useMemo((): ShiftRanking[] => {
-    const byShift: Record<ShiftType, ShiftReport[]> = { Day: [], Night: [] };
-    
+    const byShift: Record<ShiftType, ShiftReport[]> = {
+      Day: [],
+      Night: []
+    };
     shifts.forEach(s => {
       byShift[s.shift].push(s);
     });
-
     return (['Day', 'Night'] as ShiftType[]).map(shift => {
       const shiftData = byShift[shift];
       const totalShifts = shiftData.length;
-      const avgPerformance = totalShifts > 0
-        ? shiftData.reduce((sum, s) => sum + s.performance, 0) / totalShifts
-        : 0;
+      const avgPerformance = totalShifts > 0 ? shiftData.reduce((sum, s) => sum + s.performance, 0) / totalShifts : 0;
       const metTargets = shiftData.filter(s => s.performance >= 95).length;
-
-      return { shift, avgPerformance, totalShifts, metTargets };
+      return {
+        shift,
+        avgPerformance,
+        totalShifts,
+        metTargets
+      };
     });
   }, [shifts]);
-
   const lineRankings = useMemo((): LineRanking[] => {
     const byLine: Record<string, ShiftReport[]> = {};
-    
     shifts.forEach(s => {
       if (!byLine[s.productionLine]) byLine[s.productionLine] = [];
       byLine[s.productionLine].push(s);
     });
-
-    return Object.entries(byLine)
-      .map(([line, lineShifts]) => ({
-        line,
-        avgPerformance: lineShifts.reduce((sum, s) => sum + s.performance, 0) / lineShifts.length,
-        totalShifts: lineShifts.length,
-        metTargets: lineShifts.filter(s => s.performance >= 95).length,
-      }))
-      .sort((a, b) => b.avgPerformance - a.avgPerformance);
+    return Object.entries(byLine).map(([line, lineShifts]) => ({
+      line,
+      avgPerformance: lineShifts.reduce((sum, s) => sum + s.performance, 0) / lineShifts.length,
+      totalShifts: lineShifts.length,
+      metTargets: lineShifts.filter(s => s.performance >= 95).length
+    })).sort((a, b) => b.avgPerformance - a.avgPerformance);
   }, [shifts]);
-
   const leaderRankings = useMemo((): LeaderRanking[] => {
     const byLeader: Record<string, ShiftReport[]> = {};
-    
     shifts.forEach(s => {
       if (!s.lineLeader) return;
       if (!byLeader[s.lineLeader]) byLeader[s.lineLeader] = [];
       byLeader[s.lineLeader].push(s);
     });
-
-    return Object.entries(byLeader)
-      .map(([leader, leaderShifts]) => ({
-        leader,
-        avgPerformance: leaderShifts.reduce((sum, s) => sum + s.performance, 0) / leaderShifts.length,
-        totalShifts: leaderShifts.length,
-        metTargets: leaderShifts.filter(s => s.performance >= 95).length,
-      }))
-      .sort((a, b) => b.avgPerformance - a.avgPerformance);
+    return Object.entries(byLeader).map(([leader, leaderShifts]) => ({
+      leader,
+      avgPerformance: leaderShifts.reduce((sum, s) => sum + s.performance, 0) / leaderShifts.length,
+      totalShifts: leaderShifts.length,
+      metTargets: leaderShifts.filter(s => s.performance >= 95).length
+    })).sort((a, b) => b.avgPerformance - a.avgPerformance);
   }, [shifts]);
-
   const trendAlerts = useMemo((): TrendAlert[] => {
     const alerts: TrendAlert[] = [];
     const groups: Record<string, ShiftReport[]> = {};
-    
     shifts.forEach(s => {
       const key = `${s.productionLine}|${s.shift}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(s);
     });
-
     Object.entries(groups).forEach(([key, records]) => {
-      const sorted = [...records].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-
+      const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       if (sorted.length >= 3) {
         const last3 = sorted.slice(0, 3);
         const allBelow95 = last3.every(r => r.performance < 95);
-        
         if (allBelow95) {
           const [productionLine, shift] = key.split('|');
           const avgPerf = last3.reduce((sum, r) => sum + r.performance, 0) / 3;
-          
           alerts.push({
             productionLine,
             shift: shift as ShiftType,
             consecutiveCount: 3,
-            avgPerformance: avgPerf,
+            avgPerformance: avgPerf
           });
         }
       }
     });
-
     return alerts;
   }, [shifts]);
-
   const getPerformanceClass = (performance: number) => {
     if (performance >= 90) return 'performance-green';
     if (performance >= 75) return 'performance-yellow';
     return 'performance-red';
   };
-
   const getPerformanceVariant = (performance: number): 'success' | 'warning' | 'danger' => {
     if (performance >= 90) return 'success';
     if (performance >= 75) return 'warning';
     return 'danger';
   };
-
   const handleExportRanking = () => {
     exportToCsv(shifts, 'shift_ranking');
   };
-
-  return (
-    <>
-      <Header
-        title="Dashboard"
-        subtitle={`Overview - ${formatDate(today)}`}
-      />
+  return <>
+      <Header title="Dashboard" subtitle={`Overview - ${formatDate(today)}`} />
 
       <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Hero Section */}
         <div className="relative h-32 sm:h-48 rounded-xl overflow-hidden">
-          <img 
-            src={factoryImage} 
-            alt="Production Line" 
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--sidebar-bg))]/90 to-transparent flex items-center">
-            <div className="p-4 sm:p-8">
-              <h2 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Production Overview</h2>
-              <p className="text-white/80 text-sm sm:text-base hidden sm:block">Monitor real-time performance and track your production goals</p>
-            </div>
-          </div>
+          <img alt="Production Line" className="w-full h-full object-cover" src="/lovable-uploads/6c1c29eb-a379-4283-98a8-9074ddada082.png" />
+          
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard
-            title="Today's Shifts"
-            value={stats.totalToday}
-            icon={<Calendar size={24} className="text-[hsl(var(--primary))]" />}
-            subtitle="shifts registered"
-          />
-          <StatCard
-            title="Today's Performance"
-            value={`${stats.avgPerformance.toFixed(1)}%`}
-            icon={<Target size={24} className="text-[hsl(var(--primary))]" />}
-            variant={getPerformanceVariant(stats.avgPerformance)}
-          />
-          <StatCard
-            title="Total Shifts"
-            value={shifts.length}
-            icon={<Activity size={24} className="text-[hsl(var(--primary))]" />}
-            subtitle="all time"
-          />
-          <StatCard
-            title="Trend Alerts"
-            value={trendAlerts.length}
-            icon={<AlertTriangle size={24} className={trendAlerts.length > 0 ? 'text-[hsl(var(--destructive))]' : 'text-[hsl(var(--success))]'} />}
-            variant={trendAlerts.length > 0 ? 'danger' : 'success'}
-          />
+          <StatCard title="Today's Shifts" value={stats.totalToday} icon={<Calendar size={24} className="text-[hsl(var(--primary))]" />} subtitle="shifts registered" />
+          <StatCard title="Today's Performance" value={`${stats.avgPerformance.toFixed(1)}%`} icon={<Target size={24} className="text-[hsl(var(--primary))]" />} variant={getPerformanceVariant(stats.avgPerformance)} />
+          <StatCard title="Total Shifts" value={shifts.length} icon={<Activity size={24} className="text-[hsl(var(--primary))]" />} subtitle="all time" />
+          <StatCard title="Trend Alerts" value={trendAlerts.length} icon={<AlertTriangle size={24} className={trendAlerts.length > 0 ? 'text-[hsl(var(--destructive))]' : 'text-[hsl(var(--success))]'} />} variant={trendAlerts.length > 0 ? 'danger' : 'success'} />
         </div>
 
         {/* Performance View Tabs */}
         <div className="card">
           <div className="p-3 sm:p-4 border-b border-[hsl(var(--border))]">
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setActiveTab('shift')}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
-                  activeTab === 'shift' 
-                    ? 'bg-[hsl(var(--primary))] text-white' 
-                    : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'
-                }`}
-              >
+              <button onClick={() => setActiveTab('shift')} className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'shift' ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'}`}>
                 <Clock size={16} />
                 By Shift
               </button>
-              <button
-                onClick={() => setActiveTab('line')}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
-                  activeTab === 'line' 
-                    ? 'bg-[hsl(var(--primary))] text-white' 
-                    : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'
-                }`}
-              >
+              <button onClick={() => setActiveTab('line')} className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'line' ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'}`}>
                 <Factory size={16} />
                 By Line
               </button>
-              <button
-                onClick={() => setActiveTab('leader')}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
-                  activeTab === 'leader' 
-                    ? 'bg-[hsl(var(--primary))] text-white' 
-                    : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'
-                }`}
-              >
+              <button onClick={() => setActiveTab('leader')} className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'leader' ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted))]/80'}`}>
                 <Users size={16} />
                 By Leader
               </button>
@@ -263,22 +180,13 @@ export function Dashboard() {
           </div>
 
           <div className="p-3 sm:p-4">
-            {activeTab === 'shift' && (
-              <div className="grid grid-cols-1 gap-6">
+            {activeTab === 'shift' && <div className="grid grid-cols-1 gap-6">
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Day vs Night Performance</h3>
                   <PerformanceChart shifts={shifts} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  {shiftRankings.map(ranking => (
-                    <div
-                      key={ranking.shift}
-                      className={`p-3 sm:p-5 rounded-xl border-2 ${
-                        ranking.shift === 'Day'
-                          ? 'bg-gradient-to-br from-[hsl(40,95%,97%)] to-[hsl(40,90%,92%)] border-[hsl(40,80%,70%)]'
-                          : 'bg-gradient-to-br from-[hsl(220,40%,97%)] to-[hsl(220,35%,92%)] border-[hsl(220,40%,75%)]'
-                      }`}
-                    >
+                  {shiftRankings.map(ranking => <div key={ranking.shift} className={`p-3 sm:p-5 rounded-xl border-2 ${ranking.shift === 'Day' ? 'bg-gradient-to-br from-[hsl(40,95%,97%)] to-[hsl(40,90%,92%)] border-[hsl(40,80%,70%)]' : 'bg-gradient-to-br from-[hsl(220,40%,97%)] to-[hsl(220,35%,92%)] border-[hsl(220,40%,75%)]'}`}>
                       <div className="flex items-center justify-between mb-2 sm:mb-3">
                         <h4 className="font-bold text-sm sm:text-base">
                           {ranking.shift === 'Day' ? '☀️ Day' : '🌙 Night'}
@@ -297,14 +205,11 @@ export function Dashboard() {
                           <p className="font-bold">{ranking.metTargets}</p>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
-              </div>
-            )}
+              </div>}
 
-            {activeTab === 'line' && (
-              <div className="grid grid-cols-1 gap-6">
+            {activeTab === 'line' && <div className="grid grid-cols-1 gap-6">
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Performance by Line</h3>
                   <LinePerformanceChart shifts={shifts} />
@@ -312,18 +217,9 @@ export function Dashboard() {
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Line Rankings</h3>
                   <div className="space-y-2 max-h-64 overflow-auto">
-                    {lineRankings.map((ranking, idx) => (
-                      <div
-                        key={ranking.line}
-                        className="flex items-center justify-between p-3 bg-[hsl(var(--muted))] rounded-lg"
-                      >
+                    {lineRankings.map((ranking, idx) => <div key={ranking.line} className="flex items-center justify-between p-3 bg-[hsl(var(--muted))] rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                            idx === 1 ? 'bg-gray-300 text-gray-700' :
-                            idx === 2 ? 'bg-amber-600 text-white' :
-                            'bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]'
-                          }`}>
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-400 text-yellow-900' : idx === 1 ? 'bg-gray-300 text-gray-700' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]'}`}>
                             {idx + 1}
                           </span>
                           <span className="font-medium">{ranking.line}</span>
@@ -336,15 +232,12 @@ export function Dashboard() {
                             {ranking.avgPerformance.toFixed(1)}%
                           </span>
                         </div>
-                      </div>
-                    ))}
+                      </div>)}
                   </div>
                 </div>
-              </div>
-            )}
+              </div>}
 
-            {activeTab === 'leader' && (
-              <div className="grid grid-cols-1 gap-6">
+            {activeTab === 'leader' && <div className="grid grid-cols-1 gap-6">
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Performance by Leader</h3>
                   <LeaderPerformanceChart shifts={shifts} />
@@ -352,18 +245,9 @@ export function Dashboard() {
                 <div>
                   <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4">Leader Rankings</h3>
                   <div className="space-y-2 max-h-64 overflow-auto">
-                    {leaderRankings.map((ranking, idx) => (
-                      <div
-                        key={ranking.leader}
-                        className="flex items-center justify-between p-3 bg-[hsl(var(--muted))] rounded-lg"
-                      >
+                    {leaderRankings.map((ranking, idx) => <div key={ranking.leader} className="flex items-center justify-between p-3 bg-[hsl(var(--muted))] rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                            idx === 1 ? 'bg-gray-300 text-gray-700' :
-                            idx === 2 ? 'bg-amber-600 text-white' :
-                            'bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]'
-                          }`}>
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-400 text-yellow-900' : idx === 1 ? 'bg-gray-300 text-gray-700' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]'}`}>
                             {idx + 1}
                           </span>
                           <span className="font-medium">{ranking.leader}</span>
@@ -376,12 +260,10 @@ export function Dashboard() {
                             {ranking.avgPerformance.toFixed(1)}%
                           </span>
                         </div>
-                      </div>
-                    ))}
+                      </div>)}
                   </div>
                 </div>
-              </div>
-            )}
+              </div>}
           </div>
         </div>
 
@@ -406,18 +288,11 @@ export function Dashboard() {
           </div>
           
           <div className="p-4">
-            {trendAlerts.length === 0 ? (
-              <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+            {trendAlerts.length === 0 ? <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
                 <div className="text-4xl mb-2">✅</div>
                 <p>No trend alerts at the moment</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {trendAlerts.map((alert, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-4 bg-[hsl(0,85%,97%)] border border-[hsl(0,60%,85%)] rounded-lg"
-                  >
+              </div> : <div className="space-y-3">
+                {trendAlerts.map((alert, idx) => <div key={idx} className="flex items-center justify-between p-4 bg-[hsl(0,85%,97%)] border border-[hsl(0,60%,85%)] rounded-lg">
                     <div>
                       <p className="font-semibold text-[hsl(var(--foreground))]">
                         {alert.productionLine}
@@ -429,16 +304,13 @@ export function Dashboard() {
                     <div className="performance-red text-lg">
                       {alert.avgPerformance.toFixed(1)}%
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  </div>)}
+              </div>}
           </div>
         </div>
 
         {/* Recent Shifts */}
-        {shifts.length > 0 && (
-          <div className="card">
+        {shifts.length > 0 && <div className="card">
             <div className="p-4 border-b border-[hsl(var(--border))] flex justify-between items-center">
               <h2 className="font-semibold text-[hsl(var(--foreground))]">
                 Recent Shifts
@@ -462,15 +334,10 @@ export function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shifts.slice(0, 5).map(shift => (
-                    <tr key={shift.id}>
+                  {shifts.slice(0, 5).map(shift => <tr key={shift.id}>
                       <td>{formatDate(shift.date)}</td>
                       <td>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          shift.shift === 'Day'
-                            ? 'bg-[hsl(40,95%,90%)] text-[hsl(40,80%,30%)]'
-                            : 'bg-[hsl(220,40%,90%)] text-[hsl(220,60%,35%)]'
-                        }`}>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${shift.shift === 'Day' ? 'bg-[hsl(40,95%,90%)] text-[hsl(40,80%,30%)]' : 'bg-[hsl(220,40%,90%)] text-[hsl(220,60%,35%)]'}`}>
                           {shift.shift}
                         </span>
                       </td>
@@ -483,14 +350,11 @@ export function Dashboard() {
                           {shift.performance.toFixed(1)}%
                         </span>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>)}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          </div>}
       </div>
-    </>
-  );
+    </>;
 }
