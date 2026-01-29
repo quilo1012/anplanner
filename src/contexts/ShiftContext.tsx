@@ -61,11 +61,16 @@ function mapDbToShift(row: any, downtimes: any[]): ShiftReport {
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
   const [shifts, setShifts] = useState<ShiftReport[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const refreshShifts = useCallback(async () => {
+    // Don't fetch if auth is still loading or user not authenticated
+    if (authLoading) {
+      return;
+    }
+
     if (!isAuthenticated) {
       setShifts([]);
       setIsLoading(false);
@@ -112,12 +117,14 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
-  // Load shifts when authenticated
+  // Load shifts only when auth is resolved and user is authenticated
   useEffect(() => {
-    refreshShifts();
-  }, [refreshShifts]);
+    if (!authLoading) {
+      refreshShifts();
+    }
+  }, [authLoading, refreshShifts]);
 
   const uploadPhoto = async (base64Photo: string, filename: string): Promise<string | null> => {
     try {
