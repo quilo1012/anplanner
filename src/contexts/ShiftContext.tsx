@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 interface ShiftContextType {
   shifts: ShiftReport[];
   isLoading: boolean;
+  error: string | null;
   addShift: (data: ShiftFormData) => Promise<void>;
   updateShift: (id: string, data: ShiftFormData) => Promise<void>;
   deleteShift: (id: string) => Promise<void>;
@@ -61,17 +62,20 @@ function mapDbToShift(row: any, downtimes: any[]): ShiftReport {
 export function ShiftProvider({ children }: { children: ReactNode }) {
   const [shifts, setShifts] = useState<ShiftReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated } = useAuth();
 
   const refreshShifts = useCallback(async () => {
     if (!isAuthenticated) {
       setShifts([]);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
     try {
       setIsLoading(true);
+      setError(null);
 
       // Fetch shifts
       const { data: shiftsData, error: shiftsError } = await supabase
@@ -81,6 +85,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       if (shiftsError) {
         console.error('Error fetching shifts:', shiftsError);
+        setError('Failed to load shifts. Please try again.');
+        setShifts([]);
         return;
       }
 
@@ -91,6 +97,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       if (downtimesError) {
         console.error('Error fetching downtimes:', downtimesError);
+        // Non-critical - continue with shifts
       }
 
       const mappedShifts = (shiftsData || []).map(row => 
@@ -98,8 +105,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       );
 
       setShifts(mappedShifts);
-    } catch (error) {
-      console.error('Error refreshing shifts:', error);
+    } catch (err) {
+      console.error('Error refreshing shifts:', err);
+      setError('An unexpected error occurred. Please reload the page.');
+      setShifts([]);
     } finally {
       setIsLoading(false);
     }
@@ -302,7 +311,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ShiftContext.Provider value={{ shifts, isLoading, addShift, updateShift, deleteShift, getShiftById, refreshShifts }}>
+    <ShiftContext.Provider value={{ shifts, isLoading, error, addShift, updateShift, deleteShift, getShiftById, refreshShifts }}>
       {children}
     </ShiftContext.Provider>
   );

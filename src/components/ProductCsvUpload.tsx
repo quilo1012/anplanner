@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface ProductCsvUploadProps {
   onClose: () => void;
@@ -14,75 +15,155 @@ interface ParsedProduct {
   description?: string;
 }
 
+// Header aliases for flexible column matching
+const SKU_ALIASES = ['sku', 'codigo', 'código', 'code', 'product code', 'product_code', 'productcode', 'item code', 'item_code'];
+const NAME_ALIASES = ['name', 'nome', 'product', 'produto', 'product description', 'description', 'product name', 'product_name', 'productname', 'item', 'item name'];
+const PRICE_ALIASES = ['price', 'preço', 'preco', 'valor', 'unit price', 'unit_price'];
+const DESC_ALIASES = ['description', 'descrição', 'descricao', 'desc', 'details', 'notes'];
+
+// Remove BOM and invisible characters from string
+function cleanString(str: string): string {
+  return str
+    .replace(/^\uFEFF/, '') // Remove UTF-8 BOM
+    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+    .replace(/[""'']/g, '"') // Normalize quotes
+    .trim();
+}
+
+// Normalize header for matching
+function normalizeHeader(header: string): string {
+  return cleanString(header)
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9\s_]/g, '')
+    .trim();
+}
+
+// Find column index by checking against aliases
+function findColumnIndex(headers: string[], aliases: string[]): number {
+  for (let i = 0; i < headers.length; i++) {
+    const normalized = normalizeHeader(headers[i]);
+    if (aliases.some(alias => normalized === alias || normalized.includes(alias))) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ success: number; failed: number } | null>(null);
+  const [result, setResult] = useState<{ success: number; failed: number; skipped: number } | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseCSV = (content: string): ParsedProduct[] => {
-    const lines = content.split('\n').filter(line => line.trim());
+    // Remove BOM from content start
+    const cleanContent = cleanString(content);
+    
+    const lines = cleanContent.split(/\r?\n/).filter(line => line.trim());
     if (lines.length < 2) {
       throw new Error('CSV must have a header row and at least one data row');
     }
 
-    // Parse header
-    const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
-    const skuIndex = header.findIndex(h => h === 'sku' || h === 'código' || h === 'codigo');
-    const nameIndex = header.findIndex(h => h === 'name' || h === 'nome' || h === 'product' || h === 'produto');
-    const priceIndex = header.findIndex(h => h === 'price' || h === 'preço' || h === 'preco' || h === 'valor');
-    const descIndex = header.findIndex(h => h === 'description' || h === 'descrição' || h === 'descricao' || h === 'desc');
+    // Parse header with normalization
+    const headerLine = lines[0];
+    const headers = parseCSVLine(headerLine);
+    
+    const skuIndex = findColumnIndex(headers, SKU_ALIASES);
+    const nameIndex = findColumnIndex(headers, NAME_ALIASES);
+    const priceIndex = findColumnIndex(headers, PRICE_ALIASES);
+    const descIndex = findColumnIndex(headers, DESC_ALIASES);
 
     if (skuIndex === -1) {
-      throw new Error('CSV must have a "sku" or "codigo" column');
+      throw new Error('CSV must have a SKU column (e.g., "sku", "codigo", "code")');
     }
     if (nameIndex === -1) {
-      throw new Error('CSV must have a "name" or "nome" column');
+      throw new Error('CSV must have a Name column (e.g., "name", "product", "description")');
     }
 
-    const products: ParsedProduct[] = [];
+    // Use Map for deduplication (last occurrence wins)
+    const productMap = new Map<string, ParsedProduct>();
+    let skippedRows = 0;
     
     for (let i = 1; i < lines.length; i++) {
-      const line = lines[i];
-      // Handle quoted values with commas
-      const values: string[] = [];
-      let current = '';
-      let inQuotes = false;
-      
-      for (const char of line) {
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          values.push(current.trim().replace(/^"|"$/g, ''));
-          current = '';
-        } else {
-          current += char;
+      try {
+        const line = lines[i];
+        if (!line.trim()) continue;
+        
+        const values = parseCSVLine(line);
+
+        const sku = cleanString(values[skuIndex] || '');
+        const name = cleanString(values[nameIndex] || '');
+
+        // Skip rows with empty SKU or name
+        if (!sku || !name) {
+          skippedRows++;
+          continue;
         }
-      }
-      values.push(current.trim().replace(/^"|"$/g, ''));
 
-      const sku = values[skuIndex]?.trim();
-      const name = values[nameIndex]?.trim();
-
-      if (sku && name) {
         const product: ParsedProduct = { sku, name };
         
         if (priceIndex !== -1 && values[priceIndex]) {
-          const price = parseFloat(values[priceIndex].replace(/[^0-9.-]/g, ''));
-          if (!isNaN(price)) {
+          const priceStr = cleanString(values[priceIndex]);
+          const price = parseFloat(priceStr.replace(/[^0-9.-]/g, ''));
+          if (!isNaN(price) && price >= 0) {
             product.price = price;
           }
         }
         
         if (descIndex !== -1 && values[descIndex]) {
-          product.description = values[descIndex];
+          const desc = cleanString(values[descIndex]);
+          if (desc) {
+            product.description = desc;
+          }
         }
 
-        products.push(product);
+        // Store in map (overwrites duplicates)
+        productMap.set(sku.toLowerCase(), product);
+      } catch (rowError) {
+        console.warn(`Skipping malformed row ${i + 1}:`, rowError);
+        skippedRows++;
       }
     }
 
-    return products;
+    if (skippedRows > 0) {
+      console.log(`Skipped ${skippedRows} rows due to missing/invalid data`);
+    }
+
+    return Array.from(productMap.values());
+  };
+
+  // Parse a single CSV line handling quoted values
+  const parseCSVLine = (line: string): string[] => {
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    
+    // Clean up values (remove surrounding quotes)
+    return values.map(v => v.replace(/^["']|["']$/g, '').trim());
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,44 +173,67 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
     setError(null);
     setResult(null);
     setIsUploading(true);
+    setProgress(0);
+    setProgressText('Reading file...');
 
     try {
       const content = await file.text();
+      setProgress(10);
+      setProgressText('Parsing CSV...');
+      
       const products = parseCSV(content);
 
       if (products.length === 0) {
-        throw new Error('No valid products found in CSV');
+        throw new Error('No valid products found in CSV. Ensure columns "sku" and "name" exist with data.');
       }
+
+      setProgress(20);
+      setProgressText(`Found ${products.length} unique products. Uploading...`);
 
       // Insert products in batches
       const batchSize = 100;
       let successCount = 0;
       let failedCount = 0;
+      const totalBatches = Math.ceil(products.length / batchSize);
 
       for (let i = 0; i < products.length; i += batchSize) {
+        const batchNum = Math.floor(i / batchSize) + 1;
         const batch = products.slice(i, i + batchSize);
         
-        const { error: insertError } = await supabase
-          .from('products')
-          .upsert(
-            batch.map(p => ({
-              sku: p.sku,
-              name: p.name,
-              price: p.price || null,
-              description: p.description || null,
-            })),
-            { onConflict: 'sku', ignoreDuplicates: false }
-          );
+        setProgressText(`Uploading batch ${batchNum}/${totalBatches}...`);
+        
+        try {
+          const { error: insertError } = await supabase
+            .from('products')
+            .upsert(
+              batch.map(p => ({
+                sku: p.sku,
+                name: p.name,
+                price: p.price || null,
+                description: p.description || null,
+              })),
+              { onConflict: 'sku', ignoreDuplicates: false }
+            );
 
-        if (insertError) {
-          console.error('Batch insert error:', insertError);
+          if (insertError) {
+            console.error('Batch insert error:', insertError);
+            failedCount += batch.length;
+          } else {
+            successCount += batch.length;
+          }
+        } catch (batchError) {
+          console.error('Batch error:', batchError);
           failedCount += batch.length;
-        } else {
-          successCount += batch.length;
         }
+        
+        // Update progress (20-90% range for uploads)
+        const uploadProgress = 20 + (70 * (i + batch.length) / products.length);
+        setProgress(Math.min(90, uploadProgress));
       }
 
-      setResult({ success: successCount, failed: failedCount });
+      setProgress(100);
+      setProgressText('Complete!');
+      setResult({ success: successCount, failed: failedCount, skipped: 0 });
       
       if (successCount > 0) {
         setTimeout(() => {
@@ -137,6 +241,7 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
         }, 2000);
       }
     } catch (err) {
+      console.error('CSV processing error:', err);
       setError(err instanceof Error ? err.message : 'Failed to process CSV');
     } finally {
       setIsUploading(false);
@@ -168,10 +273,13 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
                 </div>
                 <h4 className="font-medium mb-2">Upload CSV File</h4>
                 <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                  CSV must have columns: <strong>sku</strong> and <strong>name</strong>
+                  Required columns: <strong>sku</strong> and <strong>name</strong>
                 </p>
                 <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                  Optional columns: price, description
+                  Optional: price, description
+                </p>
+                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2 italic">
+                  Accepts various header formats (SKU, Codigo, Code, etc.)
                 </p>
               </div>
 
@@ -186,14 +294,18 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
                 />
                 <div className={`border-2 border-dashed border-[hsl(var(--border))] rounded-lg p-6 text-center cursor-pointer hover:border-[hsl(var(--primary))] transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   {isUploading ? (
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="flex flex-col items-center gap-3">
                       <Loader2 size={24} className="animate-spin text-[hsl(var(--primary))]" />
-                      <span className="text-sm">Processing...</span>
+                      <span className="text-sm">{progressText}</span>
+                      <Progress value={progress} className="w-full h-2" />
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
                       <Upload size={24} className="text-[hsl(var(--muted-foreground))]" />
                       <span className="text-sm">Click to select CSV file</span>
+                      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                        Supports 1000+ products
+                      </span>
                     </div>
                   )}
                 </div>
