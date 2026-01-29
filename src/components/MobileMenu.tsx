@@ -44,7 +44,8 @@ export function MobileMenu() {
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-[hsl(var(--sidebar-bg))] text-white z-40 flex items-center justify-between px-4">
         <div className="flex items-center gap-3">
           <img alt="Applied Nutrition" className="h-8 w-auto bg-white rounded p-0.5" src="/lovable-uploads/e6f738cf-c192-4d42-850c-683a672b9a14.jpg" />
-          <span className="font-semibold text-sm">Shift Report</span>
+          <span className="font-semibold text-sm">
+        </span>
         </div>
         <button onClick={() => setIsOpen(!isOpen)} className="p-2 hover:bg-[hsl(var(--sidebar-hover))] rounded-lg transition-colors">
           {isOpen ? <X size={24} /> : <Menu size={24} />}
