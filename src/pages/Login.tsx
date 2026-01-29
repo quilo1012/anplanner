@@ -159,15 +159,8 @@ export function Login() {
 
       {/* Right side - Image */}
       <div className="hidden lg:block lg:w-1/2 relative">
-        <img src={factoryImage} alt="Factory Line" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--primary))]/80 to-[hsl(var(--primary))]/40 flex items-center justify-center">
-          <div className="text-center text-white p-8">
-            <h2 className="text-4xl font-bold mb-4">Shift Report App</h2>
-            <p className="text-xl opacity-90">
-              Production monitoring and performance tracking
-            </p>
-          </div>
-        </div>
+        <img alt="Factory Line" className="absolute inset-0 w-full h-full object-cover" src="/lovable-uploads/0dc2c5a0-ccdf-4149-a315-72d92eeab162.png" />
+        
       </div>
     </div>;
 }
