@@ -122,36 +122,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state
   useEffect(() => {
-    // Set up auth state listener BEFORE checking session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+    let isMounted = true;
+
+    // Check initial session FIRST
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+        
         if (session?.user) {
           const userData = await fetchUserData(session.user);
-          setUser(userData);
-          if (userData?.role === 'admin') {
-            await refreshUsers();
+          if (isMounted) {
+            setUser(userData);
+            if (userData?.role === 'admin') {
+              await refreshUsers();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Set up auth state listener for subsequent changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted) return;
+
+        // Skip initial session event since we handle it above
+        if (event === 'INITIAL_SESSION') return;
+
+        if (session?.user) {
+          const userData = await fetchUserData(session.user);
+          if (isMounted) {
+            setUser(userData);
+            if (userData?.role === 'admin') {
+              await refreshUsers();
+            }
           }
         } else {
-          setUser(null);
-          setUsers([]);
+          if (isMounted) {
+            setUser(null);
+            setUsers([]);
+          }
         }
-        setIsLoading(false);
       }
     );
 
-    // Check initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const userData = await fetchUserData(session.user);
-        setUser(userData);
-        if (userData?.role === 'admin') {
-          await refreshUsers();
-        }
-      }
-      setIsLoading(false);
-    });
-
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
