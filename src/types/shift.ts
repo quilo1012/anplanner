@@ -1,6 +1,6 @@
 import { StructuredDowntime, DowntimeCategory, DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from './downtime';
 
-export type ShiftType = 'Day' | 'Night';
+export type ShiftType = 'A' | 'B' | 'C';
 
 // Legacy downtime type (kept for backward compatibility)
 export type DowntimeReason = 
@@ -42,6 +42,8 @@ export interface ShiftReport {
   totalDowntime: number;
   monitoringPhoto?: string;
   photoFilename?: string;
+  staffPlanned: number;
+  staffActual: number;
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +63,8 @@ export interface ShiftFormData {
   structuredDowntimes?: StructuredDowntime[];
   monitoringPhoto?: string;
   photoFilename?: string;
+  staffPlanned: number;
+  staffActual: number;
 }
 
 export const DOWNTIME_REASONS: DowntimeReason[] = [
@@ -70,6 +74,8 @@ export const DOWNTIME_REASONS: DowntimeReason[] = [
   'setup',
   'other'
 ];
+
+export const SHIFT_TYPES: ShiftType[] = ['A', 'B', 'C'];
 
 export type { StructuredDowntime, DowntimeCategory };
 export { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY };

@@ -20,8 +20,8 @@ export function StructuredDowntimeForm({
   const addDowntime = () => {
     const newDowntime: StructuredDowntime = {
       id: `sdt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      category: 'machine',
-      reason: 'breakdown',
+      category: 'maintenance',
+      reason: 'cleaning',
       duration: 0,
       comment: '',
     };
@@ -60,9 +60,9 @@ export function StructuredDowntimeForm({
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-[hsl(var(--foreground))]">Downtime / Line Stops</h3>
+          <h3 className="font-semibold text-foreground">Downtime / Line Stops</h3>
           {downtimes.length > 0 && (
-            <p className={`text-sm ${exceedsThreshold ? 'text-[hsl(var(--destructive))] font-medium' : 'text-[hsl(var(--muted-foreground))]'}`}>
+            <p className={`text-sm ${exceedsThreshold ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
               Total: {totalDowntime} minutes
               {exceedsThreshold && (
                 <span className="ml-2 inline-flex items-center gap-1">
@@ -84,28 +84,28 @@ export function StructuredDowntimeForm({
       </div>
 
       {downtimes.length === 0 ? (
-        <p className="text-sm text-[hsl(var(--muted-foreground))] italic py-4 text-center border border-dashed border-[hsl(var(--border))] rounded-lg">
+        <p className="text-sm text-muted-foreground italic py-4 text-center border border-dashed border-border rounded-lg">
           No downtime recorded for this shift
         </p>
       ) : (
         <div className="space-y-3">
           {downtimes.map((downtime, index) => {
-            const availableReasons = DOWNTIME_REASONS_BY_CATEGORY[downtime.category];
+            const availableReasons = DOWNTIME_REASONS_BY_CATEGORY[downtime.category] || [];
             const requiresComment = downtime.category === 'other';
             
             return (
               <div
                 key={downtime.id}
-                className="p-4 bg-white rounded-lg border border-[hsl(var(--border))]"
+                className="p-4 bg-card rounded-lg border border-border"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                  <span className="text-sm font-medium text-foreground">
                     Stop #{index + 1}
                   </span>
                   <button
                     type="button"
                     onClick={() => removeDowntime(downtime.id)}
-                    className="text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10 p-1 rounded transition-colors"
+                    className="text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -160,13 +160,13 @@ export function StructuredDowntimeForm({
                   {/* Comment */}
                   <div>
                     <label className="label text-xs">
-                      Comment {requiresComment && <span className="text-[hsl(var(--destructive))]">*</span>}
+                      Comment {requiresComment && <span className="text-destructive">*</span>}
                     </label>
                     <input
                       type="text"
                       value={downtime.comment || ''}
                       onChange={e => updateDowntime(downtime.id, 'comment', e.target.value)}
-                      className={`input-field text-sm ${requiresComment && !downtime.comment ? 'border-[hsl(var(--destructive))]' : ''}`}
+                      className={`input-field text-sm ${requiresComment && !downtime.comment ? 'border-destructive' : ''}`}
                       placeholder={requiresComment ? 'Required for Other' : 'Optional'}
                       maxLength={150}
                     />
@@ -180,7 +180,7 @@ export function StructuredDowntimeForm({
 
       {/* Alert Box */}
       {exceedsThreshold && (
-        <div className="mt-4 p-3 bg-[hsl(0,85%,97%)] border border-[hsl(0,60%,85%)] rounded-lg flex items-center gap-2 text-sm text-[hsl(var(--destructive))]">
+        <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2 text-sm text-destructive">
           <AlertTriangle size={18} />
           <span>
             Total downtime ({totalDowntime} min) exceeds the threshold of {downtimeThreshold} minutes. 

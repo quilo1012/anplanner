@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ShiftReport, ShiftFormData, StructuredDowntime } from '@/types/shift';
+import { ShiftReport, ShiftFormData, StructuredDowntime, ShiftType } from '@/types/shift';
 import { useAuth } from './AuthContext';
 
 interface ShiftContextType {
@@ -25,6 +25,21 @@ function calculateTotalDowntime(structuredDowntimes?: StructuredDowntime[]): num
   return structuredDowntimes?.reduce((total, d) => total + d.duration, 0) || 0;
 }
 
+// Map database shift_type to ShiftType
+function mapDbShiftType(dbType: string): ShiftType {
+  const upper = dbType?.toUpperCase();
+  if (upper === 'A' || upper === 'B' || upper === 'C') return upper as ShiftType;
+  // Legacy mapping
+  if (dbType === 'day' || dbType === 'Day') return 'A';
+  if (dbType === 'night' || dbType === 'Night') return 'B';
+  return 'A';
+}
+
+// Map ShiftType to database shift_type
+function mapShiftTypeToDb(shift: ShiftType): string {
+  return shift.toLowerCase();
+}
+
 // Map database row to ShiftReport
 function mapDbToShift(row: any, downtimes: any[]): ShiftReport {
   const shiftDowntimes = downtimes.filter(d => d.shift_id === row.id);
@@ -39,7 +54,7 @@ function mapDbToShift(row: any, downtimes: any[]): ShiftReport {
   return {
     id: row.id,
     date: row.date,
-    shift: row.shift_type === 'day' ? 'Day' : 'Night',
+    shift: mapDbShiftType(row.shift_type),
     productionLine: row.production_line,
     lineLeader: row.line_leader,
     product: row.product_name,
@@ -53,6 +68,8 @@ function mapDbToShift(row: any, downtimes: any[]): ShiftReport {
     totalDowntime: calculateTotalDowntime(structuredDowntimes),
     monitoringPhoto: row.monitoring_photo_url || undefined,
     photoFilename: row.monitoring_photo_url ? row.monitoring_photo_url.split('/').pop() : undefined,
+    staffPlanned: row.staff_planned || 0,
+    staffActual: row.staff_actual || 0,
     isArchived: row.is_archived,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -181,7 +198,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         .from('shifts')
         .insert({
           date: data.date,
-          shift_type: data.shift === 'Day' ? 'day' : 'night',
+          shift_type: mapShiftTypeToDb(data.shift),
           production_line: data.productionLine,
           line_leader: data.lineLeader,
           product_name: data.product,
@@ -192,6 +209,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           comments: data.observations || null,
           is_archived: false,
           monitoring_photo_url: photoUrl,
+          staff_planned: data.staffPlanned || 0,
+          staff_actual: data.staffActual || 0,
           created_by: user.id,
         })
         .select()
@@ -247,7 +266,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         .from('shifts')
         .update({
           date: data.date,
-          shift_type: data.shift === 'Day' ? 'day' : 'night',
+          shift_type: mapShiftTypeToDb(data.shift),
           production_line: data.productionLine,
           line_leader: data.lineLeader,
           product_name: data.product,
@@ -256,6 +275,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           real_production: data.realProduction,
           performance: performance,
           comments: data.observations || null,
+          staff_planned: data.staffPlanned || 0,
+          staff_actual: data.staffActual || 0,
           ...(photoUrl && { monitoring_photo_url: photoUrl }),
         })
         .eq('id', id);
