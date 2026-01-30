@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftType } from '@/types/shift';
+import { ShiftType, SHIFT_TYPES } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
 import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock, Factory, Users } from 'lucide-react';
 
@@ -131,8 +131,9 @@ export function History() {
                 className="select-field w-full sm:w-32 text-sm"
               >
                 <option value="">All</option>
-                <option value="Day">☀️ Day</option>
-                <option value="Night">🌙 Night</option>
+                {SHIFT_TYPES.map(s => (
+                  <option key={s} value={s}>Shift {s}</option>
+                ))}
               </select>
             </div>
 
@@ -197,7 +198,7 @@ export function History() {
 
         {/* Permission notice */}
         {!canEdit && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-xs sm:text-sm text-blue-700">
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg flex items-center gap-2 text-xs sm:text-sm text-primary">
             <Lock size={16} className="flex-shrink-0" />
             <span>Editing and deleting shifts requires Supervisor or Admin access.</span>
           </div>
@@ -207,7 +208,7 @@ export function History() {
         {filteredShifts.length === 0 ? (
           <div className="card p-8 sm:p-12 text-center">
             <div className="text-4xl sm:text-6xl mb-4">📋</div>
-            <p className="text-[hsl(var(--muted-foreground))] mb-4">
+            <p className="text-muted-foreground mb-4">
               No shifts found.
             </p>
             <button
@@ -226,12 +227,8 @@ export function History() {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <p className="font-medium">{formatDate(shift.date)}</p>
-                      <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${
-                        shift.shift === 'Day'
-                          ? 'bg-[hsl(40,95%,90%)] text-[hsl(40,80%,30%)]'
-                          : 'bg-[hsl(220,40%,90%)] text-[hsl(220,60%,35%)]'
-                      }`}>
-                        {shift.shift === 'Day' ? '☀️ Day' : '🌙 Night'}
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                        Shift {shift.shift}
                       </span>
                     </div>
                     <span className={getPerformanceClass(shift.performance)}>
@@ -241,31 +238,31 @@ export function History() {
                   
                   <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                     <div>
-                      <span className="text-[hsl(var(--muted-foreground))]">Line:</span>
+                      <span className="text-muted-foreground">Line:</span>
                       <span className="ml-1 font-medium">{shift.productionLine}</span>
                     </div>
                     <div>
-                      <span className="text-[hsl(var(--muted-foreground))]">Leader:</span>
+                      <span className="text-muted-foreground">Leader:</span>
                       <span className="ml-1 font-medium">{shift.lineLeader}</span>
                     </div>
                     <div>
-                      <span className="text-[hsl(var(--muted-foreground))]">Planned:</span>
+                      <span className="text-muted-foreground">Planned:</span>
                       <span className="ml-1 font-medium">{shift.productionTarget.toLocaleString()}</span>
                     </div>
                     <div>
-                      <span className="text-[hsl(var(--muted-foreground))]">Actual:</span>
+                      <span className="text-muted-foreground">Actual:</span>
                       <span className="ml-1 font-medium">{shift.realProduction.toLocaleString()}</span>
                     </div>
                     {shift.sku && (
                       <div className="col-span-2">
-                        <span className="text-[hsl(var(--muted-foreground))]">SKU:</span>
+                        <span className="text-muted-foreground">SKU:</span>
                         <span className="ml-1 font-medium">{shift.sku}</span>
                       </div>
                     )}
                   </div>
 
                   {(canEdit || canDelete) && (
-                    <div className="flex gap-2 pt-3 border-t border-[hsl(var(--border))]">
+                    <div className="flex gap-2 pt-3 border-t border-border">
                       {canEdit && (
                         <button
                           onClick={() => handleEdit(shift.id)}
@@ -280,8 +277,8 @@ export function History() {
                           onClick={() => handleDelete(shift.id)}
                           className={`flex-1 text-sm py-2 rounded-md ${
                             confirmDelete === shift.id
-                              ? 'bg-[hsl(var(--destructive))] text-white'
-                              : 'btn-secondary text-[hsl(var(--destructive))]'
+                              ? 'bg-destructive text-destructive-foreground'
+                              : 'btn-secondary text-destructive'
                           }`}
                         >
                           <Trash2 size={14} className="inline mr-1" />
@@ -309,8 +306,8 @@ export function History() {
                     <th>Actual</th>
                     <th>Performance</th>
                     <th>Downtime</th>
+                    <th>Staff</th>
                     <th>Photo</th>
-                    <th>Notes</th>
                     {(canEdit || canDelete) && <th>Actions</th>}
                   </tr>
                 </thead>
@@ -319,18 +316,14 @@ export function History() {
                     <tr key={shift.id}>
                       <td className="whitespace-nowrap">{formatDate(shift.date)}</td>
                       <td>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          shift.shift === 'Day'
-                            ? 'bg-[hsl(40,95%,90%)] text-[hsl(40,80%,30%)]'
-                            : 'bg-[hsl(220,40%,90%)] text-[hsl(220,60%,35%)]'
-                        }`}>
-                          {shift.shift === 'Day' ? '☀️ Day' : '🌙 Night'}
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
+                          Shift {shift.shift}
                         </span>
                       </td>
                       <td>{shift.productionLine}</td>
                       <td>{shift.lineLeader}</td>
-                      <td>{shift.product || '-'}</td>
-                      <td>{shift.sku || '-'}</td>
+                      <td className="max-w-[120px] truncate">{shift.product || '-'}</td>
+                      <td className="font-mono text-xs">{shift.sku || '-'}</td>
                       <td className="text-right font-medium">{shift.productionTarget.toLocaleString()}</td>
                       <td className="text-right font-medium">{shift.realProduction.toLocaleString()}</td>
                       <td>
@@ -339,21 +332,23 @@ export function History() {
                         </span>
                       </td>
                       <td className="text-right">{shift.totalDowntime} min</td>
+                      <td className="text-center">
+                        <span className={shift.staffActual < shift.staffPlanned ? 'text-destructive font-medium' : ''}>
+                          {shift.staffActual}/{shift.staffPlanned}
+                        </span>
+                      </td>
                       <td>
                         {shift.monitoringPhoto ? (
                           <button
                             onClick={() => setPreviewPhoto(shift.monitoringPhoto!)}
-                            className="p-1.5 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
+                            className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
                             title="View photo"
                           >
                             <Image size={16} />
                           </button>
                         ) : (
-                          <span className="text-[hsl(var(--muted-foreground))]">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
-                      </td>
-                      <td className="max-w-[150px] truncate" title={shift.observations}>
-                        {shift.observations || '-'}
                       </td>
                       {(canEdit || canDelete) && (
                         <td>
@@ -361,7 +356,7 @@ export function History() {
                             {canEdit && (
                               <button
                                 onClick={() => handleEdit(shift.id)}
-                                className="p-1.5 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
+                                className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
                                 title="Edit"
                               >
                                 <Edit size={16} />
@@ -372,8 +367,8 @@ export function History() {
                                 onClick={() => handleDelete(shift.id)}
                                 className={`p-1.5 rounded transition-colors ${
                                   confirmDelete === shift.id
-                                    ? 'bg-[hsl(var(--destructive))] text-white'
-                                    : 'text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10'
+                                    ? 'bg-destructive text-destructive-foreground'
+                                    : 'text-destructive hover:bg-destructive/10'
                                 }`}
                                 title={confirmDelete === shift.id ? 'Confirm delete?' : 'Delete'}
                               >
@@ -400,7 +395,7 @@ export function History() {
             <div className="relative max-w-4xl max-h-[90vh]">
               <button
                 onClick={() => setPreviewPhoto(null)}
-                className="absolute -top-3 -right-3 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+                className="absolute -top-3 -right-3 p-2 bg-card rounded-full shadow-lg hover:bg-muted transition-colors"
               >
                 <X size={20} />
               </button>

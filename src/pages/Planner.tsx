@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
@@ -8,12 +8,12 @@ import { ProductSearch } from '@/components/ProductSearch';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftFormData, ShiftType, Downtime, StructuredDowntime } from '@/types/shift';
-import { Save, RotateCcw, X, User, ClipboardCheck, Lock, FileSpreadsheet, TrendingUp, Factory, Users, Package } from 'lucide-react';
+import { ShiftFormData, ShiftType, StructuredDowntime, SHIFT_TYPES } from '@/types/shift';
+import { Save, RotateCcw, X, User, ClipboardCheck, Lock, FileSpreadsheet, Package, Users } from 'lucide-react';
 
 const initialFormData: ShiftFormData = {
   date: new Date().toISOString().split('T')[0],
-  shift: 'Day',
+  shift: 'A',
   productionLine: '',
   lineLeader: '',
   product: '',
@@ -25,6 +25,8 @@ const initialFormData: ShiftFormData = {
   structuredDowntimes: [],
   monitoringPhoto: undefined,
   photoFilename: undefined,
+  staffPlanned: 0,
+  staffActual: 0,
 };
 
 export function Planner() {
@@ -32,7 +34,7 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { shifts, addShift, updateShift, getShiftById } = useShifts();
+  const { addShift, updateShift, getShiftById } = useShifts();
   const { user, hasRole } = useAuth();
   const [formData, setFormData] = useState<ShiftFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -42,23 +44,6 @@ export function Planner() {
 
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
-
-  // Calculate averages for the current line and leader
-  const lineStats = useMemo(() => {
-    if (!formData.productionLine) return null;
-    const lineShifts = shifts.filter(s => s.productionLine === formData.productionLine);
-    if (lineShifts.length === 0) return null;
-    const avg = lineShifts.reduce((sum, s) => sum + s.performance, 0) / lineShifts.length;
-    return { count: lineShifts.length, avg: Math.round(avg * 10) / 10 };
-  }, [shifts, formData.productionLine]);
-
-  const leaderStats = useMemo(() => {
-    if (!formData.lineLeader) return null;
-    const leaderShifts = shifts.filter(s => s.lineLeader === formData.lineLeader);
-    if (leaderShifts.length === 0) return null;
-    const avg = leaderShifts.reduce((sum, s) => sum + s.performance, 0) / leaderShifts.length;
-    return { count: leaderShifts.length, avg: Math.round(avg * 10) / 10 };
-  }, [shifts, formData.lineLeader]);
 
   useEffect(() => {
     if (editId) {
@@ -78,6 +63,8 @@ export function Planner() {
           structuredDowntimes: shift.structuredDowntimes || [],
           monitoringPhoto: shift.monitoringPhoto,
           photoFilename: shift.photoFilename,
+          staffPlanned: shift.staffPlanned || 0,
+          staffActual: shift.staffActual || 0,
         });
       }
     }
@@ -107,6 +94,7 @@ export function Planner() {
       product: product?.name || prev.product,
     }));
   };
+
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
     setFormData(prev => ({ 
       ...prev, 
@@ -134,6 +122,9 @@ export function Planner() {
     }
     if (!formData.lineLeader.trim()) {
       newErrors.lineLeader = 'Line Leader is required';
+    }
+    if (!formData.sku.trim()) {
+      newErrors.sku = 'SKU is required';
     }
     if (!formData.productionTarget || formData.productionTarget <= 0) {
       newErrors.productionTarget = 'Target must be greater than 0';
@@ -182,9 +173,9 @@ export function Planner() {
     : '0.0';
 
   const getPerformanceClass = (perf: number) => {
-    if (perf >= 90) return 'text-[hsl(var(--success))] bg-[hsl(145,65%,95%)]';
-    if (perf >= 75) return 'text-[hsl(40,80%,35%)] bg-[hsl(40,95%,95%)]';
-    return 'text-[hsl(var(--destructive))] bg-[hsl(0,85%,95%)]';
+    if (perf >= 90) return 'text-success bg-success/10';
+    if (perf >= 75) return 'text-warning bg-warning/10';
+    return 'text-destructive bg-destructive/10';
   };
 
   return (
@@ -194,7 +185,7 @@ export function Planner() {
         subtitle={isOperator ? 'Enter planned production data' : 'Record and review production data'}
       />
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Action Buttons */}
           {canReview && (
@@ -206,34 +197,29 @@ export function Planner() {
               >
                 <Package size={18} />
                 <span className="hidden sm:inline">Import Products</span>
-                <span className="sm:hidden">Products</span>
               </button>
               <button
                 onClick={() => setShowExcelUpload(true)}
                 className="btn-secondary"
               >
                 <FileSpreadsheet size={18} />
-                <span className="hidden sm:inline">Import Production Plan</span>
-                <span className="sm:hidden">Plan</span>
+                <span className="hidden sm:inline">Import Plan</span>
               </button>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Operator Entry Section */}
-            <div className="card p-6">
-              <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4 flex items-center gap-2 text-lg">
-                <User size={20} className="text-[hsl(var(--primary))]" />
-                Operator Entry
+            <div className="card p-4 sm:p-6">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
+                <User size={20} className="text-primary" />
+                Shift Information
               </h3>
-              <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                Basic shift information entered by the production operator
-              </p>
               
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label htmlFor="date" className="label">
-                    Date <span className="text-[hsl(var(--destructive))]">*</span>
+                    Date <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="date"
@@ -241,10 +227,10 @@ export function Planner() {
                     name="date"
                     value={formData.date}
                     onChange={handleChange}
-                    className={`input-field ${errors.date ? 'border-[hsl(var(--destructive))]' : ''}`}
+                    className={`input-field ${errors.date ? 'border-destructive' : ''}`}
                   />
                   {errors.date && (
-                    <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.date}</p>
+                    <p className="text-sm text-destructive mt-1">{errors.date}</p>
                   )}
                 </div>
 
@@ -257,14 +243,15 @@ export function Planner() {
                     onChange={handleChange}
                     className="select-field"
                   >
-                    <option value="Day">☀️ Day Shift</option>
-                    <option value="Night">🌙 Night Shift</option>
+                    {SHIFT_TYPES.map(s => (
+                      <option key={s} value={s}>Shift {s}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
                   <label htmlFor="productionLine" className="label">
-                    Production Line <span className="text-[hsl(var(--destructive))]">*</span>
+                    Production Line <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="text"
@@ -272,18 +259,18 @@ export function Planner() {
                     name="productionLine"
                     value={formData.productionLine}
                     onChange={handleChange}
-                    placeholder="e.g., Line 1, Line A"
-                    className={`input-field ${errors.productionLine ? 'border-[hsl(var(--destructive))]' : ''}`}
+                    placeholder="e.g., Line 1"
+                    className={`input-field ${errors.productionLine ? 'border-destructive' : ''}`}
                     maxLength={50}
                   />
                   {errors.productionLine && (
-                    <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.productionLine}</p>
+                    <p className="text-sm text-destructive mt-1">{errors.productionLine}</p>
                   )}
                 </div>
 
                 <div>
                   <label htmlFor="lineLeader" className="label">
-                    Line Leader <span className="text-[hsl(var(--destructive))]">*</span>
+                    Line Leader <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="text"
@@ -292,33 +279,19 @@ export function Planner() {
                     value={formData.lineLeader}
                     onChange={handleChange}
                     placeholder="Leader name"
-                    className={`input-field ${errors.lineLeader ? 'border-[hsl(var(--destructive))]' : ''}`}
+                    className={`input-field ${errors.lineLeader ? 'border-destructive' : ''}`}
                     maxLength={100}
                   />
                   {errors.lineLeader && (
-                    <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.lineLeader}</p>
+                    <p className="text-sm text-destructive mt-1">{errors.lineLeader}</p>
                   )}
                 </div>
 
-                <div>
-                  <label htmlFor="product" className="label">Product Name</label>
-                  <input
-                    type="text"
-                    id="product"
-                    name="product"
-                    value={formData.product}
-                    onChange={handleChange}
-                    placeholder="Product name"
-                    className="input-field"
-                    maxLength={100}
-                  />
-                </div>
-
+                {/* SKU Field - Now first in product section */}
                 <div>
                   <label htmlFor="sku" className="label flex items-center gap-2">
                     <Package size={14} />
-                    SKU
-                    {canReview && <span className="text-xs text-[hsl(var(--muted-foreground))]">(autocomplete)</span>}
+                    SKU <span className="text-destructive">*</span>
                   </label>
                   {canReview ? (
                     <ProductSearch
@@ -334,15 +307,36 @@ export function Planner() {
                       value={formData.sku}
                       onChange={handleChange}
                       placeholder="SKU code"
-                      className="input-field"
+                      className={`input-field ${errors.sku ? 'border-destructive' : ''}`}
                       maxLength={50}
                     />
                   )}
+                  {errors.sku && (
+                    <p className="text-sm text-destructive mt-1">{errors.sku}</p>
+                  )}
+                </div>
+
+                {/* Product Name - Auto-filled */}
+                <div>
+                  <label htmlFor="product" className="label">
+                    Product Name
+                    <span className="text-xs text-muted-foreground ml-1">(auto-filled)</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="product"
+                    name="product"
+                    value={formData.product}
+                    onChange={handleChange}
+                    placeholder="Auto-filled from SKU"
+                    className="input-field"
+                    maxLength={100}
+                  />
                 </div>
 
                 <div>
                   <label htmlFor="productionTarget" className="label">
-                    Planned Quantity <span className="text-[hsl(var(--destructive))]">*</span>
+                    Planned Quantity <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="number"
@@ -352,82 +346,70 @@ export function Planner() {
                     onChange={handleChange}
                     min="1"
                     placeholder="0"
-                    className={`input-field ${errors.productionTarget ? 'border-[hsl(var(--destructive))]' : ''}`}
+                    className={`input-field ${errors.productionTarget ? 'border-destructive' : ''}`}
                   />
                   {errors.productionTarget && (
-                    <p className="text-sm text-[hsl(var(--destructive))] mt-1">{errors.productionTarget}</p>
+                    <p className="text-sm text-destructive mt-1">{errors.productionTarget}</p>
                   )}
                 </div>
               </div>
             </div>
 
-            {canReview && (lineStats || leaderStats) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {lineStats && (
-                  <div className="card p-4 flex items-center gap-4">
-                    <div className="p-3 bg-[hsl(var(--muted))] rounded-lg">
-                      <Factory size={24} className="text-[hsl(var(--primary))]" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                        {formData.productionLine} Average
-                      </p>
-                      <p className={`text-xl font-bold ${
-                        lineStats.avg >= 90 ? 'text-[hsl(var(--success))]' :
-                        lineStats.avg >= 75 ? 'text-yellow-600' :
-                        'text-[hsl(var(--destructive))]'
-                      }`}>
-                        {lineStats.avg}%
-                      </p>
-                      <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                        {lineStats.count} shifts recorded
-                      </p>
-                    </div>
+            {/* Staffing Section - Supervisor Only */}
+            {canReview && (
+              <div className="card p-4 sm:p-6">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
+                  <Users size={20} className="text-primary" />
+                  Staffing
+                </h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="staffPlanned" className="label">Staff Planned</label>
+                    <input
+                      type="number"
+                      id="staffPlanned"
+                      name="staffPlanned"
+                      value={formData.staffPlanned || ''}
+                      onChange={handleChange}
+                      min="0"
+                      placeholder="0"
+                      className="input-field"
+                    />
                   </div>
-                )}
-                {leaderStats && (
-                  <div className="card p-4 flex items-center gap-4">
-                    <div className="p-3 bg-[hsl(var(--muted))] rounded-lg">
-                      <Users size={24} className="text-[hsl(var(--primary))]" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                        {formData.lineLeader} Average
-                      </p>
-                      <p className={`text-xl font-bold ${
-                        leaderStats.avg >= 90 ? 'text-[hsl(var(--success))]' :
-                        leaderStats.avg >= 75 ? 'text-yellow-600' :
-                        'text-[hsl(var(--destructive))]'
-                      }`}>
-                        {leaderStats.avg}%
-                      </p>
-                      <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                        {leaderStats.count} shifts recorded
-                      </p>
-                    </div>
+
+                  <div>
+                    <label htmlFor="staffActual" className="label">Staff Actual</label>
+                    <input
+                      type="number"
+                      id="staffActual"
+                      name="staffActual"
+                      value={formData.staffActual || ''}
+                      onChange={handleChange}
+                      min="0"
+                      placeholder="0"
+                      className="input-field"
+                    />
                   </div>
-                )}
+                </div>
               </div>
             )}
 
             {/* Supervisor Review Section */}
-            <div className={`card p-6 border-l-4 ${canReview ? 'border-l-[hsl(var(--primary))]' : 'border-l-gray-300'}`}>
-              <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4 flex items-center gap-2 text-lg">
-                <ClipboardCheck size={20} className={canReview ? 'text-[hsl(var(--primary))]' : 'text-gray-400'} />
-                Supervisor Review
+            <div className={`card p-4 sm:p-6 border-l-4 ${canReview ? 'border-l-primary' : 'border-l-muted'}`}>
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
+                <ClipboardCheck size={20} className={canReview ? 'text-primary' : 'text-muted-foreground'} />
+                Production Results
                 {!canReview && (
-                  <span className="ml-auto flex items-center gap-1 text-sm font-normal text-[hsl(var(--muted-foreground))]">
+                  <span className="ml-auto flex items-center gap-1 text-sm font-normal text-muted-foreground">
                     <Lock size={14} />
                     Supervisor access required
                   </span>
                 )}
               </h3>
-              <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                Production results and observations reviewed by the supervisor
-              </p>
               
               <div className={`${!canReview ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                   <div>
                     <label htmlFor="realProduction" className="label">Actual Production</label>
                     <input
@@ -444,10 +426,7 @@ export function Planner() {
                   </div>
 
                   <div>
-                    <label className="label flex items-center gap-2">
-                      <TrendingUp size={14} />
-                      Current Performance
-                    </label>
+                    <label className="label">Performance</label>
                     <div className={`input-field font-bold text-lg ${getPerformanceClass(parseFloat(performance))}`}>
                       {performance}%
                     </div>
@@ -471,19 +450,19 @@ export function Planner() {
                 </div>
 
                 {/* Structured Downtime Section */}
-                <div className="mb-6 p-4 bg-[hsl(var(--muted))] rounded-lg">
+                <div className="mb-6 p-4 bg-muted rounded-lg">
                   <StructuredDowntimeForm
                     downtimes={formData.structuredDowntimes || []}
                     onChange={handleStructuredDowntimesChange}
                     downtimeThreshold={60}
                   />
                   {errors.downtimes && (
-                    <p className="text-sm text-[hsl(var(--destructive))] mt-2">{errors.downtimes}</p>
+                    <p className="text-sm text-destructive mt-2">{errors.downtimes}</p>
                   )}
                 </div>
 
                 {/* Photo Upload */}
-                <div className="p-4 bg-[hsl(var(--muted))] rounded-lg">
+                <div className="p-4 bg-muted rounded-lg">
                   <PhotoUpload
                     photo={formData.monitoringPhoto}
                     filename={formData.photoFilename}
@@ -495,14 +474,14 @@ export function Planner() {
 
             {/* Actions */}
             <div className="card p-4">
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="btn-primary flex-1"
+                  className="btn-primary flex-1 min-w-[150px]"
                 >
                   <Save size={18} />
-                  {isSubmitting ? 'Saving...' : editId ? 'Update Shift' : (canReview ? 'Archive Shift' : 'Save Planned Shift')}
+                  {isSubmitting ? 'Saving...' : editId ? 'Update Shift' : 'Save Shift'}
                 </button>
                 <button
                   type="button"

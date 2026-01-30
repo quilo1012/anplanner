@@ -1,4 +1,4 @@
-export type DowntimeCategory = 'machine' | 'material' | 'people' | 'process' | 'other';
+export type DowntimeCategory = 'maintenance' | 'quality' | 'health_safety' | 'warehouse' | 'staff' | 'other';
 
 export interface DowntimeReason {
   value: string;
@@ -6,39 +6,53 @@ export interface DowntimeReason {
 }
 
 export const DOWNTIME_CATEGORIES: { value: DowntimeCategory; label: string }[] = [
-  { value: 'machine', label: 'Machine' },
-  { value: 'material', label: 'Material' },
-  { value: 'people', label: 'People' },
-  { value: 'process', label: 'Process' },
+  { value: 'maintenance', label: 'Maintenance Issues' },
+  { value: 'quality', label: 'Quality Issues' },
+  { value: 'health_safety', label: 'Health & Safety' },
+  { value: 'warehouse', label: 'Warehouse' },
+  { value: 'staff', label: 'Staff' },
   { value: 'other', label: 'Other' },
 ];
 
 export const DOWNTIME_REASONS_BY_CATEGORY: Record<DowntimeCategory, DowntimeReason[]> = {
-  machine: [
-    { value: 'breakdown', label: 'Machine Breakdown' },
-    { value: 'maintenance', label: 'Scheduled Maintenance' },
-    { value: 'calibration', label: 'Calibration Required' },
-    { value: 'power_failure', label: 'Power Failure' },
-    { value: 'sensor_issue', label: 'Sensor Issue' },
-  ],
-  material: [
-    { value: 'shortage', label: 'Material Shortage' },
-    { value: 'quality_issue', label: 'Material Quality Issue' },
-    { value: 'wrong_material', label: 'Wrong Material Delivered' },
-    { value: 'waiting_delivery', label: 'Waiting for Delivery' },
-  ],
-  people: [
-    { value: 'absent', label: 'Operator Absent' },
-    { value: 'training', label: 'Training' },
-    { value: 'break', label: 'Extended Break' },
-    { value: 'shift_change', label: 'Shift Change Delay' },
-  ],
-  process: [
-    { value: 'setup', label: 'Setup / Changeover' },
+  maintenance: [
     { value: 'cleaning', label: 'Cleaning' },
-    { value: 'quality_check', label: 'Quality Check Hold' },
-    { value: 'approval_wait', label: 'Waiting for Approval' },
-    { value: 'battery_waiting', label: 'Battery Waiting' },
+    { value: 'line_prep', label: 'Line Prep' },
+    { value: 'blending', label: 'Blending' },
+    { value: 'deep_clean', label: 'Deep Clean' },
+    { value: 'blender_fault', label: 'Blender Fault' },
+    { value: 'filler_fault', label: 'Filler Fault' },
+    { value: 'labeller_fault', label: 'Labeller Fault' },
+    { value: 'printer_fault', label: 'Printer Fault' },
+    { value: 'conveyor_fault', label: 'Conveyor Fault' },
+    { value: 'electrical_fault', label: 'Electrical Fault' },
+    { value: 'sensor_fault', label: 'Sensor Fault' },
+  ],
+  quality: [
+    { value: 'sample_approval', label: 'Sample Approval' },
+    { value: 'line_approval', label: 'Line Approval' },
+    { value: 'metal_detected', label: 'Metal Detected' },
+    { value: 'leaks', label: 'Leaks' },
+    { value: 'reblend', label: 'Reblend' },
+  ],
+  health_safety: [
+    { value: 'incident', label: 'Safety Incident' },
+    { value: 'inspection', label: 'Safety Inspection' },
+    { value: 'ppe_issue', label: 'PPE Issue' },
+    { value: 'evacuation', label: 'Evacuation' },
+  ],
+  warehouse: [
+    { value: 'material_shortage', label: 'Material Shortage' },
+    { value: 'wrong_material', label: 'Wrong Material' },
+    { value: 'waiting_delivery', label: 'Waiting for Delivery' },
+    { value: 'pallet_issue', label: 'Pallet Issue' },
+  ],
+  staff: [
+    { value: 'new_staff', label: 'New Staff' },
+    { value: 'training', label: 'Training' },
+    { value: 'absent', label: 'Staff Absent' },
+    { value: 'break_extended', label: 'Extended Break' },
+    { value: 'shift_change', label: 'Shift Change Delay' },
   ],
   other: [
     { value: 'other', label: 'Other (specify in comment)' },

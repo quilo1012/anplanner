@@ -85,6 +85,8 @@ export type Database = {
           real_production: number
           shift_type: string
           sku: string | null
+          staff_actual: number | null
+          staff_planned: number | null
           updated_at: string
         }
         Insert: {
@@ -103,6 +105,8 @@ export type Database = {
           real_production?: number
           shift_type: string
           sku?: string | null
+          staff_actual?: number | null
+          staff_planned?: number | null
           updated_at?: string
         }
         Update: {
@@ -121,6 +125,8 @@ export type Database = {
           real_production?: number
           shift_type?: string
           sku?: string | null
+          staff_actual?: number | null
+          staff_planned?: number | null
           updated_at?: string
         }
         Relationships: []

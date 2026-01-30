@@ -10,7 +10,7 @@ import {
   ReferenceLine,
   Legend,
 } from 'recharts';
-import { ShiftReport } from '@/types/shift';
+import { ShiftReport, SHIFT_TYPES } from '@/types/shift';
 
 interface PerformanceTrendChartProps {
   shifts: ShiftReport[];
@@ -18,17 +18,16 @@ interface PerformanceTrendChartProps {
 
 export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
   const chartData = useMemo(() => {
-    // Group by date and calculate averages
-    const byDate: Record<string, { day: number[]; night: number[] }> = {};
+    // Group by date and calculate averages per shift
+    const byDate: Record<string, { a: number[]; b: number[]; c: number[] }> = {};
     
     shifts.forEach(s => {
       if (!byDate[s.date]) {
-        byDate[s.date] = { day: [], night: [] };
+        byDate[s.date] = { a: [], b: [], c: [] };
       }
-      if (s.shift === 'Day') {
-        byDate[s.date].day.push(s.performance);
-      } else {
-        byDate[s.date].night.push(s.performance);
+      const shiftKey = s.shift.toLowerCase() as 'a' | 'b' | 'c';
+      if (byDate[s.date][shiftKey]) {
+        byDate[s.date][shiftKey].push(s.performance);
       }
     });
 
@@ -37,24 +36,21 @@ export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
       .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
       .slice(-7)
       .map(([date, data]) => {
-        const dayAvg = data.day.length > 0 
-          ? Math.round(data.day.reduce((a, b) => a + b, 0) / data.day.length * 10) / 10 
-          : null;
-        const nightAvg = data.night.length > 0 
-          ? Math.round(data.night.reduce((a, b) => a + b, 0) / data.night.length * 10) / 10 
-          : null;
+        const calcAvg = (arr: number[]) => 
+          arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null;
         
         return {
           date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          day: dayAvg,
-          night: nightAvg,
+          a: calcAvg(data.a),
+          b: calcAvg(data.b),
+          c: calcAvg(data.c),
         };
       });
   }, [shifts]);
 
   if (chartData.length === 0) {
     return (
-      <div className="h-64 flex items-center justify-center text-[hsl(var(--muted-foreground))]">
+      <div className="h-64 flex items-center justify-center text-muted-foreground">
         No data available for trend analysis
       </div>
     );
@@ -93,20 +89,29 @@ export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
           />
           <Line 
             type="monotone" 
-            dataKey="day" 
-            name="☀️ Day Shift"
-            stroke="hsl(40, 95%, 50%)" 
+            dataKey="a" 
+            name="Shift A"
+            stroke="hsl(220, 70%, 50%)" 
             strokeWidth={2}
-            dot={{ fill: 'hsl(40, 95%, 50%)', strokeWidth: 2 }}
+            dot={{ fill: 'hsl(220, 70%, 50%)', strokeWidth: 2 }}
             connectNulls
           />
           <Line 
             type="monotone" 
-            dataKey="night" 
-            name="🌙 Night Shift"
-            stroke="hsl(220, 70%, 50%)" 
+            dataKey="b" 
+            name="Shift B"
+            stroke="hsl(145, 65%, 42%)" 
             strokeWidth={2}
-            dot={{ fill: 'hsl(220, 70%, 50%)', strokeWidth: 2 }}
+            dot={{ fill: 'hsl(145, 65%, 42%)', strokeWidth: 2 }}
+            connectNulls
+          />
+          <Line 
+            type="monotone" 
+            dataKey="c" 
+            name="Shift C"
+            stroke="hsl(40, 95%, 50%)" 
+            strokeWidth={2}
+            dot={{ fill: 'hsl(40, 95%, 50%)', strokeWidth: 2 }}
             connectNulls
           />
         </LineChart>

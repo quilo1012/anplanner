@@ -10,7 +10,7 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
-import { ShiftReport, ShiftType } from '@/types/shift';
+import { ShiftReport, ShiftType, SHIFT_TYPES } from '@/types/shift';
 
 interface PerformanceChartProps {
   shifts: ShiftReport[];
@@ -18,20 +18,22 @@ interface PerformanceChartProps {
 
 export function PerformanceChart({ shifts }: PerformanceChartProps) {
   const chartData = useMemo(() => {
-    const byShift: Record<ShiftType, ShiftReport[]> = { Day: [], Night: [] };
+    const byShift: Record<ShiftType, ShiftReport[]> = { A: [], B: [], C: [] };
     
     shifts.forEach(s => {
-      byShift[s.shift].push(s);
+      if (byShift[s.shift]) {
+        byShift[s.shift].push(s);
+      }
     });
 
-    return (['Day', 'Night'] as ShiftType[]).map(shift => {
+    return SHIFT_TYPES.map(shift => {
       const shiftData = byShift[shift];
       const avgPerformance = shiftData.length > 0
         ? shiftData.reduce((sum, s) => sum + s.performance, 0) / shiftData.length
         : 0;
       
       return {
-        name: shift === 'Day' ? '☀️ Day Shift' : '🌙 Night Shift',
+        name: `Shift ${shift}`,
         performance: Math.round(avgPerformance * 10) / 10,
         shifts: shiftData.length,
       };
