@@ -25,14 +25,15 @@ function calculateTotalDowntime(structuredDowntimes?: StructuredDowntime[]): num
   return structuredDowntimes?.reduce((total, d) => total + d.duration, 0) || 0;
 }
 
-// Map database shift_type to ShiftType
+// Map database shift_type to ShiftType (DAY/NIGHT)
 function mapDbShiftType(dbType: string): ShiftType {
   const upper = dbType?.toUpperCase();
-  if (upper === 'A' || upper === 'B' || upper === 'C') return upper as ShiftType;
-  // Legacy mapping
-  if (dbType === 'day' || dbType === 'Day') return 'A';
-  if (dbType === 'night' || dbType === 'Night') return 'B';
-  return 'A';
+  if (upper === 'DAY') return 'DAY';
+  if (upper === 'NIGHT') return 'NIGHT';
+  // Legacy mapping from A/B/C
+  if (upper === 'A' || upper === 'B') return 'DAY';
+  if (upper === 'C') return 'NIGHT';
+  return 'DAY';
 }
 
 // Map ShiftType to database shift_type

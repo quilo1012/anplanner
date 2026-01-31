@@ -10,7 +10,7 @@ import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Fa
 
 export function Dashboard() {
   const { shifts, isLoading } = useShifts();
-  const [selectedShift, setSelectedShift] = useState<ShiftType>('A');
+  const [selectedShift, setSelectedShift] = useState<ShiftType>('DAY');
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -126,7 +126,7 @@ export function Dashboard() {
 
   return (
     <>
-      <Header title="Dashboard" subtitle={`Shift ${selectedShift} - ${formatDate(today)}`} />
+      <Header title="Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(today)}`} />
 
       <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Welcome Message */}
@@ -147,7 +147,7 @@ export function Dashboard() {
                       : 'bg-muted hover:bg-accent text-foreground'
                   }`}
                 >
-                  Shift {shift}
+                  {shift}
                 </button>
               ))}
             </div>
@@ -187,9 +187,9 @@ export function Dashboard() {
           <div className="card">
             <div className="p-4 border-b border-border flex justify-between items-center">
               <div>
-                <h2 className="font-semibold text-foreground flex items-center gap-2">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
                   <Factory size={20} />
-                  Production Lines - Shift {selectedShift}
+                  Production Lines - {selectedShift} Shift
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   Current status per line
@@ -241,7 +241,7 @@ export function Dashboard() {
         <div className="card p-4 sm:p-6">
           <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
             <TrendingUp size={20} />
-            Performance Trend - Shift {selectedShift} (Last 7 Days)
+            Performance Trend - {selectedShift} Shift (Last 7 Days)
           </h3>
           <PerformanceTrendChart shifts={filteredShifts} />
         </div>

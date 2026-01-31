@@ -1,6 +1,6 @@
 import { StructuredDowntime, DowntimeCategory, DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from './downtime';
 
-export type ShiftType = 'A' | 'B' | 'C';
+export type ShiftType = 'DAY' | 'NIGHT';
 
 // Legacy downtime type (kept for backward compatibility)
 export type DowntimeReason = 
@@ -75,7 +75,7 @@ export const DOWNTIME_REASONS: DowntimeReason[] = [
   'other'
 ];
 
-export const SHIFT_TYPES: ShiftType[] = ['A', 'B', 'C'];
+export const SHIFT_TYPES: ShiftType[] = ['DAY', 'NIGHT'];
 
 export type { StructuredDowntime, DowntimeCategory };
 export { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY };

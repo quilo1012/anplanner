@@ -19,13 +19,13 @@ interface PerformanceTrendChartProps {
 export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
   const chartData = useMemo(() => {
     // Group by date and calculate averages per shift
-    const byDate: Record<string, { a: number[]; b: number[]; c: number[] }> = {};
+    const byDate: Record<string, { day: number[]; night: number[] }> = {};
     
     shifts.forEach(s => {
       if (!byDate[s.date]) {
-        byDate[s.date] = { a: [], b: [], c: [] };
+        byDate[s.date] = { day: [], night: [] };
       }
-      const shiftKey = s.shift.toLowerCase() as 'a' | 'b' | 'c';
+      const shiftKey = s.shift.toLowerCase() as 'day' | 'night';
       if (byDate[s.date][shiftKey]) {
         byDate[s.date][shiftKey].push(s.performance);
       }
@@ -41,9 +41,8 @@ export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
         
         return {
           date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          a: calcAvg(data.a),
-          b: calcAvg(data.b),
-          c: calcAvg(data.c),
+          day: calcAvg(data.day),
+          night: calcAvg(data.night),
         };
       });
   }, [shifts]);
@@ -60,22 +59,21 @@ export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 88%)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="date" 
-            tick={{ fill: 'hsl(220, 10%, 45%)', fontSize: 11 }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
           />
           <YAxis 
             domain={[0, 100]}
-            tick={{ fill: 'hsl(220, 10%, 45%)', fontSize: 11 }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
             tickFormatter={(value) => `${value}%`}
           />
           <Tooltip 
             contentStyle={{
-              backgroundColor: 'hsl(0, 0%, 100%)',
-              border: '1px solid hsl(220, 15%, 88%)',
+              backgroundColor: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
               borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
             }}
             formatter={(value: number | null) => value !== null ? [`${value}%`, ''] : ['N/A', '']}
           />
@@ -89,8 +87,8 @@ export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
           />
           <Line 
             type="monotone" 
-            dataKey="a" 
-            name="Shift A"
+            dataKey="day" 
+            name="DAY"
             stroke="hsl(220, 70%, 50%)" 
             strokeWidth={2}
             dot={{ fill: 'hsl(220, 70%, 50%)', strokeWidth: 2 }}
@@ -98,20 +96,11 @@ export function PerformanceTrendChart({ shifts }: PerformanceTrendChartProps) {
           />
           <Line 
             type="monotone" 
-            dataKey="b" 
-            name="Shift B"
-            stroke="hsl(145, 65%, 42%)" 
+            dataKey="night" 
+            name="NIGHT"
+            stroke="hsl(280, 65%, 50%)" 
             strokeWidth={2}
-            dot={{ fill: 'hsl(145, 65%, 42%)', strokeWidth: 2 }}
-            connectNulls
-          />
-          <Line 
-            type="monotone" 
-            dataKey="c" 
-            name="Shift C"
-            stroke="hsl(40, 95%, 50%)" 
-            strokeWidth={2}
-            dot={{ fill: 'hsl(40, 95%, 50%)', strokeWidth: 2 }}
+            dot={{ fill: 'hsl(280, 65%, 50%)', strokeWidth: 2 }}
             connectNulls
           />
         </LineChart>

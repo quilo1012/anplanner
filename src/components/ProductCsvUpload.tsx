@@ -5,7 +5,7 @@ import { Progress } from '@/components/ui/progress';
 
 interface ProductCsvUploadProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }
 
 interface ParsedProduct {
@@ -235,7 +235,7 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
       setProgressText('Complete!');
       setResult({ success: successCount, failed: failedCount, skipped: 0 });
       
-      if (successCount > 0) {
+      if (successCount > 0 && onSuccess) {
         setTimeout(() => {
           onSuccess();
         }, 2000);

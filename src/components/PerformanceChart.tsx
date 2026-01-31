@@ -18,7 +18,7 @@ interface PerformanceChartProps {
 
 export function PerformanceChart({ shifts }: PerformanceChartProps) {
   const chartData = useMemo(() => {
-    const byShift: Record<ShiftType, ShiftReport[]> = { A: [], B: [], C: [] };
+    const byShift: Record<ShiftType, ShiftReport[]> = { DAY: [], NIGHT: [] };
     
     shifts.forEach(s => {
       if (byShift[s.shift]) {
@@ -33,7 +33,7 @@ export function PerformanceChart({ shifts }: PerformanceChartProps) {
         : 0;
       
       return {
-        name: `Shift ${shift}`,
+        name: shift,
         performance: Math.round(avgPerformance * 10) / 10,
         shifts: shiftData.length,
       };
@@ -50,22 +50,21 @@ export function PerformanceChart({ shifts }: PerformanceChartProps) {
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 88%)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="name" 
-            tick={{ fill: 'hsl(220, 10%, 45%)', fontSize: 12 }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
           />
           <YAxis 
             domain={[0, 100]}
-            tick={{ fill: 'hsl(220, 10%, 45%)', fontSize: 12 }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
             tickFormatter={(value) => `${value}%`}
           />
           <Tooltip 
             contentStyle={{
-              backgroundColor: 'hsl(0, 0%, 100%)',
-              border: '1px solid hsl(220, 15%, 88%)',
+              backgroundColor: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
               borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
             }}
             formatter={(value: number) => [`${value}%`, 'Performance']}
           />
