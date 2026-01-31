@@ -65,12 +65,12 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
   const parseShift = (value: any): ShiftType | null => {
     if (!value) return null;
     const normalized = String(value).toUpperCase().trim();
-    if (normalized === 'A') return 'A';
-    if (normalized === 'B') return 'B';
-    if (normalized === 'C') return 'C';
-    // Legacy mapping
-    if (normalized === 'DAY' || normalized === 'D') return 'A';
-    if (normalized === 'NIGHT' || normalized === 'N') return 'B';
+    // Primary DAY/NIGHT mapping
+    if (normalized === 'DAY' || normalized === 'D') return 'DAY';
+    if (normalized === 'NIGHT' || normalized === 'N') return 'NIGHT';
+    // Legacy A/B/C mapping
+    if (normalized === 'A' || normalized === 'B') return 'DAY';
+    if (normalized === 'C') return 'NIGHT';
     return null;
   };
 
@@ -113,7 +113,7 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
         if (!date) errors.push('Invalid or missing Date');
         
         const shift = parseShift(row.Shift);
-        if (!shift) errors.push('Invalid Shift (use A/B/C)');
+        if (!shift) errors.push('Invalid Shift (use DAY/NIGHT)');
         
         const productionLine = row['Production Line']?.toString().trim();
         if (!productionLine) errors.push('Missing Production Line');
@@ -126,7 +126,7 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
 
         return {
           date: date || '',
-          shift: shift || 'A',
+          shift: shift || 'DAY',
           productionLine: productionLine || '',
           lineLeader: row['Line Leader']?.toString().trim() || 'TBD',
           product: product || '',
@@ -227,7 +227,7 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
                 <h4 className="font-medium mb-2">Required Columns:</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
                   <span className="px-2 py-1 bg-card rounded">Date</span>
-                  <span className="px-2 py-1 bg-card rounded">Shift (A/B/C)</span>
+                  <span className="px-2 py-1 bg-card rounded">Shift (DAY/NIGHT)</span>
                   <span className="px-2 py-1 bg-card rounded">Production Line</span>
                   <span className="px-2 py-1 bg-card rounded">Product Name</span>
                   <span className="px-2 py-1 bg-card rounded">Planned Quantity</span>
@@ -298,7 +298,7 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
                             )}
                           </td>
                           <td className="p-2">{entry.date || '-'}</td>
-                          <td className="p-2">Shift {entry.shift}</td>
+                          <td className="p-2">{entry.shift}</td>
                           <td className="p-2">{entry.productionLine || '-'}</td>
                           <td className="p-2">{entry.lineLeader}</td>
                           <td className="p-2">{entry.product || '-'}</td>

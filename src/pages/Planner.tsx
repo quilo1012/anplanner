@@ -13,7 +13,7 @@ import { Save, RotateCcw, X, User, ClipboardCheck, Lock, FileSpreadsheet, Packag
 
 const initialFormData: ShiftFormData = {
   date: new Date().toISOString().split('T')[0],
-  shift: 'A',
+  shift: 'DAY',
   productionLine: '',
   lineLeader: '',
   product: '',
@@ -244,7 +244,7 @@ export function Planner() {
                     className="select-field"
                   >
                     {SHIFT_TYPES.map(s => (
-                      <option key={s} value={s}>Shift {s}</option>
+                      <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
                 </div>
@@ -472,36 +472,34 @@ export function Planner() {
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="card p-4">
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="btn-primary flex-1 min-w-[150px]"
-                >
-                  <Save size={18} />
-                  {isSubmitting ? 'Saving...' : editId ? 'Update Shift' : 'Save Shift'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="btn-secondary"
-                >
-                  <RotateCcw size={18} />
-                  Reset
-                </button>
-                {editId && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/history')}
-                    className="btn-secondary"
-                  >
-                    <X size={18} />
-                    Cancel
-                  </button>
+            {/* Form Actions */}
+            <div className="flex flex-wrap gap-3 justify-end">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="btn-secondary"
+                disabled={isSubmitting}
+              >
+                <RotateCcw size={18} />
+                Reset
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} />
+                    {editId ? 'Update Shift' : 'Save Shift'}
+                  </>
                 )}
-              </div>
+              </button>
             </div>
           </form>
         </div>
@@ -517,10 +515,7 @@ export function Planner() {
 
       {/* Product CSV Upload Modal */}
       {showProductUpload && (
-        <ProductCsvUpload
-          onClose={() => setShowProductUpload(false)}
-          onSuccess={() => setShowProductUpload(false)}
-        />
+        <ProductCsvUpload onClose={() => setShowProductUpload(false)} />
       )}
     </>
   );
