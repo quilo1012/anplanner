@@ -5,8 +5,12 @@ import { useShifts } from '@/contexts/ShiftContext';
 import { ShiftReport, ShiftType, SHIFT_TYPES } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
 import { PerformanceTrendChart } from '@/components/PerformanceTrendChart';
+import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
+import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
+import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
+import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { StatCard } from '@/components/StatCard';
-import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Factory, Package } from 'lucide-react';
+import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Factory, Package, BarChart3 } from 'lucide-react';
 
 export function Dashboard() {
   const { shifts, isLoading } = useShifts();
@@ -236,6 +240,51 @@ export function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Performance Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {/* Performance by SKU */}
+          <div className="card p-4 sm:p-6">
+            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+              <Package size={20} />
+              Performance by SKU - {selectedShift}
+            </h3>
+            <PerformanceBySKU shifts={filteredShifts} />
+          </div>
+
+          {/* Performance by Line */}
+          <div className="card p-4 sm:p-6">
+            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+              <Factory size={20} />
+              Performance by Line - {selectedShift}
+            </h3>
+            <p className="text-xs text-muted-foreground mb-2">
+              Aggregates ALL products from each line
+            </p>
+            <PerformanceByLine shifts={filteredShifts} />
+          </div>
+
+          {/* Performance by Leader */}
+          <div className="card p-4 sm:p-6">
+            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+              <Users size={20} />
+              Performance by Leader - {selectedShift}
+            </h3>
+            <p className="text-xs text-muted-foreground mb-2">
+              Sum of all lines under each leader's responsibility
+            </p>
+            <PerformanceByLeader shifts={filteredShifts} />
+          </div>
+
+          {/* Daily Production Summary */}
+          <div className="card p-4 sm:p-6">
+            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+              <BarChart3 size={20} />
+              Daily Production Summary - {selectedShift}
+            </h3>
+            <DailyProductionSummary shifts={filteredShifts} />
+          </div>
+        </div>
 
         {/* Performance Trend */}
         <div className="card p-4 sm:p-6">

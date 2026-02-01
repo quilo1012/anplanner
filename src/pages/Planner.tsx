@@ -209,6 +209,12 @@ export function Planner() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Info Banner */}
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm text-primary">
+              <strong>💡 Dica:</strong> Cada linha de produção pode ter múltiplos produtos. 
+              Crie um registro para cada combinação de Linha + SKU + Turno.
+            </div>
+
             {/* Operator Entry Section */}
             <div className="card p-4 sm:p-6">
               <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
