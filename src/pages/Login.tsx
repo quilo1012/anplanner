@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import logo from '@/assets/applied-nutrition-logo.png';
-import factoryImage from '@/assets/factory-line.jpg';
 import { LogIn, Eye, EyeOff, AlertCircle, UserPlus, Loader2 } from 'lucide-react';
 export function Login() {
   const navigate = useNavigate();
@@ -76,91 +74,120 @@ export function Login() {
         </div>
       </div>;
   }
-  return <div className="min-h-screen flex">
-      {/* Left side - Login form */}
-      <div className="flex-1 flex flex-col justify-center px-8 lg:px-16 bg-[hsl(var(--background))]">
-        <div className="max-w-md w-full mx-auto">
-          {/* Logo */}
-          <div className="mb-8">
-            <img alt="Applied Nutrition" className="h-12 w-auto" src="/lovable-uploads/edb5031b-7c69-414e-97a6-9c4eddd3f540.jpg" />
-          </div>
-
-          <h1 className="text-3xl font-bold text-[hsl(var(--foreground))] mb-2">
-            {isSignup ? 'Create Account' : 'Welcome back'}
-          </h1>
-          <p className="text-[hsl(var(--muted-foreground))] mb-8">
-            {isSignup ? 'Sign up to access the Shift Report App' : 'Sign in to access the Shift Report App'}
-          </p>
-
-          {error && <div className="mb-6 p-4 bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 rounded-lg flex items-center gap-3">
-              <AlertCircle size={20} className="text-[hsl(var(--destructive))]" />
-              <span className="text-sm text-[hsl(var(--destructive))]">{error}</span>
-            </div>}
-
-          {signupSuccess && <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-              <span className="text-sm text-green-700">Account created successfully!</span>
-            </div>}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {isSignup && <div>
-                <label htmlFor="name" className="label">
-                  Full Name
-                </label>
-                <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your full name" className="input-field" required={isSignup} autoComplete="name" />
-              </div>}
-
-            <div>
-              <label htmlFor="email" className="label">
-                Email Address
-              </label>
-              <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="input-field" required autoComplete="email" />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="label">
-                Password
-              </label>
-              <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} id="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="input-field pr-10" required autoComplete={isSignup ? 'new-password' : 'current-password'} minLength={isSignup ? 6 : undefined} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {isSignup && <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                  Password must be at least 6 characters
-                </p>}
-            </div>
-
-            <button type="submit" disabled={isLoading} className="btn-primary w-full justify-center py-3">
-              {isLoading ? <Loader2 size={18} className="animate-spin" /> : isSignup ? <UserPlus size={18} /> : <LogIn size={18} />}
-              {isLoading ? 'Please wait...' : isSignup ? 'Create Account' : 'Sign In'}
-            </button>
-          </form>
-
-          {/* Toggle between login and signup */}
-          <div className="mt-6 text-center">
-            <button type="button" onClick={toggleMode} className="text-sm text-[hsl(var(--primary))] hover:underline">
-              {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
-          </div>
-
-          {/* Demo info */}
-          {!isSignup && <div className="mt-8 p-4 bg-[hsl(var(--muted))] rounded-lg">
-              <p className="text-sm font-medium text-[hsl(var(--foreground))] mb-2">
-                New here?
-              </p>
-              <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                Create an account to get started. New users are assigned the Operator role by default.
-                An admin can upgrade your role later.
-              </p>
-            </div>}
+  return (
+    <div className="min-h-screen flex bg-background">
+      {/* Login form - Full width */}
+      <div className="flex-1 flex flex-col justify-center px-8 lg:px-16 max-w-xl mx-auto">
+        {/* Logo */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-primary">APPLIED NUTRITION</h2>
+          <p className="text-sm text-muted-foreground">Shift Report System</p>
         </div>
-      </div>
 
-      {/* Right side - Image */}
-      <div className="hidden lg:block lg:w-1/2 relative">
-        <img alt="Factory Line" className="absolute inset-0 w-full h-full object-cover" src="/lovable-uploads/0dc2c5a0-ccdf-4149-a315-72d92eeab162.png" />
-        
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          {isSignup ? 'Create Account' : 'Welcome back'}
+        </h1>
+        <p className="text-muted-foreground mb-8">
+          {isSignup ? 'Sign up to access the Shift Report App' : 'Sign in to access the Shift Report App'}
+        </p>
+
+        {error && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-3">
+            <AlertCircle size={20} className="text-destructive" />
+            <span className="text-sm text-destructive">{error}</span>
+          </div>
+        )}
+
+        {signupSuccess && (
+          <div className="mb-6 p-4 bg-success/10 border border-success/20 rounded-lg flex items-center gap-3">
+            <span className="text-sm text-success">Account created successfully!</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {isSignup && (
+            <div>
+              <label htmlFor="name" className="label">Full Name</label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Your full name"
+                className="input-field"
+                required={isSignup}
+                autoComplete="name"
+              />
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="email" className="label">Email Address</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              className="input-field"
+              required
+              autoComplete="email"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="label">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="input-field pr-10"
+                required
+                autoComplete={isSignup ? 'new-password' : 'current-password'}
+                minLength={isSignup ? 6 : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {isSignup && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Password must be at least 6 characters
+              </p>
+            )}
+          </div>
+
+          <button type="submit" disabled={isLoading} className="btn-primary w-full justify-center py-3">
+            {isLoading ? <Loader2 size={18} className="animate-spin" /> : isSignup ? <UserPlus size={18} /> : <LogIn size={18} />}
+            {isLoading ? 'Please wait...' : isSignup ? 'Create Account' : 'Sign In'}
+          </button>
+        </form>
+
+        {/* Toggle between login and signup */}
+        <div className="mt-6 text-center">
+          <button type="button" onClick={toggleMode} className="text-sm text-primary hover:underline">
+            {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+          </button>
+        </div>
+
+        {/* Help text */}
+        {!isSignup && (
+          <div className="mt-8 p-4 bg-muted rounded-lg">
+            <p className="text-sm font-medium text-foreground mb-2">New here?</p>
+            <p className="text-xs text-muted-foreground">
+              Create an account to get started. New users are assigned the Operator role by default.
+              An admin can upgrade your role later.
+            </p>
+          </div>
+        )}
       </div>
-    </div>;
+    </div>
+  );
 }

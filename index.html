@@ -3,23 +3,79 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
     <title>Applied Nutrition - Shift Report App</title>
     <meta name="description" content="Production monitoring and shift report management for Applied Nutrition factory floor" />
     <meta name="author" content="Applied Nutrition" />
 
     <meta property="og:title" content="Applied Nutrition - Shift Report App" />
-    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:description" content="Professional shift reporting and production monitoring" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Inline critical CSS to prevent white flash -->
+    <style>
+      :root {
+        --app-bg: #ffffff;
+        --app-fg: #0a0a0a;
+        --app-primary: #1a6b3f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --app-bg: #0a0a0a;
+          --app-fg: #fafafa;
+        }
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background-color: var(--app-bg);
+        color: var(--app-fg);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      #root {
+        min-height: 100vh;
+        background-color: var(--app-bg);
+      }
+      /* Initial loading state */
+      .app-loader {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        gap: 1rem;
+      }
+      .app-loader-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--app-fg);
+        border-top-color: var(--app-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .app-loader-text {
+        font-size: 0.875rem;
+        opacity: 0.7;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Fallback loading state visible until React hydrates -->
+      <div class="app-loader">
+        <div class="app-loader-spinner"></div>
+        <p class="app-loader-text">Loading...</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
