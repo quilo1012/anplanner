@@ -16,16 +16,44 @@ interface PerformanceByLeaderProps {
 
 export function PerformanceByLeader({ shifts }: PerformanceByLeaderProps) {
   const chartData = useMemo(() => {
-    const byLeader: Record<string, number> = {};
+    // Aggregate ALL products under each leader's responsibility
+    const byLeader: Record<string, { 
+      production: number; 
+      target: number;
+      lineCount: number;
+      skuCount: number;
+    }> = {};
+    
+    // Track unique lines per leader
+    const leaderLines: Record<string, Set<string>> = {};
     
     shifts.forEach(s => {
       if (s.lineLeader) {
-        byLeader[s.lineLeader] = (byLeader[s.lineLeader] || 0) + s.realProduction;
+        if (!byLeader[s.lineLeader]) {
+          byLeader[s.lineLeader] = { production: 0, target: 0, lineCount: 0, skuCount: 0 };
+          leaderLines[s.lineLeader] = new Set();
+        }
+        byLeader[s.lineLeader].production += s.realProduction;
+        byLeader[s.lineLeader].target += s.productionTarget;
+        byLeader[s.lineLeader].skuCount += 1;
+        leaderLines[s.lineLeader].add(s.productionLine);
       }
     });
 
+    // Add line count
+    Object.keys(byLeader).forEach(leader => {
+      byLeader[leader].lineCount = leaderLines[leader]?.size || 0;
+    });
+
     return Object.entries(byLeader)
-      .map(([leader, total]) => ({ leader, total }))
+      .map(([leader, data]) => ({ 
+        leader, 
+        total: data.production,
+        target: data.target,
+        lineCount: data.lineCount,
+        skuCount: data.skuCount,
+        performance: data.target > 0 ? Math.round((data.production / data.target) * 100) : 0,
+      }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 10); // Top 10 leaders
   }, [shifts]);
@@ -43,7 +71,7 @@ export function PerformanceByLeader({ shifts }: PerformanceByLeaderProps) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart 
           data={chartData} 
-          margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
+          margin={{ top: 10, right: 30, left: 20, bottom: 60 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis 
@@ -63,7 +91,11 @@ export function PerformanceByLeader({ shifts }: PerformanceByLeaderProps) {
               border: '1px solid hsl(var(--border))',
               borderRadius: '8px',
             }}
-            formatter={(value: number) => [value.toLocaleString(), 'Units']}
+            formatter={(value: number) => [value.toLocaleString(), 'Units Produced']}
+            labelFormatter={(label) => {
+              const item = chartData.find(d => d.leader === label);
+              return `${label} - ${item?.lineCount || 0} lines, ${item?.skuCount || 0} products`;
+            }}
           />
           <Bar 
             dataKey="total" 

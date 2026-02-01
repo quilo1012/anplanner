@@ -17,15 +17,23 @@ interface PerformanceByLineProps {
 
 export function PerformanceByLine({ shifts }: PerformanceByLineProps) {
   const chartData = useMemo(() => {
-    const byLine: Record<string, { production: number; downtime: number }> = {};
+    // Aggregate ALL products from the same line
+    const byLine: Record<string, { 
+      production: number; 
+      downtime: number; 
+      target: number;
+      skuCount: number;
+    }> = {};
     
     shifts.forEach(s => {
       if (s.productionLine) {
         if (!byLine[s.productionLine]) {
-          byLine[s.productionLine] = { production: 0, downtime: 0 };
+          byLine[s.productionLine] = { production: 0, downtime: 0, target: 0, skuCount: 0 };
         }
         byLine[s.productionLine].production += s.realProduction;
+        byLine[s.productionLine].target += s.productionTarget;
         byLine[s.productionLine].downtime += s.totalDowntime;
+        byLine[s.productionLine].skuCount += 1;
       }
     });
 
@@ -33,7 +41,10 @@ export function PerformanceByLine({ shifts }: PerformanceByLineProps) {
       .map(([line, data]) => ({ 
         line, 
         production: data.production,
-        downtime: data.downtime 
+        target: data.target,
+        downtime: data.downtime,
+        skuCount: data.skuCount,
+        performance: data.target > 0 ? Math.round((data.production / data.target) * 100) : 0,
       }))
       .sort((a, b) => b.production - a.production);
   }, [shifts]);
@@ -66,6 +77,15 @@ export function PerformanceByLine({ shifts }: PerformanceByLineProps) {
               backgroundColor: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
               borderRadius: '8px',
+            }}
+            formatter={(value: number, name: string) => {
+              if (name === 'Production') return [value.toLocaleString(), 'Production'];
+              if (name === 'Downtime (min)') return [value, 'Downtime (min)'];
+              return [value, name];
+            }}
+            labelFormatter={(label) => {
+              const item = chartData.find(d => d.line === label);
+              return `${label} (${item?.skuCount || 0} products)`;
             }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
