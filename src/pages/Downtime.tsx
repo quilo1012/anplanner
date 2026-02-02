@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -426,8 +426,8 @@ export function Downtime() {
                   </thead>
                   <tbody>
                     {filteredDowntimes.map(entry => (
-                      <>
-                        <tr key={entry.id} className="hover:bg-muted/50">
+                      <React.Fragment key={entry.id}>
+                        <tr className="hover:bg-muted/50">
                           <td className="text-center">
                             {entry.comment && (
                               <button onClick={() => toggleRow(entry.id)} className="p-1 hover:bg-muted rounded">
@@ -464,7 +464,7 @@ export function Downtime() {
                           )}
                         </tr>
                         {expandedRows.has(entry.id) && entry.comment && (
-                          <tr key={`${entry.id}-comment`} className="bg-muted/30">
+                          <tr className="bg-muted/30">
                             <td colSpan={canDelete ? 10 : 9} className="py-2 px-4">
                               <div className="text-sm text-muted-foreground italic">
                                 <strong>Comment:</strong> {entry.comment}
@@ -472,7 +472,7 @@ export function Downtime() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>

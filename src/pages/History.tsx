@@ -362,15 +362,14 @@ export function History() {
                         <React.Fragment key={shift.id}>
                           <tr className="hover:bg-muted/50">
                             <td className="text-center">
-                              {hasDetails && (
-                                <button 
-                                  onClick={() => toggleRow(shift.id)} 
-                                  className="p-1 hover:bg-muted rounded transition-colors"
-                                  title="Toggle details"
-                                >
-                                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </button>
-                              )}
+                              <button 
+                                onClick={() => toggleRow(shift.id)} 
+                                className={`p-1 hover:bg-muted rounded transition-colors ${hasDetails ? '' : 'opacity-30'}`}
+                                title={hasDetails ? "Toggle details" : "No additional details"}
+                                disabled={!hasDetails}
+                              >
+                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              </button>
                             </td>
                             <td className="whitespace-nowrap text-sm">{formatDate(shift.date)}</td>
                             <td>
