@@ -117,9 +117,7 @@ export function Login() {
             <h2 className="text-2xl font-bold text-foreground">
               {isSignup ? 'Create Account' : 'Welcome Back'}
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {isSignup ? 'Sign up to access the system' : 'Sign in to continue'}
-            </p>
+            
           </div>
 
           {/* Error Message */}
@@ -194,11 +192,10 @@ export function Login() {
 
           {/* Help Text */}
           {!isSignup && <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
-              <p className="text-sm font-medium text-foreground mb-1">New here?</p>
+              <p className="text-sm font-medium text-foreground mb-1">
+          </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Create an account to get started. New users are assigned the Operator role.
-                An admin can upgrade your role later.
-              </p>
+          </p>
             </div>}
         </div>
 
