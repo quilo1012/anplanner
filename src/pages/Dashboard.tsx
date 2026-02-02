@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { useShifts } from '@/contexts/ShiftContext';
@@ -11,30 +11,43 @@ import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { StatCard } from '@/components/StatCard';
-import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Factory, Package, BarChart3, Printer, TableIcon } from 'lucide-react';
+import { Activity, TrendingUp, AlertTriangle, Target, Clock, Users, Factory, Package, BarChart3, Printer, TableIcon, Calendar, Filter } from 'lucide-react';
 
 export function Dashboard() {
   const { shifts, isLoading } = useShifts();
   const [selectedShift, setSelectedShift] = useState<ShiftType>('DAY');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedLine, setSelectedLine] = useState<string>('');
+  const [selectedLeader, setSelectedLeader] = useState<string>('');
 
-  const today = new Date().toISOString().split('T')[0];
+  // Get unique lines and leaders for filters
+  const { uniqueLines, uniqueLeaders } = useMemo(() => {
+    const lines = [...new Set(shifts.map(s => s.productionLine))].sort();
+    const leaders = [...new Set(shifts.map(s => s.lineLeader))].sort();
+    return { uniqueLines: lines, uniqueLeaders: leaders };
+  }, [shifts]);
 
-  // Filter shifts by selected shift type
+  // Filter shifts by date, shift type, and optional filters
   const filteredShifts = useMemo(() => {
-    return shifts.filter(s => s.shift === selectedShift);
-  }, [shifts, selectedShift]);
+    return shifts.filter(s => {
+      const matchesDate = s.date === selectedDate;
+      const matchesShift = s.shift === selectedShift;
+      const matchesLine = !selectedLine || s.productionLine === selectedLine;
+      const matchesLeader = !selectedLeader || s.lineLeader === selectedLeader;
+      return matchesDate && matchesShift && matchesLine && matchesLeader;
+    });
+  }, [shifts, selectedDate, selectedShift, selectedLine, selectedLeader]);
 
   const stats = useMemo(() => {
-    const todayShifts = filteredShifts.filter(s => s.date === today);
-    const totalToday = todayShifts.length;
-    const avgPerformance = totalToday > 0 
-      ? todayShifts.reduce((sum, s) => sum + s.performance, 0) / totalToday 
+    const totalToday = filteredShifts.length;
+    const avgPerformance = totalToday > 0
+      ? filteredShifts.reduce((sum, s) => sum + s.performance, 0) / totalToday
       : 0;
     const totalDowntime = filteredShifts.reduce((sum, s) => sum + s.totalDowntime, 0);
     const totalProduction = filteredShifts.reduce((sum, s) => sum + s.realProduction, 0);
     const totalPlannedStaff = filteredShifts.reduce((sum, s) => sum + (s.staffPlanned || 0), 0);
     const totalActualStaff = filteredShifts.reduce((sum, s) => sum + (s.staffActual || 0), 0);
-    
+
     return {
       totalToday,
       avgPerformance,
@@ -44,7 +57,7 @@ export function Dashboard() {
       totalActualStaff,
       totalShifts: filteredShifts.length,
     };
-  }, [filteredShifts, today]);
+  }, [filteredShifts]);
 
   // Group by production line for current shift
   const lineStats = useMemo(() => {
@@ -135,7 +148,7 @@ export function Dashboard() {
 
   return (
     <>
-      <Header title="Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(today)}`} />
+      <Header title="Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(selectedDate)}`} />
 
       <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6 print:p-0">
         {/* Welcome Message - hide on print */}
@@ -143,28 +156,67 @@ export function Dashboard() {
           <WelcomeScreen />
         </div>
 
-        {/* Shift Filter - Mandatory */}
+        {/* Global Filters - Mandatory Date & Shift */}
         <div className="card p-4 no-print">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-foreground">Select Shift:</span>
-              <div className="flex gap-2">
-                {SHIFT_TYPES.map(shift => (
-                  <button
-                    key={shift}
-                    onClick={() => setSelectedShift(shift)}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                      selectedShift === shift
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted hover:bg-accent text-foreground'
-                    }`}
-                  >
-                    {shift}
-                  </button>
-                ))}
-              </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter size={18} className="text-primary" />
+              <span className="text-sm font-semibold text-foreground">Filters:</span>
             </div>
-            <button onClick={handlePrint} className="btn-secondary text-sm">
+
+            {/* Date Filter - Mandatory */}
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-muted-foreground" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="input-field text-sm py-1.5 w-auto"
+              />
+            </div>
+
+            {/* Shift Filter - Mandatory */}
+            <div className="flex gap-2">
+              {SHIFT_TYPES.map(shift => (
+                <button
+                  key={shift}
+                  onClick={() => setSelectedShift(shift)}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    selectedShift === shift
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-accent text-foreground'
+                  }`}
+                >
+                  {shift}
+                </button>
+              ))}
+            </div>
+
+            {/* Line Filter - Optional */}
+            <select
+              value={selectedLine}
+              onChange={(e) => setSelectedLine(e.target.value)}
+              className="select-field text-sm py-1.5 w-auto min-w-[140px]"
+            >
+              <option value="">All Lines</option>
+              {uniqueLines.map(line => (
+                <option key={line} value={line}>{line}</option>
+              ))}
+            </select>
+
+            {/* Leader Filter - Optional */}
+            <select
+              value={selectedLeader}
+              onChange={(e) => setSelectedLeader(e.target.value)}
+              className="select-field text-sm py-1.5 w-auto min-w-[140px]"
+            >
+              <option value="">All Leaders</option>
+              {uniqueLeaders.map(leader => (
+                <option key={leader} value={leader}>{leader}</option>
+              ))}
+            </select>
+
+            <button onClick={handlePrint} className="btn-secondary text-sm ml-auto">
               <Printer size={16} />
               <span className="hidden sm:inline">Print Report</span>
             </button>
@@ -175,7 +227,7 @@ export function Dashboard() {
         <div className="hidden print:block mb-4">
           <h1 className="text-2xl font-bold">Applied Nutrition - Dashboard Report</h1>
           <p className="text-sm">
-            Shift: {selectedShift} | Date: {formatDate(today)} | Generated: {new Date().toLocaleString()}
+            Shift: {selectedShift} | Date: {formatDate(selectedDate)} | Line: {selectedLine || 'All'} | Leader: {selectedLeader || 'All'} | Generated: {new Date().toLocaleString()}
           </p>
         </div>
 

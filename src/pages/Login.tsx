@@ -1,15 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogIn, Eye, EyeOff, AlertCircle, UserPlus, Loader2, Mail, Lock } from 'lucide-react';
+import { LogIn, Eye, EyeOff, AlertCircle, UserPlus, Loader2, Mail, Lock, User } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
-  const {
-    login,
-    signup,
-    isLoading: authLoading
-  } = useAuth();
+  const { login, signup, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -53,17 +49,10 @@ export function Login() {
     setIsLoading(true);
     try {
       if (isSignup) {
-        const result = await signup({
-          email,
-          password,
-          name
-        });
+        const result = await signup({ email, password, name });
         if (result.success) {
           setSignupSuccess(true);
-          const loginResult = await login({
-            email,
-            password
-          });
+          const loginResult = await login({ email, password });
           if (loginResult.success) {
             navigate('/');
           } else {
@@ -74,10 +63,7 @@ export function Login() {
           setError(result.error || 'Signup failed');
         }
       } else {
-        const result = await login({
-          email,
-          password
-        });
+        const result = await login({ email, password });
         if (result.success) {
           navigate('/');
         } else {
@@ -99,7 +85,7 @@ export function Login() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted via-background to-muted">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 size={48} className="animate-spin text-primary" />
           <p className="text-muted-foreground">Loading...</p>
@@ -109,10 +95,10 @@ export function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-muted via-background to-muted">
-      {/* Login Card */}
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-muted/50 via-background to-muted/50">
       <div className="w-full max-w-md">
-        <div className="card p-6 sm:p-8 shadow-xl border-border/50">
+        {/* Login Card */}
+        <div className="bg-card rounded-xl border border-border shadow-xl p-6 sm:p-8">
           {/* Logo & Branding */}
           <div className="text-center mb-8">
             <div className="mx-auto mb-4 flex justify-center">
@@ -136,9 +122,7 @@ export function Login() {
               {isSignup ? 'Create Account' : 'Welcome Back'}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {isSignup 
-                ? 'Sign up to access the system' 
-                : 'Sign in to continue'}
+              {isSignup ? 'Sign up to access the system' : 'Sign in to continue'}
             </p>
           </div>
 
@@ -164,15 +148,18 @@ export function Login() {
                 <label htmlFor="name" className="label">
                   Full Name <span className="text-destructive">*</span>
                 </label>
-                <input
-                  type="text"
-                  id="name"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Your full name"
-                  className="input-field"
-                  autoComplete="name"
-                />
+                <div className="relative">
+                  <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    id="name"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Your full name"
+                    className="input-field pl-10"
+                    autoComplete="name"
+                  />
+                </div>
               </div>
             )}
 
@@ -225,9 +212,9 @@ export function Login() {
               )}
             </div>
 
-            <button 
-              type="submit" 
-              disabled={isLoading} 
+            <button
+              type="submit"
+              disabled={isLoading}
               className="btn-primary w-full justify-center py-3 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
             >
               {isLoading ? (
@@ -251,9 +238,9 @@ export function Login() {
 
           {/* Toggle Mode */}
           <div className="mt-6 text-center">
-            <button 
-              type="button" 
-              onClick={toggleMode} 
+            <button
+              type="button"
+              onClick={toggleMode}
               className="text-sm text-primary hover:underline font-medium"
             >
               {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
@@ -265,7 +252,7 @@ export function Login() {
             <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
               <p className="text-sm font-medium text-foreground mb-1">New here?</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Create an account to get started. New users are assigned the Operator role. 
+                Create an account to get started. New users are assigned the Operator role.
                 An admin can upgrade your role later.
               </p>
             </div>
