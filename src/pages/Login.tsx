@@ -111,9 +111,6 @@ export function Login() {
             <h1 className="text-xl font-bold text-primary tracking-tight">
               APPLIED NUTRITION
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Shift Report System
-            </p>
           </div>
 
           {/* Title */}
