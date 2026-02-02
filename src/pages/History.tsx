@@ -1,16 +1,16 @@
 import { useState, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { PrintReport } from '@/components/PrintReport';
+import { EditShiftDialog } from '@/components/history/EditShiftDialog';
+import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftType, SHIFT_TYPES } from '@/types/shift';
+import { ShiftType, SHIFT_TYPES, ShiftReport } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
 import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock, Factory, Users, Printer } from 'lucide-react';
 
 export function History() {
-  const navigate = useNavigate();
-  const { shifts, deleteShift } = useShifts();
+  const { shifts, refreshShifts } = useShifts();
   const { hasRole } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
   
@@ -19,9 +19,12 @@ export function History() {
   const [filterShift, setFilterShift] = useState<ShiftType | ''>('');
   const [filterLine, setFilterLine] = useState('');
   const [filterLeader, setFilterLeader] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+
+  // Edit and Delete dialog state
+  const [editShift, setEditShift] = useState<ShiftReport | null>(null);
+  const [deleteShift, setDeleteShift] = useState<ShiftReport | null>(null);
 
   const canEdit = hasRole(['supervisor', 'admin']);
   const canDelete = hasRole(['supervisor', 'admin']);
@@ -51,19 +54,14 @@ export function History() {
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [shifts, filterFromDate, filterToDate, filterShift, filterLine, filterLeader]);
 
-  const handleEdit = (id: string) => {
+  const handleEdit = (shift: ShiftReport) => {
     if (!canEdit) return;
-    navigate(`/planner?edit=${id}`);
+    setEditShift(shift);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (shift: ShiftReport) => {
     if (!canDelete) return;
-    if (confirmDelete === id) {
-      await deleteShift(id);
-      setConfirmDelete(null);
-    } else {
-      setConfirmDelete(id);
-    }
+    setDeleteShift(shift);
   };
 
   const handleExport = () => {
@@ -98,6 +96,10 @@ export function History() {
   // Get the date and shift for print report
   const printDate = filterFromDate || new Date().toISOString().split('T')[0];
   const printShift = filterShift || 'DAY';
+
+  const handleDialogSuccess = () => {
+    refreshShifts();
+  };
 
   return (
     <>
@@ -235,12 +237,6 @@ export function History() {
             <p className="text-muted-foreground mb-4">
               No shifts found.
             </p>
-            <button
-              onClick={() => navigate('/planner')}
-              className="btn-primary"
-            >
-              Register First Shift
-            </button>
           </div>
         ) : (
           <>
@@ -289,7 +285,7 @@ export function History() {
                     <div className="flex gap-2 pt-3 border-t border-border">
                       {canEdit && (
                         <button
-                          onClick={() => handleEdit(shift.id)}
+                          onClick={() => handleEdit(shift)}
                           className="btn-secondary flex-1 text-sm py-2"
                         >
                           <Edit size={14} />
@@ -298,15 +294,11 @@ export function History() {
                       )}
                       {canDelete && (
                         <button
-                          onClick={() => handleDelete(shift.id)}
-                          className={`flex-1 text-sm py-2 rounded-md ${
-                            confirmDelete === shift.id
-                              ? 'bg-destructive text-destructive-foreground'
-                              : 'btn-secondary text-destructive'
-                          }`}
+                          onClick={() => handleDelete(shift)}
+                          className="flex-1 text-sm py-2 rounded-md btn-secondary text-destructive hover:bg-destructive hover:text-destructive-foreground"
                         >
                           <Trash2 size={14} className="inline mr-1" />
-                          {confirmDelete === shift.id ? 'Confirm' : 'Delete'}
+                          Delete
                         </button>
                       )}
                     </div>
@@ -379,7 +371,7 @@ export function History() {
                           <div className="flex gap-2">
                             {canEdit && (
                               <button
-                                onClick={() => handleEdit(shift.id)}
+                                onClick={() => handleEdit(shift)}
                                 className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
                                 title="Edit"
                               >
@@ -388,13 +380,9 @@ export function History() {
                             )}
                             {canDelete && (
                               <button
-                                onClick={() => handleDelete(shift.id)}
-                                className={`p-1.5 rounded transition-colors ${
-                                  confirmDelete === shift.id
-                                    ? 'bg-destructive text-destructive-foreground'
-                                    : 'text-destructive hover:bg-destructive/10'
-                                }`}
-                                title={confirmDelete === shift.id ? 'Confirm delete?' : 'Delete'}
+                                onClick={() => handleDelete(shift)}
+                                className="p-1.5 text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                title="Delete"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -443,6 +431,22 @@ export function History() {
           </div>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <EditShiftDialog
+        shift={editShift}
+        open={!!editShift}
+        onOpenChange={(open) => !open && setEditShift(null)}
+        onSuccess={handleDialogSuccess}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        shift={deleteShift}
+        open={!!deleteShift}
+        onOpenChange={(open) => !open && setDeleteShift(null)}
+        onSuccess={handleDialogSuccess}
+      />
     </>
   );
 }
