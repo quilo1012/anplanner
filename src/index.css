@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 15%;
 
-    --primary: 220 70% 50%;
+    --primary: 210 100% 45%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 15% 92%;
@@ -38,41 +38,49 @@
 
     --border: 220 15% 88%;
     --input: 220 15% 88%;
-    --ring: 220 70% 50%;
+    --ring: 210 100% 45%;
 
     --radius: 0.5rem;
 
-    /* Sidebar - Dark professional look in both modes */
-    --sidebar: 220 25% 15%;
+    /* Industrial Sidebar - Dark Navy Blue */
+    --sidebar: 220 45% 12%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 220 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 22%;
+    --sidebar-primary: 195 100% 50%;
+    --sidebar-primary-foreground: 220 45% 12%;
+    --sidebar-accent: 220 45% 18%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 220 25% 22%;
-    --sidebar-ring: 220 70% 55%;
+    --sidebar-border: 220 45% 20%;
+    --sidebar-ring: 195 100% 50%;
+
+    /* Industrial Colors */
+    --industrial-blue: 210 100% 45%;
+    --industrial-cyan: 195 100% 50%;
+    --industrial-purple: 270 60% 55%;
+    --industrial-green: 145 65% 42%;
+    --industrial-orange: 30 95% 55%;
+    --industrial-red: 0 75% 45%;
   }
 
   .dark {
-    --background: 220 20% 10%;
+    --background: 220 25% 8%;
     --foreground: 220 10% 95%;
 
-    --card: 220 20% 14%;
+    --card: 220 25% 12%;
     --card-foreground: 220 10% 95%;
 
-    --popover: 220 20% 14%;
+    --popover: 220 25% 12%;
     --popover-foreground: 220 10% 95%;
 
-    --primary: 220 70% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 195 100% 50%;
+    --primary-foreground: 220 45% 10%;
 
-    --secondary: 220 20% 20%;
+    --secondary: 220 25% 18%;
     --secondary-foreground: 220 10% 90%;
 
-    --muted: 220 20% 18%;
+    --muted: 220 25% 15%;
     --muted-foreground: 220 10% 60%;
 
-    --accent: 220 20% 22%;
+    --accent: 220 25% 20%;
     --accent-foreground: 220 10% 95%;
 
     --destructive: 0 75% 50%;
@@ -84,19 +92,27 @@
     --warning: 40 95% 55%;
     --warning-foreground: 40 95% 15%;
 
-    --border: 220 20% 22%;
-    --input: 220 20% 22%;
-    --ring: 220 70% 55%;
+    --border: 220 25% 20%;
+    --input: 220 25% 20%;
+    --ring: 195 100% 50%;
 
-    /* Sidebar - Dark professional look */
-    --sidebar: 220 25% 10%;
+    /* Industrial Sidebar - Darker Navy */
+    --sidebar: 220 45% 8%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 220 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 18%;
+    --sidebar-primary: 195 100% 50%;
+    --sidebar-primary-foreground: 220 45% 8%;
+    --sidebar-accent: 220 45% 14%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 220 25% 18%;
-    --sidebar-ring: 220 70% 55%;
+    --sidebar-border: 220 45% 16%;
+    --sidebar-ring: 195 100% 50%;
+
+    /* Industrial Colors */
+    --industrial-blue: 210 100% 50%;
+    --industrial-cyan: 195 100% 55%;
+    --industrial-purple: 270 60% 60%;
+    --industrial-green: 145 65% 50%;
+    --industrial-orange: 30 95% 60%;
+    --industrial-red: 0 75% 50%;
   }
 }
 
