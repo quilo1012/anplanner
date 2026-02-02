@@ -70,8 +70,6 @@ export function Planner() {
             id: editId,
             sku: shift.sku,
             product: shift.product,
-            productionTarget: shift.productionTarget,
-            realProduction: shift.realProduction,
           }],
           observations: shift.observations,
           structuredDowntimes: shift.structuredDowntimes || [],
@@ -134,16 +132,13 @@ export function Planner() {
       newErrors.lineLeader = 'Line Leader is required';
     }
 
-    // Validate SKU rows
+    // Validate SKU rows - only SKU is required (no quantity in planner)
     if (formState.skuRows.length === 0) {
       newErrors.skuRows = 'At least one product is required';
     } else {
       formState.skuRows.forEach(row => {
         if (!row.sku.trim()) {
           newErrors[`sku_${row.id}`] = 'SKU is required';
-        }
-        if (row.productionTarget <= 0) {
-          newErrors[`target_${row.id}`] = 'Target must be greater than 0';
         }
       });
     }
@@ -178,8 +173,8 @@ export function Planner() {
           lineLeader: formState.lineLeader,
           product: row.product,
           sku: row.sku,
-          productionTarget: row.productionTarget,
-          realProduction: row.realProduction,
+          productionTarget: 0, // Planner does NOT capture quantities
+          realProduction: 0,   // Planner does NOT capture quantities
           observations: formState.observations,
           downtimes: [],
           structuredDowntimes: formState.structuredDowntimes,
@@ -190,7 +185,7 @@ export function Planner() {
         };
         await updateShift(editId, formData);
       } else {
-        // Save each SKU row as separate shift record
+        // Save each SKU row as independent record - NEVER overwrites others
         for (const row of formState.skuRows) {
           if (!row.sku.trim()) continue; // Skip empty rows
           
@@ -201,8 +196,8 @@ export function Planner() {
             lineLeader: formState.lineLeader,
             product: row.product,
             sku: row.sku,
-            productionTarget: row.productionTarget,
-            realProduction: row.realProduction,
+            productionTarget: 0, // Planner does NOT capture quantities
+            realProduction: 0,   // Planner does NOT capture quantities
             observations: formState.observations,
             downtimes: [],
             structuredDowntimes: formState.structuredDowntimes,

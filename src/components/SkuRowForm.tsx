@@ -9,6 +9,8 @@ interface SkuRowFormProps {
   errors?: Record<string, string>;
 }
 
+// Planner SKU Form - PLANNING ONLY (no production quantities)
+// Behaves exactly like downtime entries: unlimited rows, + button, independent saves
 export function SkuRowForm({ 
   skuRows, 
   onChange, 
@@ -16,17 +18,19 @@ export function SkuRowForm({
   errors = {}
 }: SkuRowFormProps) {
   const addSkuRow = () => {
+    // Add new independent row - does NOT affect existing rows
     onChange([...skuRows, createEmptySkuRow()]);
   };
 
   const removeSkuRow = (id: string) => {
+    // Remove only this specific row
     onChange(skuRows.filter(row => row.id !== id));
   };
 
   const updateSkuRow = (
     id: string, 
     field: keyof SkuRow, 
-    value: string | number
+    value: string
   ) => {
     onChange(
       skuRows.map(row => 
@@ -45,20 +49,6 @@ export function SkuRowForm({
     );
   };
 
-  const totalTarget = skuRows.reduce((sum, row) => sum + row.productionTarget, 0);
-  const totalProduction = skuRows.reduce((sum, row) => sum + row.realProduction, 0);
-
-  const getPerformance = (target: number, actual: number) => {
-    if (target <= 0) return 0;
-    return (actual / target) * 100;
-  };
-
-  const getPerformanceClass = (perf: number) => {
-    if (perf >= 90) return 'text-success bg-success/10';
-    if (perf >= 75) return 'text-warning bg-warning/10';
-    return 'text-destructive bg-destructive/10';
-  };
-
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -67,16 +57,14 @@ export function SkuRowForm({
             <Package size={18} className="text-primary" />
             Products / SKUs
           </h3>
-          {skuRows.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {skuRows.length} product(s) • Target: {totalTarget.toLocaleString()} • Actual: {totalProduction.toLocaleString()}
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            {skuRows.length} product(s) planned • Add unlimited SKUs per line
+          </p>
         </div>
         <button
           type="button"
           onClick={addSkuRow}
-          className="btn-secondary text-sm"
+          className="btn-primary text-sm"
         >
           <Plus size={16} />
           Add SKU
@@ -86,15 +74,13 @@ export function SkuRowForm({
       {skuRows.length === 0 ? (
         <div className="text-sm text-muted-foreground italic py-6 text-center border border-dashed border-border rounded-lg">
           <Package size={24} className="mx-auto mb-2 opacity-50" />
-          <p>No products added yet</p>
-          <p className="text-xs mt-1">Click "Add SKU" to add products to this shift</p>
+          <p>No products planned yet</p>
+          <p className="text-xs mt-1">Click "Add SKU" to plan products for this shift</p>
         </div>
       ) : (
         <div className="space-y-3">
           {skuRows.map((row, index) => {
-            const performance = getPerformance(row.productionTarget, row.realProduction);
             const hasSkuError = !row.sku.trim() && errors[`sku_${row.id}`];
-            const hasTargetError = row.productionTarget <= 0 && errors[`target_${row.id}`];
             
             return (
               <div
@@ -116,9 +102,9 @@ export function SkuRowForm({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* SKU */}
-                  <div className="md:col-span-1">
+                  <div>
                     <label className="label text-xs">
                       SKU <span className="text-destructive">*</span>
                     </label>
@@ -141,56 +127,20 @@ export function SkuRowForm({
                   </div>
 
                   {/* Product Name */}
-                  <div className="md:col-span-1">
+                  <div>
                     <label className="label text-xs">
                       Product Name
-                      <span className="text-xs text-muted-foreground ml-1">(auto)</span>
+                      <span className="text-xs text-muted-foreground ml-1">(auto-filled from SKU)</span>
                     </label>
                     <input
                       type="text"
                       value={row.product}
                       onChange={e => updateSkuRow(row.id, 'product', e.target.value)}
-                      placeholder="Auto-filled"
-                      className="input-field text-sm"
+                      placeholder="Auto-filled from database"
+                      className="input-field text-sm bg-muted"
                       maxLength={100}
+                      readOnly
                     />
-                  </div>
-
-                  {/* Target */}
-                  <div>
-                    <label className="label text-xs">
-                      Target <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={row.productionTarget || ''}
-                      onChange={e => updateSkuRow(row.id, 'productionTarget', parseInt(e.target.value) || 0)}
-                      min="0"
-                      placeholder="0"
-                      className={`input-field text-sm ${hasTargetError ? 'border-destructive' : ''}`}
-                    />
-                  </div>
-
-                  {/* Actual Production - Supervisor only */}
-                  <div>
-                    <label className="label text-xs">Actual</label>
-                    <input
-                      type="number"
-                      value={row.realProduction || ''}
-                      onChange={e => updateSkuRow(row.id, 'realProduction', parseInt(e.target.value) || 0)}
-                      min="0"
-                      placeholder="0"
-                      className="input-field text-sm"
-                      disabled={!canReview}
-                    />
-                  </div>
-
-                  {/* Performance */}
-                  <div>
-                    <label className="label text-xs">Performance</label>
-                    <div className={`input-field text-sm font-semibold ${getPerformanceClass(performance)}`}>
-                      {performance.toFixed(1)}%
-                    </div>
                   </div>
                 </div>
 
@@ -207,27 +157,11 @@ export function SkuRowForm({
         </div>
       )}
 
-      {/* Summary */}
-      {skuRows.length > 1 && (
-        <div className="mt-4 p-3 bg-muted rounded-lg">
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Total Target:</span>
-              <span className="ml-2 font-semibold">{totalTarget.toLocaleString()}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Total Actual:</span>
-              <span className="ml-2 font-semibold">{totalProduction.toLocaleString()}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Overall:</span>
-              <span className={`ml-2 font-semibold ${getPerformanceClass(getPerformance(totalTarget, totalProduction))}`}>
-                {getPerformance(totalTarget, totalProduction).toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Info banner */}
+      <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm text-muted-foreground">
+        <p className="font-medium text-foreground mb-1">Planning Mode</p>
+        <p>Each SKU is saved as an independent record. You can add unlimited products per line and shift.</p>
+      </div>
     </div>
   );
 }
