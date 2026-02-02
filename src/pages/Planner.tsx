@@ -2,32 +2,43 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
+import { SkuRowForm } from '@/components/SkuRowForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { ExcelUpload } from '@/components/ExcelUpload';
-import { ProductSearch } from '@/components/ProductSearch';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShiftFormData, ShiftType, StructuredDowntime, SHIFT_TYPES } from '@/types/shift';
-import { Save, RotateCcw, X, User, ClipboardCheck, Lock, FileSpreadsheet, Package, Users } from 'lucide-react';
+import { SkuRow, createEmptySkuRow } from '@/types/planner';
+import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
 
-const initialFormData: ShiftFormData = {
+interface PlannerFormState {
+  date: string;
+  shift: ShiftType;
+  productionLine: string;
+  lineLeader: string;
+  skuRows: SkuRow[];
+  observations: string;
+  structuredDowntimes: StructuredDowntime[];
+  monitoringPhoto?: string;
+  photoFilename?: string;
+  staffPlanned: number;
+  staffActual: number;
+}
+
+const createInitialState = (): PlannerFormState => ({
   date: new Date().toISOString().split('T')[0],
   shift: 'DAY',
   productionLine: '',
   lineLeader: '',
-  product: '',
-  sku: '',
-  productionTarget: 0,
-  realProduction: 0,
+  skuRows: [createEmptySkuRow()],
   observations: '',
-  downtimes: [],
   structuredDowntimes: [],
   monitoringPhoto: undefined,
   photoFilename: undefined,
   staffPlanned: 0,
   staffActual: 0,
-};
+});
 
 export function Planner() {
   const navigate = useNavigate();
@@ -36,7 +47,7 @@ export function Planner() {
 
   const { addShift, updateShift, getShiftById } = useShifts();
   const { user, hasRole } = useAuth();
-  const [formData, setFormData] = useState<ShiftFormData>(initialFormData);
+  const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
@@ -45,21 +56,24 @@ export function Planner() {
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
 
+  // Load existing shift data for editing
   useEffect(() => {
     if (editId) {
       const shift = getShiftById(editId);
       if (shift) {
-        setFormData({
+        setFormState({
           date: shift.date,
           shift: shift.shift,
           productionLine: shift.productionLine,
           lineLeader: shift.lineLeader,
-          product: shift.product,
-          sku: shift.sku,
-          productionTarget: shift.productionTarget,
-          realProduction: shift.realProduction,
+          skuRows: [{
+            id: editId,
+            sku: shift.sku,
+            product: shift.product,
+            productionTarget: shift.productionTarget,
+            realProduction: shift.realProduction,
+          }],
           observations: shift.observations,
-          downtimes: shift.downtimes,
           structuredDowntimes: shift.structuredDowntimes || [],
           monitoringPhoto: shift.monitoringPhoto,
           photoFilename: shift.photoFilename,
@@ -70,11 +84,11 @@ export function Planner() {
     }
   }, [editId, getShiftById]);
 
-  const handleChange = (
+  const handleFieldChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormState(prev => ({
       ...prev,
       [name]: type === 'number' ? (parseFloat(value) || 0) : value,
     }));
@@ -83,20 +97,16 @@ export function Planner() {
     }
   };
 
-  const handleStructuredDowntimesChange = (downtimes: StructuredDowntime[]) => {
-    setFormData(prev => ({ ...prev, structuredDowntimes: downtimes }));
+  const handleSkuRowsChange = (rows: SkuRow[]) => {
+    setFormState(prev => ({ ...prev, skuRows: rows }));
   };
 
-  const handleProductSelect = (sku: string, product?: { sku: string; name: string }) => {
-    setFormData(prev => ({
-      ...prev,
-      sku,
-      product: product?.name || prev.product,
-    }));
+  const handleStructuredDowntimesChange = (downtimes: StructuredDowntime[]) => {
+    setFormState(prev => ({ ...prev, structuredDowntimes: downtimes }));
   };
 
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
-    setFormData(prev => ({ 
+    setFormState(prev => ({ 
       ...prev, 
       monitoringPhoto: photo,
       photoFilename: filename,
@@ -114,24 +124,32 @@ export function Planner() {
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.date) {
+    if (!formState.date) {
       newErrors.date = 'Date is required';
     }
-    if (!formData.productionLine.trim()) {
+    if (!formState.productionLine.trim()) {
       newErrors.productionLine = 'Production Line is required';
     }
-    if (!formData.lineLeader.trim()) {
+    if (!formState.lineLeader.trim()) {
       newErrors.lineLeader = 'Line Leader is required';
     }
-    if (!formData.sku.trim()) {
-      newErrors.sku = 'SKU is required';
-    }
-    if (!formData.productionTarget || formData.productionTarget <= 0) {
-      newErrors.productionTarget = 'Target must be greater than 0';
+
+    // Validate SKU rows
+    if (formState.skuRows.length === 0) {
+      newErrors.skuRows = 'At least one product is required';
+    } else {
+      formState.skuRows.forEach(row => {
+        if (!row.sku.trim()) {
+          newErrors[`sku_${row.id}`] = 'SKU is required';
+        }
+        if (row.productionTarget <= 0) {
+          newErrors[`target_${row.id}`] = 'Target must be greater than 0';
+        }
+      });
     }
 
     // Validate structured downtimes - "Other" category requires comment
-    const invalidDowntimes = formData.structuredDowntimes?.filter(
+    const invalidDowntimes = formState.structuredDowntimes?.filter(
       d => d.category === 'other' && !d.comment?.trim()
     );
     if (invalidDowntimes && invalidDowntimes.length > 0) {
@@ -150,10 +168,51 @@ export function Planner() {
     setIsSubmitting(true);
 
     try {
-      if (editId) {
+      // If editing, update single shift
+      if (editId && formState.skuRows.length === 1) {
+        const row = formState.skuRows[0];
+        const formData: ShiftFormData = {
+          date: formState.date,
+          shift: formState.shift,
+          productionLine: formState.productionLine,
+          lineLeader: formState.lineLeader,
+          product: row.product,
+          sku: row.sku,
+          productionTarget: row.productionTarget,
+          realProduction: row.realProduction,
+          observations: formState.observations,
+          downtimes: [],
+          structuredDowntimes: formState.structuredDowntimes,
+          monitoringPhoto: formState.monitoringPhoto,
+          photoFilename: formState.photoFilename,
+          staffPlanned: formState.staffPlanned,
+          staffActual: formState.staffActual,
+        };
         await updateShift(editId, formData);
       } else {
-        await addShift(formData);
+        // Save each SKU row as separate shift record
+        for (const row of formState.skuRows) {
+          if (!row.sku.trim()) continue; // Skip empty rows
+          
+          const formData: ShiftFormData = {
+            date: formState.date,
+            shift: formState.shift,
+            productionLine: formState.productionLine,
+            lineLeader: formState.lineLeader,
+            product: row.product,
+            sku: row.sku,
+            productionTarget: row.productionTarget,
+            realProduction: row.realProduction,
+            observations: formState.observations,
+            downtimes: [],
+            structuredDowntimes: formState.structuredDowntimes,
+            monitoringPhoto: formState.monitoringPhoto,
+            photoFilename: formState.photoFilename,
+            staffPlanned: formState.staffPlanned,
+            staffActual: formState.staffActual,
+          };
+          await addShift(formData);
+        }
       }
       navigate('/history');
     } catch (error) {
@@ -164,18 +223,8 @@ export function Planner() {
   };
 
   const handleReset = () => {
-    setFormData(initialFormData);
+    setFormState(createInitialState());
     setErrors({});
-  };
-
-  const performance = formData.productionTarget > 0
-    ? ((formData.realProduction / formData.productionTarget) * 100).toFixed(1)
-    : '0.0';
-
-  const getPerformanceClass = (perf: number) => {
-    if (perf >= 90) return 'text-success bg-success/10';
-    if (perf >= 75) return 'text-warning bg-warning/10';
-    return 'text-destructive bg-destructive/10';
   };
 
   return (
@@ -209,20 +258,14 @@ export function Planner() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Info Banner */}
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm text-primary">
-              <strong>💡 Dica:</strong> Cada linha de produção pode ter múltiplos produtos. 
-              Crie um registro para cada combinação de Linha + SKU + Turno.
-            </div>
-
-            {/* Operator Entry Section */}
+            {/* Shift Information Card */}
             <div className="card p-4 sm:p-6">
               <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
                 <User size={20} className="text-primary" />
                 Shift Information
               </h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label htmlFor="date" className="label">
                     Date <span className="text-destructive">*</span>
@@ -231,8 +274,8 @@ export function Planner() {
                     type="date"
                     id="date"
                     name="date"
-                    value={formData.date}
-                    onChange={handleChange}
+                    value={formState.date}
+                    onChange={handleFieldChange}
                     className={`input-field ${errors.date ? 'border-destructive' : ''}`}
                   />
                   {errors.date && (
@@ -245,8 +288,8 @@ export function Planner() {
                   <select
                     id="shift"
                     name="shift"
-                    value={formData.shift}
-                    onChange={handleChange}
+                    value={formState.shift}
+                    onChange={handleFieldChange}
                     className="select-field"
                   >
                     {SHIFT_TYPES.map(s => (
@@ -263,8 +306,8 @@ export function Planner() {
                     type="text"
                     id="productionLine"
                     name="productionLine"
-                    value={formData.productionLine}
-                    onChange={handleChange}
+                    value={formState.productionLine}
+                    onChange={handleFieldChange}
                     placeholder="e.g., Line 1"
                     className={`input-field ${errors.productionLine ? 'border-destructive' : ''}`}
                     maxLength={50}
@@ -282,8 +325,8 @@ export function Planner() {
                     type="text"
                     id="lineLeader"
                     name="lineLeader"
-                    value={formData.lineLeader}
-                    onChange={handleChange}
+                    value={formState.lineLeader}
+                    onChange={handleFieldChange}
                     placeholder="Leader name"
                     className={`input-field ${errors.lineLeader ? 'border-destructive' : ''}`}
                     maxLength={100}
@@ -292,73 +335,20 @@ export function Planner() {
                     <p className="text-sm text-destructive mt-1">{errors.lineLeader}</p>
                   )}
                 </div>
-
-                {/* SKU Field - Now first in product section */}
-                <div>
-                  <label htmlFor="sku" className="label flex items-center gap-2">
-                    <Package size={14} />
-                    SKU <span className="text-destructive">*</span>
-                  </label>
-                  {canReview ? (
-                    <ProductSearch
-                      value={formData.sku}
-                      onChange={handleProductSelect}
-                      placeholder="Type SKU to search..."
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      id="sku"
-                      name="sku"
-                      value={formData.sku}
-                      onChange={handleChange}
-                      placeholder="SKU code"
-                      className={`input-field ${errors.sku ? 'border-destructive' : ''}`}
-                      maxLength={50}
-                    />
-                  )}
-                  {errors.sku && (
-                    <p className="text-sm text-destructive mt-1">{errors.sku}</p>
-                  )}
-                </div>
-
-                {/* Product Name - Auto-filled */}
-                <div>
-                  <label htmlFor="product" className="label">
-                    Product Name
-                    <span className="text-xs text-muted-foreground ml-1">(auto-filled)</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="product"
-                    name="product"
-                    value={formData.product}
-                    onChange={handleChange}
-                    placeholder="Auto-filled from SKU"
-                    className="input-field"
-                    maxLength={100}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="productionTarget" className="label">
-                    Planned Quantity <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    id="productionTarget"
-                    name="productionTarget"
-                    value={formData.productionTarget || ''}
-                    onChange={handleChange}
-                    min="1"
-                    placeholder="0"
-                    className={`input-field ${errors.productionTarget ? 'border-destructive' : ''}`}
-                  />
-                  {errors.productionTarget && (
-                    <p className="text-sm text-destructive mt-1">{errors.productionTarget}</p>
-                  )}
-                </div>
               </div>
+            </div>
+
+            {/* SKU Rows Section - Like Downtime Form */}
+            <div className="card p-4 sm:p-6">
+              <SkuRowForm
+                skuRows={formState.skuRows}
+                onChange={handleSkuRowsChange}
+                canReview={canReview}
+                errors={errors}
+              />
+              {errors.skuRows && (
+                <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>
+              )}
             </div>
 
             {/* Staffing Section - Supervisor Only */}
@@ -376,8 +366,8 @@ export function Planner() {
                       type="number"
                       id="staffPlanned"
                       name="staffPlanned"
-                      value={formData.staffPlanned || ''}
-                      onChange={handleChange}
+                      value={formState.staffPlanned || ''}
+                      onChange={handleFieldChange}
                       min="0"
                       placeholder="0"
                       className="input-field"
@@ -390,8 +380,8 @@ export function Planner() {
                       type="number"
                       id="staffActual"
                       name="staffActual"
-                      value={formData.staffActual || ''}
-                      onChange={handleChange}
+                      value={formState.staffActual || ''}
+                      onChange={handleFieldChange}
                       min="0"
                       placeholder="0"
                       className="input-field"
@@ -405,7 +395,7 @@ export function Planner() {
             <div className={`card p-4 sm:p-6 border-l-4 ${canReview ? 'border-l-primary' : 'border-l-muted'}`}>
               <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
                 <ClipboardCheck size={20} className={canReview ? 'text-primary' : 'text-muted-foreground'} />
-                Production Results
+                Production Review
                 {!canReview && (
                   <span className="ml-auto flex items-center gap-1 text-sm font-normal text-muted-foreground">
                     <Lock size={14} />
@@ -415,38 +405,14 @@ export function Planner() {
               </h3>
               
               <div className={`${!canReview ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                  <div>
-                    <label htmlFor="realProduction" className="label">Actual Production</label>
-                    <input
-                      type="number"
-                      id="realProduction"
-                      name="realProduction"
-                      value={formData.realProduction || ''}
-                      onChange={handleChange}
-                      min="0"
-                      placeholder="0"
-                      className="input-field"
-                      disabled={!canReview}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">Performance</label>
-                    <div className={`input-field font-bold text-lg ${getPerformanceClass(parseFloat(performance))}`}>
-                      {performance}%
-                    </div>
-                  </div>
-                </div>
-
                 {/* Observations */}
                 <div className="mb-6">
                   <label htmlFor="observations" className="label">Comments / Observations</label>
                   <textarea
                     id="observations"
                     name="observations"
-                    value={formData.observations}
-                    onChange={handleChange}
+                    value={formState.observations}
+                    onChange={handleFieldChange}
                     rows={3}
                     placeholder="Additional notes about the shift..."
                     className="input-field resize-none"
@@ -458,7 +424,7 @@ export function Planner() {
                 {/* Structured Downtime Section */}
                 <div className="mb-6 p-4 bg-muted rounded-lg">
                   <StructuredDowntimeForm
-                    downtimes={formData.structuredDowntimes || []}
+                    downtimes={formState.structuredDowntimes || []}
                     onChange={handleStructuredDowntimesChange}
                     downtimeThreshold={60}
                   />
@@ -470,8 +436,8 @@ export function Planner() {
                 {/* Photo Upload */}
                 <div className="p-4 bg-muted rounded-lg">
                   <PhotoUpload
-                    photo={formData.monitoringPhoto}
-                    filename={formData.photoFilename}
+                    photo={formState.monitoringPhoto}
+                    filename={formState.photoFilename}
                     onChange={handlePhotoChange}
                   />
                 </div>
@@ -502,7 +468,7 @@ export function Planner() {
                 ) : (
                   <>
                     <Save size={18} />
-                    {editId ? 'Update Shift' : 'Save Shift'}
+                    {editId ? 'Update Shift' : `Save ${formState.skuRows.length} Product(s)`}
                   </>
                 )}
               </button>
