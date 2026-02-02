@@ -1,9 +1,8 @@
+// Planner is for PLANNING ONLY - no production quantities
 export interface SkuRow {
   id: string;
   sku: string;
   product: string;
-  productionTarget: number;
-  realProduction: number;
 }
 
 export interface PlannerFormData {
@@ -13,14 +12,10 @@ export interface PlannerFormData {
   lineLeader: string;
   skuRows: SkuRow[];
   observations: string;
-  staffPlanned: number;
-  staffActual: number;
 }
 
 export const createEmptySkuRow = (): SkuRow => ({
   id: `sku-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   sku: '',
   product: '',
-  productionTarget: 0,
-  realProduction: 0,
 });
