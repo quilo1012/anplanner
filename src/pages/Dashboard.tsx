@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { Header } from '@/components/Header';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { useShifts } from '@/contexts/ShiftContext';
@@ -9,8 +9,9 @@ import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
+import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { StatCard } from '@/components/StatCard';
-import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Factory, Package, BarChart3 } from 'lucide-react';
+import { Activity, TrendingUp, AlertTriangle, Calendar, Target, Clock, Users, Factory, Package, BarChart3, Printer, TableIcon } from 'lucide-react';
 
 export function Dashboard() {
   const { shifts, isLoading } = useShifts();
@@ -117,6 +118,10 @@ export function Dashboard() {
     exportToCsv(filteredShifts, `shift_${selectedShift}_report`);
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (isLoading) {
     return (
       <>
@@ -132,30 +137,46 @@ export function Dashboard() {
     <>
       <Header title="Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(today)}`} />
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-        {/* Welcome Message */}
-        <WelcomeScreen />
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6 print:p-0">
+        {/* Welcome Message - hide on print */}
+        <div className="no-print">
+          <WelcomeScreen />
+        </div>
 
         {/* Shift Filter - Mandatory */}
-        <div className="card p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-foreground">Select Shift:</span>
-            <div className="flex gap-2">
-              {SHIFT_TYPES.map(shift => (
-                <button
-                  key={shift}
-                  onClick={() => setSelectedShift(shift)}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                    selectedShift === shift
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-accent text-foreground'
-                  }`}
-                >
-                  {shift}
-                </button>
-              ))}
+        <div className="card p-4 no-print">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-foreground">Select Shift:</span>
+              <div className="flex gap-2">
+                {SHIFT_TYPES.map(shift => (
+                  <button
+                    key={shift}
+                    onClick={() => setSelectedShift(shift)}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      selectedShift === shift
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted hover:bg-accent text-foreground'
+                    }`}
+                  >
+                    {shift}
+                  </button>
+                ))}
+              </div>
             </div>
+            <button onClick={handlePrint} className="btn-secondary text-sm">
+              <Printer size={16} />
+              <span className="hidden sm:inline">Print Report</span>
+            </button>
           </div>
+        </div>
+
+        {/* Print Header - only visible on print */}
+        <div className="hidden print:block mb-4">
+          <h1 className="text-2xl font-bold">Applied Nutrition - Dashboard Report</h1>
+          <p className="text-sm">
+            Shift: {selectedShift} | Date: {formatDate(today)} | Generated: {new Date().toLocaleString()}
+          </p>
         </div>
 
         {/* Stats Cards */}
@@ -196,7 +217,7 @@ export function Dashboard() {
                   Production Lines - {selectedShift} Shift
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Current status per line
+                  Current status by line
                 </p>
               </div>
               <button onClick={handleExportCsv} className="btn-secondary text-sm">
@@ -286,8 +307,20 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Performance Trend */}
+        {/* Daily Summary Table */}
         <div className="card p-4 sm:p-6">
+          <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+            <TableIcon size={20} />
+            Daily Summary - {selectedShift} Shift
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Aggregated view: Date + Shift + Line
+          </p>
+          <DailySummaryTable shifts={filteredShifts} />
+        </div>
+
+        {/* Performance Trend - hide on print (charts don't print well) */}
+        <div className="card p-4 sm:p-6 no-print">
           <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
             <TrendingUp size={20} />
             Performance Trend - {selectedShift} Shift (Last 7 Days)
@@ -333,7 +366,7 @@ export function Dashboard() {
 
         {/* Empty State */}
         {shifts.length === 0 && (
-          <div className="card p-8 text-center">
+          <div className="card p-8 text-center no-print">
             <Activity size={48} className="mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">No Shift Data</h3>
             <p className="text-muted-foreground">

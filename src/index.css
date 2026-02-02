@@ -42,14 +42,15 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 220 25% 18%;
-    --sidebar-foreground: 220 10% 90%;
-    --sidebar-primary: 220 70% 50%;
+    /* Sidebar - Dark professional look in both modes */
+    --sidebar: 220 25% 15%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 220 70% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 25%;
-    --sidebar-accent-foreground: 220 10% 90%;
-    --sidebar-border: 220 25% 25%;
-    --sidebar-ring: 220 70% 50%;
+    --sidebar-accent: 220 25% 22%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 25% 22%;
+    --sidebar-ring: 220 70% 55%;
   }
 
   .dark {
@@ -87,13 +88,14 @@
     --input: 220 20% 22%;
     --ring: 220 70% 55%;
 
-    --sidebar-background: 220 25% 8%;
-    --sidebar-foreground: 220 10% 90%;
+    /* Sidebar - Dark professional look */
+    --sidebar: 220 25% 10%;
+    --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 220 70% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 15%;
-    --sidebar-accent-foreground: 220 10% 90%;
-    --sidebar-border: 220 25% 15%;
+    --sidebar-accent: 220 25% 18%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 25% 18%;
     --sidebar-ring: 220 70% 55%;
   }
 }
@@ -221,17 +223,42 @@
 
 /* Print styles */
 @media print {
-  .no-print {
+  .no-print,
+  .no-print *,
+  aside,
+  nav,
+  header {
     display: none !important;
   }
   
   body {
     background: white !important;
     color: black !important;
+    font-size: 12px !important;
+  }
+  
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
   .card {
     border: 1px solid #ddd !important;
     box-shadow: none !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  .table th,
+  .table td {
+    padding: 0.5rem !important;
+    border-bottom: 1px solid #ddd !important;
+  }
+  
+  .performance-green,
+  .performance-yellow,
+  .performance-red {
+    background: transparent !important;
+    border: 1px solid currentColor !important;
   }
 }
