@@ -1,13 +1,13 @@
-import { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Header } from '@/components/Header';
 import { PrintReport } from '@/components/PrintReport';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftType, SHIFT_TYPES, ShiftReport } from '@/types/shift';
+import { ShiftType, SHIFT_TYPES, ShiftReport, DOWNTIME_CATEGORIES } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
-import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock, Factory, Users, Printer } from 'lucide-react';
+import { Edit, Trash2, Download, X, Image, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search } from 'lucide-react';
 
 export function History() {
   const { shifts, refreshShifts } = useShifts();
@@ -19,27 +19,31 @@ export function History() {
   const [filterShift, setFilterShift] = useState<ShiftType | ''>('');
   const [filterLine, setFilterLine] = useState('');
   const [filterLeader, setFilterLeader] = useState('');
+  const [filterSku, setFilterSku] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  // Edit and Delete dialog state
   const [editShift, setEditShift] = useState<ShiftReport | null>(null);
   const [deleteShift, setDeleteShift] = useState<ShiftReport | null>(null);
 
   const canEdit = hasRole(['supervisor', 'admin']);
   const canDelete = hasRole(['supervisor', 'admin']);
 
-  // Get unique lines and leaders for filter dropdowns
-  const { uniqueLines, uniqueLeaders } = useMemo(() => {
+  const { uniqueLines, uniqueLeaders, uniqueSkus } = useMemo(() => {
     const lines = new Set<string>();
     const leaders = new Set<string>();
+    const skus = new Set<string>();
     shifts.forEach(s => {
       if (s.productionLine) lines.add(s.productionLine);
       if (s.lineLeader) leaders.add(s.lineLeader);
+      if (s.sku) skus.add(s.sku);
     });
     return {
       uniqueLines: Array.from(lines).sort(),
       uniqueLeaders: Array.from(leaders).sort(),
+      uniqueSkus: Array.from(skus).sort(),
     };
   }, [shifts]);
 
@@ -50,9 +54,29 @@ export function History() {
       if (filterShift && shift.shift !== filterShift) return false;
       if (filterLine && shift.productionLine !== filterLine) return false;
       if (filterLeader && shift.lineLeader !== filterLeader) return false;
+      if (filterSku && shift.sku !== filterSku) return false;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = 
+          shift.productionLine.toLowerCase().includes(query) ||
+          shift.lineLeader.toLowerCase().includes(query) ||
+          shift.product.toLowerCase().includes(query) ||
+          (shift.sku && shift.sku.toLowerCase().includes(query)) ||
+          (shift.observations && shift.observations.toLowerCase().includes(query));
+        if (!matchesSearch) return false;
+      }
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [shifts, filterFromDate, filterToDate, filterShift, filterLine, filterLeader]);
+  }, [shifts, filterFromDate, filterToDate, filterShift, filterLine, filterLeader, filterSku, searchQuery]);
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleEdit = (shift: ShiftReport) => {
     if (!canEdit) return;
@@ -89,11 +113,11 @@ export function History() {
     setFilterShift('');
     setFilterLine('');
     setFilterLeader('');
+    setFilterSku('');
+    setSearchQuery('');
   };
 
-  const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader;
-
-  // Get the date and shift for print report
+  const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader || filterSku || searchQuery;
   const printDate = filterFromDate || new Date().toISOString().split('T')[0];
   const printShift = filterShift || 'DAY';
 
@@ -110,60 +134,64 @@ export function History() {
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
         {/* Filters */}
-        <div className="card p-3 sm:p-4 mb-4 sm:mb-6">
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 sm:gap-4 items-end">
-            <div className="col-span-1">
-              <label className="label flex items-center gap-1 text-xs sm:text-sm">
-                <Calendar size={14} />
+        <div className="card p-3 sm:p-4 mb-4">
+          <div className="mb-3">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Quick search (line, leader, SKU, product, notes)..."
+                className="input-field pl-10 w-full text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 items-end">
+            <div>
+              <label className="label flex items-center gap-1 text-xs">
+                <Calendar size={12} />
                 From
               </label>
               <input
                 type="date"
                 value={filterFromDate}
                 onChange={e => setFilterFromDate(e.target.value)}
-                className="input-field w-full sm:w-40 text-sm"
+                className="input-field w-full text-sm"
               />
             </div>
-
-            <div className="col-span-1">
-              <label className="label flex items-center gap-1 text-xs sm:text-sm">
-                <Calendar size={14} />
+            <div>
+              <label className="label flex items-center gap-1 text-xs">
+                <Calendar size={12} />
                 To
               </label>
               <input
                 type="date"
                 value={filterToDate}
                 onChange={e => setFilterToDate(e.target.value)}
-                className="input-field w-full sm:w-40 text-sm"
+                className="input-field w-full text-sm"
               />
             </div>
-
-            <div className="col-span-1">
-              <label className="label flex items-center gap-1 text-xs sm:text-sm">
-                <Filter size={14} />
-                Shift
-              </label>
+            <div>
+              <label className="label text-xs">Shift</label>
               <select
                 value={filterShift}
                 onChange={e => setFilterShift(e.target.value as ShiftType | '')}
-                className="select-field w-full sm:w-32 text-sm"
+                className="select-field w-full text-sm"
               >
                 <option value="">All</option>
                 {SHIFT_TYPES.map(s => (
-                  <option key={s} value={s}>Shift {s}</option>
+                  <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </div>
-
-            <div className="col-span-1">
-              <label className="label flex items-center gap-1 text-xs sm:text-sm">
-                <Factory size={14} />
-                Line
-              </label>
+            <div>
+              <label className="label text-xs">Line</label>
               <select
                 value={filterLine}
                 onChange={e => setFilterLine(e.target.value)}
-                className="select-field w-full sm:w-36 text-sm"
+                className="select-field w-full text-sm"
               >
                 <option value="">All</option>
                 {uniqueLines.map(line => (
@@ -171,16 +199,12 @@ export function History() {
                 ))}
               </select>
             </div>
-
-            <div className="col-span-1">
-              <label className="label flex items-center gap-1 text-xs sm:text-sm">
-                <Users size={14} />
-                Leader
-              </label>
+            <div>
+              <label className="label text-xs">Leader</label>
               <select
                 value={filterLeader}
                 onChange={e => setFilterLeader(e.target.value)}
-                className="select-field w-full sm:w-40 text-sm"
+                className="select-field w-full text-sm"
               >
                 <option value="">All</option>
                 {uniqueLeaders.map(leader => (
@@ -188,35 +212,30 @@ export function History() {
                 ))}
               </select>
             </div>
-
-            <div className="col-span-1 flex gap-2">
+            <div>
+              <label className="label text-xs">SKU</label>
+              <select
+                value={filterSku}
+                onChange={e => setFilterSku(e.target.value)}
+                className="select-field w-full text-sm"
+              >
+                <option value="">All</option>
+                {uniqueSkus.map(sku => (
+                  <option key={sku} value={sku}>{sku}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end gap-2">
               {hasFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="btn-secondary text-sm px-3"
-                >
-                  <X size={16} />
-                  <span className="hidden sm:inline">Clear</span>
+                <button onClick={clearFilters} className="btn-secondary text-xs py-2 px-2" title="Clear filters">
+                  <X size={14} />
                 </button>
               )}
-            </div>
-
-            <div className="col-span-2 sm:col-span-1 sm:ml-auto flex gap-2">
-              <button
-                onClick={handlePrint}
-                disabled={filteredShifts.length === 0}
-                className="btn-secondary text-sm"
-              >
-                <Printer size={16} />
-                <span className="hidden sm:inline">Print</span>
+              <button onClick={handlePrint} disabled={filteredShifts.length === 0} className="btn-secondary text-xs py-2">
+                <Printer size={14} />
               </button>
-              <button
-                onClick={handleExport}
-                disabled={filteredShifts.length === 0}
-                className="btn-success text-sm"
-              >
-                <Download size={16} />
-                <span>Export CSV</span>
+              <button onClick={handleExport} disabled={filteredShifts.length === 0} className="btn-success text-xs py-2">
+                <Download size={14} />
               </button>
             </div>
           </div>
@@ -230,13 +249,11 @@ export function History() {
           </div>
         )}
 
-        {/* Table - Desktop, Cards - Mobile */}
+        {/* Content */}
         {filteredShifts.length === 0 ? (
           <div className="card p-8 sm:p-12 text-center">
             <div className="text-4xl sm:text-6xl mb-4">📋</div>
-            <p className="text-muted-foreground mb-4">
-              No shifts found.
-            </p>
+            <p className="text-muted-foreground mb-4">No shifts found.</p>
           </div>
         ) : (
           <>
@@ -248,11 +265,11 @@ export function History() {
                     <div>
                       <p className="font-medium">{formatDate(shift.date)}</p>
                       <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-                        Shift {shift.shift}
+                        {shift.shift}
                       </span>
                     </div>
                     <span className={getPerformanceClass(shift.performance)}>
-                      {shift.performance.toFixed(1)}%
+                      {shift.performance.toFixed(0)}%
                     </span>
                   </div>
                   
@@ -281,6 +298,13 @@ export function History() {
                     )}
                   </div>
 
+                  {shift.observations && (
+                    <div className="mb-3 p-2 bg-muted rounded text-xs">
+                      <MessageSquare size={12} className="inline mr-1" />
+                      {shift.observations}
+                    </div>
+                  )}
+
                   {(canEdit || canDelete) && (
                     <div className="flex gap-2 pt-3 border-t border-border">
                       {canEdit && (
@@ -308,92 +332,156 @@ export function History() {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden sm:block card table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Shift</th>
-                    <th>Line</th>
-                    <th>Leader</th>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th>Planned</th>
-                    <th>Actual</th>
-                    <th>Performance</th>
-                    <th>Downtime</th>
-                    <th>Staff</th>
-                    <th>Photo</th>
-                    {(canEdit || canDelete) && <th>Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredShifts.map(shift => (
-                    <tr key={shift.id}>
-                      <td className="whitespace-nowrap">{formatDate(shift.date)}</td>
-                      <td>
-                        <span className="px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
-                          Shift {shift.shift}
-                        </span>
-                      </td>
-                      <td>{shift.productionLine}</td>
-                      <td>{shift.lineLeader}</td>
-                      <td className="max-w-[120px] truncate">{shift.product || '-'}</td>
-                      <td className="font-mono text-xs">{shift.sku || '-'}</td>
-                      <td className="text-right font-medium">{shift.productionTarget.toLocaleString()}</td>
-                      <td className="text-right font-medium">{shift.realProduction.toLocaleString()}</td>
-                      <td>
-                        <span className={getPerformanceClass(shift.performance)}>
-                          {shift.performance.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="text-right">{shift.totalDowntime} min</td>
-                      <td className="text-center">
-                        <span className={shift.staffActual < shift.staffPlanned ? 'text-destructive font-medium' : ''}>
-                          {shift.staffActual}/{shift.staffPlanned}
-                        </span>
-                      </td>
-                      <td>
-                        {shift.monitoringPhoto ? (
-                          <button
-                            onClick={() => setPreviewPhoto(shift.monitoringPhoto!)}
-                            className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
-                            title="View photo"
-                          >
-                            <Image size={16} />
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      {(canEdit || canDelete) && (
-                        <td>
-                          <div className="flex gap-2">
-                            {canEdit && (
-                              <button
-                                onClick={() => handleEdit(shift)}
-                                className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
-                                title="Edit"
-                              >
-                                <Edit size={16} />
-                              </button>
-                            )}
-                            {canDelete && (
-                              <button
-                                onClick={() => handleDelete(shift)}
-                                className="p-1.5 text-destructive hover:bg-destructive/10 rounded transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      )}
+            <div className="hidden sm:block card overflow-hidden">
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th className="w-8"></th>
+                      <th>Date</th>
+                      <th>Shift</th>
+                      <th>Line</th>
+                      <th>Leader</th>
+                      <th>Product</th>
+                      <th>SKU</th>
+                      <th className="text-right">Planned</th>
+                      <th className="text-right">Actual</th>
+                      <th>Perf</th>
+                      <th className="text-right">Downtime</th>
+                      <th className="text-center">Staff</th>
+                      <th className="text-center">Photo</th>
+                      {(canEdit || canDelete) && <th className="w-24">Actions</th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredShifts.map(shift => {
+                      const hasDetails = shift.observations || (shift.structuredDowntimes && shift.structuredDowntimes.length > 0);
+                      const isExpanded = expandedRows.has(shift.id);
+                      
+                      return (
+                        <React.Fragment key={shift.id}>
+                          <tr className="hover:bg-muted/50">
+                            <td className="text-center">
+                              {hasDetails && (
+                                <button 
+                                  onClick={() => toggleRow(shift.id)} 
+                                  className="p-1 hover:bg-muted rounded transition-colors"
+                                  title="Toggle details"
+                                >
+                                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </button>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap text-sm">{formatDate(shift.date)}</td>
+                            <td>
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                                {shift.shift}
+                              </span>
+                            </td>
+                            <td className="font-medium text-sm">{shift.productionLine}</td>
+                            <td className="text-sm">{shift.lineLeader}</td>
+                            <td className="max-w-[100px] truncate text-sm" title={shift.product}>{shift.product || '-'}</td>
+                            <td className="font-mono text-xs">{shift.sku || '-'}</td>
+                            <td className="text-right font-medium text-sm">{shift.productionTarget.toLocaleString()}</td>
+                            <td className="text-right font-medium text-sm">{shift.realProduction.toLocaleString()}</td>
+                            <td>
+                              <span className={getPerformanceClass(shift.performance)}>
+                                {shift.performance.toFixed(0)}%
+                              </span>
+                            </td>
+                            <td className="text-right text-sm">{shift.totalDowntime} min</td>
+                            <td className="text-center text-sm">
+                              <span className={shift.staffActual < shift.staffPlanned ? 'text-destructive font-medium' : ''}>
+                                {shift.staffActual}/{shift.staffPlanned}
+                              </span>
+                            </td>
+                            <td className="text-center">
+                              {shift.monitoringPhoto ? (
+                                <button
+                                  onClick={() => setPreviewPhoto(shift.monitoringPhoto!)}
+                                  className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
+                                  title="View photo"
+                                >
+                                  <Image size={14} />
+                                </button>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
+                            </td>
+                            {(canEdit || canDelete) && (
+                              <td>
+                                <div className="flex gap-1">
+                                  {canEdit && (
+                                    <button
+                                      onClick={() => handleEdit(shift)}
+                                      className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
+                                      title="Edit"
+                                    >
+                                      <Edit size={14} />
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <button
+                                      onClick={() => handleDelete(shift)}
+                                      className="p-1.5 text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                      title="Delete"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                          
+                          {isExpanded && hasDetails && (
+                            <tr className="bg-muted/30">
+                              <td colSpan={(canEdit || canDelete) ? 14 : 13} className="py-3 px-4">
+                                <div className="space-y-3">
+                                  {shift.observations && (
+                                    <div className="flex items-start gap-2">
+                                      <MessageSquare size={14} className="text-primary mt-0.5 shrink-0" />
+                                      <div>
+                                        <p className="text-xs font-medium text-foreground">Notes</p>
+                                        <p className="text-sm text-muted-foreground">{shift.observations}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {shift.structuredDowntimes && shift.structuredDowntimes.length > 0 && (
+                                    <div className="flex items-start gap-2">
+                                      <Clock size={14} className="text-destructive mt-0.5 shrink-0" />
+                                      <div className="flex-1">
+                                        <p className="text-xs font-medium text-foreground mb-1">
+                                          Downtime Entries ({shift.structuredDowntimes.length})
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                          {shift.structuredDowntimes.map(dt => (
+                                            <div key={dt.id} className="bg-card border border-border rounded p-2 text-xs">
+                                              <div className="flex justify-between items-start">
+                                                <span className="font-medium">
+                                                  {DOWNTIME_CATEGORIES.find(c => c.value === dt.category)?.label || dt.category}
+                                                </span>
+                                                <span className="font-bold text-destructive">{dt.duration} min</span>
+                                              </div>
+                                              <p className="text-muted-foreground">{dt.reason}</p>
+                                              {dt.comment && <p className="italic mt-1 text-muted-foreground">"{dt.comment}"</p>}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}
@@ -432,7 +520,6 @@ export function History() {
         )}
       </div>
 
-      {/* Edit Dialog */}
       <EditShiftDialog
         shift={editShift}
         open={!!editShift}
@@ -440,7 +527,6 @@ export function History() {
         onSuccess={handleDialogSuccess}
       />
 
-      {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog
         shift={deleteShift}
         open={!!deleteShift}

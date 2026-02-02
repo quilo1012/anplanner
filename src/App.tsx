@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
 import { Planner } from '@/pages/Planner';
+import { Downtime } from '@/pages/Downtime';
 import { History } from '@/pages/History';
 import { Login } from '@/pages/Login';
 import { Admin } from '@/pages/Admin';
@@ -27,6 +28,7 @@ const App = () => (
             >
               <Route index element={<Dashboard />} />
               <Route path="planner" element={<Planner />} />
+              <Route path="downtime" element={<Downtime />} />
               <Route path="history" element={<History />} />
               <Route
                 path="admin"

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Factory } from 'lucide-react';
+import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Factory, Clock } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 
 export function Sidebar() {
@@ -8,6 +8,7 @@ export function Sidebar() {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['operator', 'supervisor', 'admin'] },
+    { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
   ];

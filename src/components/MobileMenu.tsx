@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Factory } from 'lucide-react';
+import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Factory, Clock } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 
 export function MobileMenu() {
@@ -10,6 +10,7 @@ export function MobileMenu() {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['operator', 'supervisor', 'admin'] },
+    { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
   ];
