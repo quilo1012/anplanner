@@ -1,16 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
+import { PrintReport } from '@/components/PrintReport';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShiftType, SHIFT_TYPES } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
-import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock, Factory, Users } from 'lucide-react';
+import { Edit, Trash2, Download, Filter, X, Image, Calendar, Lock, Factory, Users, Printer } from 'lucide-react';
 
 export function History() {
   const navigate = useNavigate();
   const { shifts, deleteShift } = useShifts();
   const { hasRole } = useAuth();
+  const printRef = useRef<HTMLDivElement>(null);
   
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
@@ -19,6 +21,7 @@ export function History() {
   const [filterLeader, setFilterLeader] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']);
   const canDelete = hasRole(['supervisor', 'admin']);
@@ -67,6 +70,15 @@ export function History() {
     exportToCsv(filteredShifts, 'shift_history');
   };
 
+  const handlePrint = () => {
+    if (filteredShifts.length === 0) return;
+    setShowPrintPreview(true);
+    setTimeout(() => {
+      window.print();
+      setShowPrintPreview(false);
+    }, 100);
+  };
+
   const getPerformanceClass = (performance: number) => {
     if (performance >= 90) return 'performance-green';
     if (performance >= 75) return 'performance-yellow';
@@ -82,6 +94,10 @@ export function History() {
   };
 
   const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader;
+
+  // Get the date and shift for print report
+  const printDate = filterFromDate || new Date().toISOString().split('T')[0];
+  const printShift = filterShift || 'DAY';
 
   return (
     <>
@@ -183,11 +199,19 @@ export function History() {
               )}
             </div>
 
-            <div className="col-span-2 sm:col-span-1 sm:ml-auto">
+            <div className="col-span-2 sm:col-span-1 sm:ml-auto flex gap-2">
+              <button
+                onClick={handlePrint}
+                disabled={filteredShifts.length === 0}
+                className="btn-secondary text-sm"
+              >
+                <Printer size={16} />
+                <span className="hidden sm:inline">Print</span>
+              </button>
               <button
                 onClick={handleExport}
                 disabled={filteredShifts.length === 0}
-                className="btn-success w-full sm:w-auto text-sm"
+                className="btn-success text-sm"
               >
                 <Download size={16} />
                 <span>Export CSV</span>
@@ -405,6 +429,17 @@ export function History() {
                 className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
               />
             </div>
+          </div>
+        )}
+
+        {/* Hidden Print Preview */}
+        {showPrintPreview && (
+          <div className="hidden print:block" ref={printRef}>
+            <PrintReport 
+              shifts={filteredShifts} 
+              date={printDate} 
+              shift={printShift as ShiftType} 
+            />
           </div>
         )}
       </div>
