@@ -65,6 +65,15 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Industrial Dashboard Colors
+        industrial: {
+          blue: "hsl(var(--industrial-blue))",
+          cyan: "hsl(var(--industrial-cyan))",
+          purple: "hsl(var(--industrial-purple))",
+          green: "hsl(var(--industrial-green))",
+          orange: "hsl(var(--industrial-orange))",
+          red: "hsl(var(--industrial-red))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
