@@ -13,7 +13,7 @@ import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
 import { ActionButtons } from '@/components/dashboard/ActionButtons';
-import { Activity, TrendingUp, AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, TableIcon, Calendar, Filter } from 'lucide-react';
+import { Activity, TrendingUp, AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, TableIcon, Calendar, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const LINE_COLORS = [
@@ -30,6 +30,7 @@ export function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedLine, setSelectedLine] = useState<string>('');
   const [selectedLeader, setSelectedLeader] = useState<string>('');
+  const [showCharts, setShowCharts] = useState(true);
 
   // Get unique lines and leaders for filters
   const { uniqueLines, uniqueLeaders } = useMemo(() => {
@@ -101,13 +102,14 @@ export function Dashboard() {
         totalDowntime,
         currentSku: latestShift?.sku || '-',
         currentProduct: latestShift?.product || '-',
+        currentLeader: latestShift?.lineLeader || '-',
         staffPlanned: latestShift?.staffPlanned || 0,
         staffActual: latestShift?.staffActual || 0,
         availability: Math.max(0, availability),
         colorClass: LINE_COLORS[index % LINE_COLORS.length],
         status: avgPerformance >= 90 ? 'running' : avgPerformance >= 70 ? 'warning' : 'stopped',
       };
-    }).sort((a, b) => b.avgPerformance - a.avgPerformance);
+    }).sort((a, b) => a.line.localeCompare(b.line));
   }, [filteredShifts]);
 
   // Trend alerts (3 consecutive records below 95%)
@@ -140,13 +142,16 @@ export function Dashboard() {
     return alerts;
   }, [filteredShifts]);
 
-  const handleExportCsv = () => {
-    exportToCsv(filteredShifts, `shift_${selectedShift}_report`);
-  };
-
   const handlePrint = () => {
     window.print();
   };
+
+  const clearFilters = () => {
+    setSelectedLine('');
+    setSelectedLeader('');
+  };
+
+  const hasOptionalFilters = selectedLine || selectedLeader;
 
   // Action button handlers
   const handleStartJob = () => toast.info('Start Job - Feature coming soon');
@@ -170,14 +175,14 @@ export function Dashboard() {
     <>
       <Header title="Production Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(selectedDate)}`} />
 
-      <div className="flex-1 overflow-auto p-4 sm:p-5 print:p-0">
+      <div className="flex-1 overflow-auto p-3 sm:p-5 print:p-0">
         {/* Welcome Message - hide on print */}
-        <div className="no-print mb-4">
+        <div className="no-print mb-3">
           <WelcomeScreen />
         </div>
 
         {/* Action Buttons - Industrial Style */}
-        <div className="no-print mb-4">
+        <div className="no-print mb-3">
           <ActionButtons
             onStartJob={handleStartJob}
             onEndJob={handleEndJob}
@@ -187,35 +192,35 @@ export function Dashboard() {
           />
         </div>
 
-        {/* Global Filters - Mandatory Date & Shift */}
-        <div className="card p-4 mb-4 no-print">
-          <div className="flex flex-wrap items-center gap-3">
+        {/* Global Filters - Compact */}
+        <div className="card p-3 mb-3 no-print">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2">
-              <Filter size={18} className="text-primary" />
-              <span className="text-sm font-semibold text-foreground">Filters:</span>
+              <Filter size={16} className="text-primary shrink-0" />
+              <span className="text-xs font-semibold text-foreground hidden sm:inline">Filters:</span>
             </div>
 
             {/* Date Filter */}
-            <div className="flex items-center gap-2">
-              <Calendar size={16} className="text-muted-foreground" />
+            <div className="flex items-center gap-1.5">
+              <Calendar size={14} className="text-muted-foreground" />
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="input-field text-sm py-1.5 w-auto"
+                className="input-field text-sm py-1.5 px-2 w-auto"
               />
             </div>
 
-            {/* Shift Filter */}
-            <div className="flex gap-1">
+            {/* Shift Toggle */}
+            <div className="flex rounded-lg border border-border overflow-hidden">
               {SHIFT_TYPES.map(shift => (
                 <button
                   key={shift}
                   onClick={() => setSelectedShift(shift)}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  className={`px-3 py-1.5 font-medium text-sm transition-colors ${
                     selectedShift === shift
                       ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-accent text-foreground'
+                      : 'bg-card hover:bg-muted text-foreground'
                   }`}
                 >
                   {shift}
@@ -227,7 +232,7 @@ export function Dashboard() {
             <select
               value={selectedLine}
               onChange={(e) => setSelectedLine(e.target.value)}
-              className="select-field text-sm py-1.5 w-auto min-w-[130px]"
+              className="select-field text-sm py-1.5 px-2 w-auto min-w-[100px]"
             >
               <option value="">All Lines</option>
               {uniqueLines.map(line => (
@@ -239,7 +244,7 @@ export function Dashboard() {
             <select
               value={selectedLeader}
               onChange={(e) => setSelectedLeader(e.target.value)}
-              className="select-field text-sm py-1.5 w-auto min-w-[130px]"
+              className="select-field text-sm py-1.5 px-2 w-auto min-w-[100px]"
             >
               <option value="">All Leaders</option>
               {uniqueLeaders.map(leader => (
@@ -247,10 +252,29 @@ export function Dashboard() {
               ))}
             </select>
 
-            <button onClick={handlePrint} className="btn-secondary text-sm ml-auto">
-              <Printer size={16} />
-              <span className="hidden sm:inline">Print</span>
-            </button>
+            {hasOptionalFilters && (
+              <button
+                onClick={clearFilters}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title="Clear filters"
+              >
+                <X size={16} />
+              </button>
+            )}
+
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowCharts(!showCharts)}
+                className={`btn-secondary text-xs px-2 py-1.5 ${showCharts ? '' : 'opacity-60'}`}
+              >
+                <BarChart3 size={14} />
+                <span className="hidden sm:inline">Charts</span>
+              </button>
+              <button onClick={handlePrint} className="btn-secondary text-xs px-2 py-1.5">
+                <Printer size={14} />
+                <span className="hidden sm:inline">Print</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -263,9 +287,9 @@ export function Dashboard() {
         </div>
 
         {/* Main Layout: Lines + OEE Panel */}
-        <div className="flex gap-4 mb-4">
+        <div className="flex gap-3 mb-3">
           {/* Line Status Cards */}
-          <div className="flex-1 space-y-3">
+          <div className="flex-1 space-y-2 min-w-0">
             {lineStats.length > 0 ? (
               lineStats.map((line) => (
                 <LineStatusCard
@@ -273,25 +297,29 @@ export function Dashboard() {
                   lineName={line.line}
                   sku={line.currentSku}
                   product={line.currentProduct}
+                  leader={line.currentLeader}
+                  shift={selectedShift}
                   performance={line.avgPerformance}
                   availability={line.availability}
+                  staffActual={line.staffActual}
+                  staffPlanned={line.staffPlanned}
                   status={line.status as 'running' | 'stopped' | 'warning'}
                   colorClass={line.colorClass}
                 />
               ))
             ) : (
-              <div className="card p-8 text-center">
-                <Factory size={48} className="mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">No Lines Active</h3>
+              <div className="card p-6 text-center">
+                <Factory size={40} className="mx-auto text-muted-foreground mb-3" />
+                <h3 className="text-base font-medium text-foreground mb-1">No Lines Active</h3>
                 <p className="text-muted-foreground text-sm">
-                  No production data for the selected date and shift.
+                  No production data for {formatDate(selectedDate)} - {selectedShift} shift
                 </p>
               </div>
             )}
           </div>
 
           {/* OEE Panel - Fixed Right Column */}
-          <div className="hidden lg:block w-56 shrink-0">
+          <div className="hidden lg:flex flex-col gap-3 w-52 shrink-0">
             <OEEPanel
               performance={stats.avgPerformance}
               availability={stats.availability}
@@ -301,51 +329,76 @@ export function Dashboard() {
             />
             
             {/* Quick Stats */}
-            <div className="mt-4 space-y-2">
+            <div className="space-y-2">
               <div className="bg-card border border-border rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
                   <Package size={14} />
-                  Production
+                  Total Production
                 </div>
-                <p className="text-lg font-bold text-foreground">{stats.totalProduction.toLocaleString()}</p>
+                <p className="text-xl font-bold text-foreground tabular-nums">
+                  {stats.totalProduction.toLocaleString()}
+                </p>
               </div>
               
               <div className="bg-card border border-border rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
                   <Clock size={14} />
-                  Downtime
+                  Total Downtime
                 </div>
-                <p className="text-lg font-bold text-foreground">{stats.totalDowntime} min</p>
+                <p className="text-xl font-bold text-foreground tabular-nums">
+                  {stats.totalDowntime} <span className="text-sm font-normal">min</span>
+                </p>
               </div>
               
               <div className="bg-card border border-border rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
                   <Users size={14} />
-                  Staff
+                  Staff Today
                 </div>
-                <p className="text-lg font-bold text-foreground">
-                  {stats.totalActualStaff}/{stats.totalPlannedStaff}
+                <p className="text-xl font-bold text-foreground tabular-nums">
+                  {stats.totalActualStaff}
+                  <span className="text-sm font-normal text-muted-foreground">/{stats.totalPlannedStaff}</span>
                 </p>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Mobile OEE Summary */}
+        <div className="lg:hidden grid grid-cols-4 gap-2 mb-3">
+          <div className="bg-card border border-border rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-foreground">{stats.oee.toFixed(0)}%</p>
+            <p className="text-[10px] text-muted-foreground uppercase">OEE</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-foreground">{stats.avgPerformance.toFixed(0)}%</p>
+            <p className="text-[10px] text-muted-foreground uppercase">Perf</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-foreground">{stats.totalProduction.toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground uppercase">Units</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-foreground">{stats.totalDowntime}</p>
+            <p className="text-[10px] text-muted-foreground uppercase">Downtime</p>
+          </div>
+        </div>
+
         {/* Trend Alerts */}
         {trendAlerts.length > 0 && (
-          <div className="card mb-4">
-            <div className="p-4 border-b border-border">
+          <div className="card mb-3 overflow-hidden">
+            <div className="px-3 py-2 border-b border-border bg-destructive/5">
               <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
-                <AlertTriangle size={18} className="text-destructive" />
+                <AlertTriangle size={16} className="text-destructive" />
                 Performance Alerts
               </h2>
             </div>
             
-            <div className="p-3 space-y-2">
+            <div className="p-2 space-y-1.5">
               {trendAlerts.map((alert, idx) => (
                 <div 
                   key={idx} 
-                  className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/30 rounded-lg"
+                  className="flex items-center justify-between p-2 bg-destructive/10 border border-destructive/30 rounded-md"
                 >
                   <div>
                     <p className="font-semibold text-foreground text-sm">{alert.productionLine}</p>
@@ -353,7 +406,7 @@ export function Dashboard() {
                       {alert.consecutiveCount} consecutive records below target
                     </p>
                   </div>
-                  <div className="performance-red text-sm">
+                  <div className="performance-red text-sm font-bold">
                     {alert.avgPerformance.toFixed(1)}%
                   </div>
                 </div>
@@ -362,58 +415,62 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Performance Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <div className="card p-4">
-            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-              <Package size={18} />
-              Performance by SKU
-            </h3>
-            <PerformanceBySKU shifts={filteredShifts} />
-          </div>
+        {/* Performance Charts Grid - Collapsible */}
+        {showCharts && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <Package size={16} />
+                  Performance by SKU
+                </h3>
+                <PerformanceBySKU shifts={filteredShifts} />
+              </div>
 
-          <div className="card p-4">
-            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-              <Factory size={18} />
-              Performance by Line
-            </h3>
-            <PerformanceByLine shifts={filteredShifts} />
-          </div>
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <Factory size={16} />
+                  Performance by Line
+                </h3>
+                <PerformanceByLine shifts={filteredShifts} />
+              </div>
 
-          <div className="card p-4">
-            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-              <Users size={18} />
-              Performance by Leader
-            </h3>
-            <PerformanceByLeader shifts={filteredShifts} />
-          </div>
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <Users size={16} />
+                  Performance by Leader
+                </h3>
+                <PerformanceByLeader shifts={filteredShifts} />
+              </div>
 
-          <div className="card p-4">
-            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-              <BarChart3 size={18} />
-              Daily Summary
-            </h3>
-            <DailyProductionSummary shifts={filteredShifts} />
-          </div>
-        </div>
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <BarChart3 size={16} />
+                  Daily Summary
+                </h3>
+                <DailyProductionSummary shifts={filteredShifts} />
+              </div>
+            </div>
 
-        {/* Daily Summary Table */}
-        <div className="card p-4 mb-4">
-          <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-            <TableIcon size={18} />
-            Daily Summary Table
-          </h3>
-          <DailySummaryTable shifts={filteredShifts} />
-        </div>
+            {/* Daily Summary Table */}
+            <div className="card p-3 mb-3">
+              <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                <TableIcon size={16} />
+                Daily Summary Table
+              </h3>
+              <DailySummaryTable shifts={filteredShifts} />
+            </div>
 
-        {/* Performance Trend */}
-        <div className="card p-4 no-print">
-          <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-            <TrendingUp size={18} />
-            Performance Trend (Last 7 Days)
-          </h3>
-          <PerformanceTrendChart shifts={filteredShifts} />
-        </div>
+            {/* Performance Trend */}
+            <div className="card p-3 no-print">
+              <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                <TrendingUp size={16} />
+                Performance Trend (Last 7 Days)
+              </h3>
+              <PerformanceTrendChart shifts={filteredShifts} />
+            </div>
+          </>
+        )}
 
         {/* Empty State */}
         {shifts.length === 0 && (
