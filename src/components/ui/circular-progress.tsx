@@ -8,6 +8,7 @@ interface CircularProgressProps {
   className?: string;
   label?: string;
   showValue?: boolean;
+  colorOverride?: 'success' | 'destructive' | 'warning';
 }
 
 export function CircularProgress({
@@ -17,13 +18,22 @@ export function CircularProgress({
   className,
   label,
   showValue = true,
+  colorOverride,
 }: CircularProgressProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (value / 100) * circumference;
   
-  // Dynamic color based on value
+  // Dynamic color based on value or override
   const getColor = () => {
+    if (colorOverride) {
+      const colorMap = {
+        success: 'hsl(var(--success))',
+        destructive: 'hsl(var(--destructive))',
+        warning: 'hsl(var(--warning))',
+      };
+      return colorMap[colorOverride];
+    }
     if (value >= 90) return 'hsl(var(--success))';
     if (value >= 70) return 'hsl(var(--warning))';
     return 'hsl(var(--destructive))';

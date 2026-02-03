@@ -57,7 +57,7 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
 
     setIsSubmitting(true);
     try {
-      await updateShift(shift.id, {
+      const result = await updateShift(shift.id, {
         date,
         shift: shiftType,
         productionLine,
@@ -74,6 +74,11 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
         staffPlanned,
         staffActual,
       });
+
+      if (result && !result.success) {
+        toast.error(`Failed to update: ${result.error || 'Unknown error'}`);
+        return;
+      }
 
       toast.success('Shift updated successfully');
       onOpenChange(false);

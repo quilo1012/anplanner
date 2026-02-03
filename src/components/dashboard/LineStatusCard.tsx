@@ -194,6 +194,7 @@ export function LineStatusCard({
                 size={52}
                 strokeWidth={5}
                 label="Perf"
+                colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
               />
               <CircularProgress
                 value={availability}

@@ -4,6 +4,7 @@ import { useShifts } from '@/contexts/ShiftContext';
 import { ShiftReport, ShiftType, SHIFT_TYPES } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
 import { PerformanceTrendChart } from '@/components/PerformanceTrendChart';
+import { DowntimeTrendChart } from '@/components/charts/DowntimeTrendChart';
 import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
@@ -453,13 +454,23 @@ export function Dashboard() {
               <DailySummaryTable shifts={filteredShifts} />
             </div>
 
-            {/* Performance Trend */}
-            <div className="card p-3 no-print">
-              <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
-                <TrendingUp size={16} />
-                Performance Trend (Last 7 Days)
-              </h3>
-              <PerformanceTrendChart shifts={filteredShifts} />
+            {/* Trend Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="card p-3 no-print">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <TrendingUp size={16} />
+                  Performance Trend (Last 7 Days)
+                </h3>
+                <PerformanceTrendChart shifts={shifts} />
+              </div>
+              
+              <div className="card p-3 no-print">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <Clock size={16} />
+                  Downtime Trend (Last 7 Days)
+                </h3>
+                <DowntimeTrendChart shifts={shifts} />
+              </div>
             </div>
           </>
         )}
