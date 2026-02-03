@@ -1,5 +1,5 @@
 import { CircularProgress } from '@/components/ui/circular-progress';
-import { Factory, Play, Pause, AlertTriangle, User, Package, CheckCircle, XCircle, Target } from 'lucide-react';
+import { Factory, Play, Pause, AlertTriangle, User, Package, CheckCircle, XCircle, Target, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LineStatusCardProps {
@@ -170,6 +170,16 @@ export function LineStatusCard({
                       )}
                     </span>
                   </div>
+                </div>
+              )}
+
+              {/* UPM (Units per Minute) */}
+              {hasTargetData && (
+                <div className="flex items-center gap-2 pl-5 mt-1 text-xs text-muted-foreground">
+                  <Clock size={12} />
+                  <span>
+                    {(realProduction / 570).toFixed(2)} / {(productionTarget / 570).toFixed(2)} UPM
+                  </span>
                 </div>
               )}
 
