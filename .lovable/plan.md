@@ -1,106 +1,105 @@
 
-# Correção: Downtime - Incompatibilidade entre Código e Banco de Dados
+# Correção: Planner Travando no "Saving..."
 
-## Problema Encontrado
+## Problema Identificado
 
-A tabela `structured_downtimes` tem uma constraint que só aceita categorias específicas, mas o código está enviando valores diferentes:
+O botão "Saving..." fica rodando infinitamente porque:
 
-| Banco de Dados (Permitido) | Código (Enviado) | Status |
-|---------------------------|------------------|--------|
-| `machine` | `maintenance` | Rejeitado |
-| `material` | `quality` | Rejeitado |
-| `people` | `health_safety` | Rejeitado |
-| `process` | `warehouse` | Rejeitado |
-| `other` | `staff` | Rejeitado |
-| `other` | `other` | Aceito |
+1. **A função `addShift` não lança exceções** - quando há erro de RLS (ex: usuário sem permissão), ela apenas loga no console e retorna silenciosamente
+2. **Planner não recebe feedback** - continua executando como se tudo estivesse ok, mas o shift não foi salvo
+3. **O loop de SKUs pode travar** - se o primeiro shift falhar, o código continua tentando os próximos sem saber que falhou
 
-### Erro no Log do Banco:
-```
-"new row for relation 'structured_downtimes' violates check constraint 'structured_downtimes_category_check'"
-```
+## Solução
 
----
+### 1. Modificar ShiftContext.tsx - Retornar resultado da operação
 
-## Solução: Atualizar Constraint do Banco
+A função `addShift` deve retornar um objeto indicando sucesso/falha:
 
-A melhor abordagem é atualizar a constraint do banco para aceitar as categorias definidas no código, pois as categorias do código são mais descritivas e específicas para o contexto industrial.
+```typescript
+// Antes:
+const addShift = async (data: ShiftFormData) => {
+  if (!user) return;
+  // ...
+  if (shiftError) {
+    console.error('Error adding shift:', shiftError);
+    return;  // Silencioso!
+  }
+}
 
-### Migration SQL Necessária:
-
-```sql
--- Remover constraint antiga
-ALTER TABLE structured_downtimes 
-DROP CONSTRAINT IF EXISTS structured_downtimes_category_check;
-
--- Adicionar nova constraint com categorias corretas
-ALTER TABLE structured_downtimes 
-ADD CONSTRAINT structured_downtimes_category_check 
-CHECK (category = ANY (ARRAY[
-  'maintenance'::text, 
-  'quality'::text, 
-  'health_safety'::text, 
-  'warehouse'::text, 
-  'staff'::text, 
-  'other'::text
-]));
+// Depois:
+const addShift = async (data: ShiftFormData): Promise<{ success: boolean; error?: string }> => {
+  if (!user) return { success: false, error: 'User not authenticated' };
+  // ...
+  if (shiftError) {
+    console.error('Error adding shift:', shiftError);
+    return { success: false, error: shiftError.message };
+  }
+  // ...
+  return { success: true };
+}
 ```
 
----
+### 2. Modificar Planner.tsx - Tratar erros e mostrar feedback
 
-## Mudanças Adicionais
+```typescript
+// No handleSubmit:
+for (const row of formState.skuRows) {
+  if (!row.sku.trim()) continue;
+  
+  const formData = { /* ... */ };
+  const result = await addShift(formData);
+  
+  if (!result.success) {
+    toast.error(`Failed to save: ${result.error}`);
+    return; // Para o loop e mantém isSubmitting = false
+  }
+  isFirstShift = false;
+}
 
-### 1. Campo Duration - Formato HH:MM
-Já implementado na última mudança. O componente `DurationInput` aceita:
-- `"90"` - minutos diretos
-- `"1:30"` - formato hora:minutos
-- `"1.5"` - formato decimal
-- `"1h30m"` - formato explícito
+toast.success('Shift saved successfully!');
+navigate('/history');
+```
 
-### 2. Verificação Após Correção
+### 3. Corrigir DurationInput - Adicionar forwardRef
 
-Uma vez que a constraint seja atualizada:
-- **Dashboard**: Exibirá `totalDowntime` calculado automaticamente
-- **Página Downtime**: Listará todos os registros da tabela `structured_downtimes`
+O componente `DurationInput` precisa usar `React.forwardRef` para evitar warnings:
 
----
+```typescript
+const DurationInput = React.forwardRef<HTMLInputElement, DurationInputProps>(
+  ({ value, onChange }, ref) => {
+    // ...
+    return (
+      <input ref={ref} /* ... */ />
+    );
+  }
+);
+```
 
 ## Arquivos a Modificar
 
-### 1. Migração SQL (via ferramenta de migração)
-- Atualizar constraint `structured_downtimes_category_check`
+| Arquivo | Mudança |
+|---------|---------|
+| `src/contexts/ShiftContext.tsx` | `addShift` retorna `{ success, error }` |
+| `src/pages/Planner.tsx` | Trata resultado e mostra toast de erro/sucesso |
+| `src/components/StructuredDowntimeForm.tsx` | `DurationInput` com `forwardRef` |
+| `src/types/shift.ts` | Adicionar tipo de retorno (se necessário) |
 
-### 2. Nenhuma mudança de código necessária
-- O código TypeScript já usa as categorias corretas
-- O `ShiftContext.tsx` já salva corretamente quando a constraint permite
-
----
-
-## Fluxo Após Correção
+## Fluxo Corrigido
 
 ```text
-1. Usuário adiciona Downtime no Planner
-   → Categoria: "maintenance", Reason: "cleaning", Duration: "1:30"
-
-2. Sistema converte duração
-   → 90 minutos
-
-3. Ao salvar shift
-   → INSERT INTO structured_downtimes (category: "maintenance", reason: "cleaning", duration: 90)
-   → Aceito pela nova constraint
-
-4. Dashboard
-   → Busca shifts com totalDowntime calculado
-   → Exibe: "Total Downtime: 90 min"
-
-5. Página Downtime
-   → Lista entrada com categoria "Maintenance Issues", 90 min
+1. Usuário clica "Save"
+2. handleSubmit valida formulário
+3. Loop de SKUs:
+   - Chama addShift(formData)
+   - Se falhar: toast.error("RLS policy violation...") e para
+   - Se sucesso: continua para próximo SKU
+4. Todos salvos: toast.success e navega para /history
+5. Se erro: botão volta ao estado normal, usuário vê mensagem
 ```
-
----
 
 ## Benefícios
 
-1. **Downtimes salvos corretamente** - Constraint aceita categorias do código
-2. **Visibilidade imediata** - Dashboard e Downtime page mostram dados
-3. **Entrada flexível** - Formato HH:MM já implementado
-4. **Categorias descritivas** - Nomes mais claros para operadores
+1. **Feedback visual claro** - Usuário sabe se salvou ou não
+2. **Tratamento de erros RLS** - Mensagens explicativas quando falta permissão
+3. **Botão não trava** - Sempre volta ao estado normal após tentativa
+4. **Logs mais úteis** - Console mostra exatamente onde falhou
