@@ -1,248 +1,227 @@
 
-# Downtime Visibility, Dashboard Charts, and Performance Improvements
+# Plano: Trend de Downtime, Cores de Target e Edição no History
 
-## Current State Analysis
+## Resumo das Mudanças
 
-### Problem 1: Downtime Data NOT Saving
-- **Root Cause**: The `structured_downtimes` table is **EMPTY** (verified via database query)
-- The constraint was recently fixed, but downtimes added before the fix were never persisted
-- Both Dashboard and Downtime pages correctly query this data - they just have nothing to display
-
-### Problem 2: Missing Downtime Analysis Charts
-- Dashboard has no charts showing downtime breakdown by category or reason
-- No visualization of problem patterns
-
-### Problem 3: Target Color Rules Not Implemented
-- LineStatusCard uses performance-based colors (90%/70% thresholds) for status
-- No direct Produced vs Target comparison with GREEN/RED visual indicators
-
-### Problem 4: OEE Panel Shows "Quality" Metric
-- Currently shows: Performance, Availability, Quality
-- User wants: Performance, Total Production only (simplified)
+| Funcionalidade | Status Atual | Mudança |
+|----------------|--------------|---------|
+| Trend de Downtime | Não existe | Criar gráfico de linha mostrando tendência de downtime nos últimos 7 dias |
+| Cor de Target | CircularProgress usa performance% | Atualizar para usar comparação Real vs Target |
+| Edição no History | Já funciona para Supervisor/Admin | Verificar e garantir feedback visual |
 
 ---
 
-## Solution Plan
+## 1. Gráfico de Trend de Downtime (NOVO)
 
-### 1. Verify Downtime Saves Correctly (Testing)
+### Criar: `src/components/charts/DowntimeTrendChart.tsx`
 
-The code is correct - we need to verify by testing:
-- Add a new shift with downtime via Planner
-- Confirm it appears in Dashboard and Downtime page
-- If still failing, check console for errors
+Componente de gráfico de linha similar ao `PerformanceTrendChart`, mas para downtime:
 
-### 2. Add Downtime Analysis Charts to Dashboard
+```
++--------------------------------------------------+
+|  Downtime Trend (Last 7 Days)                    |
+|  ┌────────────────────────────────────────────┐  |
+|  │     *                                       │  |
+|  │    / \                  *                   │  |
+|  │   /   \      *         / \                  │  |
+|  │  /     \    / \       /   \                 │  |
+|  │ *       \  /   *-----*     *                │  |
+|  │          \/                                 │  |
+|  │ Jan 28  29   30   31   Feb 1   2    3      │  |
+|  └────────────────────────────────────────────┘  |
+|        DAY Shift    NIGHT Shift                  |
++--------------------------------------------------+
+```
 
-Create two new chart components:
+Lógica:
+- Agrupa downtimes por data e turno (DAY/NIGHT)
+- Mostra últimos 7 dias
+- Duas linhas: uma para cada turno
+- Eixo Y: minutos de downtime
 
-#### DowntimeByCategory.tsx
-- Horizontal bar chart
-- Categories: Maintenance, Quality, Health & Safety, Warehouse, Staff, Other
-- Shows total minutes per category
-- Color-coded bars
+### Integrar no Dashboard.tsx
 
-#### DowntimeByReason.tsx
-- Horizontal bar chart
-- Shows top 10 reasons across all categories
-- Aggregates minutes per reason
-
-Both charts will:
-- Use `filteredShifts` data (same source as other charts)
-- Extract from `shift.structuredDowntimes`
-- Show empty state when no data
-- Update instantly with filters
-
-### 3. Add Target Color Rules to LineStatusCard
-
-Modify `LineStatusCard.tsx`:
-- Add `realProduction` and `productionTarget` props
-- Calculate: `isOnTarget = realProduction >= productionTarget`
-- Add visual indicator: GREEN checkmark or RED warning icon
-- Apply color to SKU/production values
-
-Modify `Dashboard.tsx`:
-- Pass production totals to LineStatusCard
-- Calculate line totals from aggregated shift data
-
-### 4. Simplify OEE Panel (Remove Quality)
-
-Modify `OEEPanel.tsx`:
-- Remove Quality KPI row
-- Keep only Performance and Availability
-- Recalculate OEE as: Performance × Availability / 100
-- Add Total Production stat inline
+Adicionar o novo gráfico na seção de charts, ao lado do Performance Trend.
 
 ---
 
-## Technical Implementation Details
+## 2. Correção de Cores no LineStatusCard
 
-### New File: `src/components/charts/DowntimeByCategory.tsx`
+### Problema Atual
+O componente `CircularProgress` usa a performance percentual (90%/70%/abaixo) para determinar cores, mas o requisito é comparar **Produção Real vs Target**.
+
+### Solução
+Modificar `LineStatusCard.tsx` para:
+
+1. Adicionar prop opcional `useTargetColors?: boolean`
+2. Quando `useTargetColors=true` e `hasTargetData`:
+   - Passar uma cor customizada para o CircularProgress baseada em `isOnTarget`
+   - Verde se `realProduction >= productionTarget`
+   - Vermelho se `realProduction < productionTarget`
+
+### Mudança no CircularProgress
+Adicionar prop opcional `colorOverride` para permitir cor forçada:
 
 ```typescript
-interface DowntimeByCategoryProps {
+interface CircularProgressProps {
+  // ... existing props
+  colorOverride?: 'success' | 'destructive' | 'warning';
+}
+```
+
+### Resultado Visual
+
+| Situação | Cor do Círculo |
+|----------|----------------|
+| Produção >= Target | Verde (success) |
+| Produção < Target | Vermelho (destructive) |
+| Sem dados de target | Usa lógica atual (performance %) |
+
+---
+
+## 3. Edição no History (Verificação)
+
+### Status Atual
+O código já permite edição para Supervisor e Admin:
+
+```typescript
+// src/pages/History.tsx linha 31-32
+const canEdit = hasRole(['supervisor', 'admin']);
+const canDelete = hasRole(['supervisor', 'admin']);
+```
+
+E o botão de edição existe:
+```typescript
+{canEdit && (
+  <button onClick={() => handleEdit(shift)} ...>
+    <Edit size={14} /> Edit
+  </button>
+)}
+```
+
+### Problema Identificado
+O `EditShiftDialog.tsx` existe e funciona, mas pode não estar dando feedback visual adequado quando o resultado do `updateShift` retorna erro.
+
+### Melhoria
+Atualizar o `handleSubmit` do `EditShiftDialog` para usar o novo retorno de `updateShift`:
+
+```typescript
+const result = await updateShift(shift.id, {...});
+if (!result.success) {
+  toast.error(`Failed to update: ${result.error}`);
+  return;
+}
+toast.success('Shift updated successfully');
+```
+
+---
+
+## Arquivos a Criar
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/components/charts/DowntimeTrendChart.tsx` | Gráfico de tendência de downtime |
+
+## Arquivos a Modificar
+
+| Arquivo | Mudanças |
+|---------|----------|
+| `src/components/ui/circular-progress.tsx` | Adicionar prop `colorOverride` |
+| `src/components/dashboard/LineStatusCard.tsx` | Passar cores baseadas em target para CircularProgress |
+| `src/pages/Dashboard.tsx` | Adicionar DowntimeTrendChart na seção de gráficos |
+| `src/components/history/EditShiftDialog.tsx` | Usar retorno de resultado para feedback de erro |
+
+---
+
+## Detalhes Técnicos
+
+### DowntimeTrendChart.tsx
+
+```typescript
+interface DowntimeTrendChartProps {
   shifts: ShiftReport[];
 }
 
-// Aggregates structuredDowntimes by category
-// Returns bar chart with DOWNTIME_CATEGORIES colors
-// Shows total minutes per category
+// Agrupa por data e turno
+// Últimos 7 dias
+// Usa LineChart do Recharts
+// Duas linhas: DAY (azul) e NIGHT (roxo)
+// Eixo Y: minutos totais de downtime
 ```
 
-### New File: `src/components/charts/DowntimeByReason.tsx`
+### CircularProgress.tsx - Mudança
 
 ```typescript
-interface DowntimeByReasonProps {
-  shifts: ShiftReport[];
-}
+// Adicionar prop
+colorOverride?: 'success' | 'destructive' | 'warning';
 
-// Aggregates structuredDowntimes by reason
-// Returns horizontal bar chart
-// Top 10 reasons by total minutes
+// Modificar getColor():
+const getColor = () => {
+  if (colorOverride) {
+    const colorMap = {
+      success: 'hsl(var(--success))',
+      destructive: 'hsl(var(--destructive))',
+      warning: 'hsl(var(--warning))',
+    };
+    return colorMap[colorOverride];
+  }
+  // lógica atual...
+};
 ```
 
-### Modified: `src/components/dashboard/LineStatusCard.tsx`
+### LineStatusCard.tsx - Mudança
 
-Add props:
-- `realProduction: number`
-- `productionTarget: number`
-
-Add visual:
-- Target indicator badge (GREEN/RED)
-- Production values with color highlighting
-
-### Modified: `src/components/dashboard/OEEPanel.tsx`
-
-Remove:
-- Quality KPI row
-- Quality from OEE calculation
-
-Add:
-- Total Production stat
-- Simplified OEE formula
-
-### Modified: `src/pages/Dashboard.tsx`
-
-Add to charts section:
-- DowntimeByCategory chart
-- DowntimeByReason chart
-
-Pass to LineStatusCard:
-- `realProduction` from lineShifts sum
-- `productionTarget` from lineShifts sum
-
----
-
-## Dashboard Layout Changes
-
-### Current Charts Grid (2 columns):
-1. Performance by SKU
-2. Performance by Line
-3. Performance by Leader
-4. Daily Summary
-
-### New Charts Grid (2 columns):
-1. Performance by SKU
-2. Performance by Line
-3. Performance by Leader
-4. Daily Summary
-5. **Downtime by Category** (NEW)
-6. **Downtime by Reason** (NEW)
-
----
-
-## Empty State Handling
-
-All charts will display:
-```
-┌─────────────────────────────────┐
-│                                 │
-│    [Icon]                       │
-│    No downtime data             │
-│    for selected filters         │
-│                                 │
-└─────────────────────────────────┘
+Na seção dos KPI circles:
+```typescript
+<CircularProgress
+  value={performance}
+  size={52}
+  strokeWidth={5}
+  label="Perf"
+  colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
+/>
 ```
 
 ---
 
-## LineStatusCard Target Indicator
+## Fluxo Visual Final
 
+### Dashboard com Downtime Trend:
+```
+┌─────────────────────────────────────────────────────┐
+│  Performance Trend (Last 7 Days)                    │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Downtime Trend (Last 7 Days)  ← NOVO               │
+└─────────────────────────────────────────────────────┘
+```
+
+### LineStatusCard com Cores Corrigidas:
 ```
 ┌──────────────────────────────────────────┐
-│  [Line 1]  ● Running  👤 Leader Name     │
-│  ────────────────────────────────────    │
-│  📦 SKU12345                             │
-│     Product Description                  │
-│                                          │
-│  Target: 1000  Actual: 1050              │
-│  ✓ ON TARGET  (+5%)                      │  ← GREEN badge
+│  [Line 1]  Running                       │
+│  SKU: ABC123                             │
+│  1050 / 1000  ✓ ON TARGET               │
 │                                          │
 │  [Perf 105%]  [Avail 98%]               │
+│      Verde       Amarelo                 │  ← Cores baseadas em target
 └──────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────┐
-│  [Line 2]  ⚠ Warning  👤 Leader Name     │
-│  ────────────────────────────────────    │
-│  📦 SKU67890                             │
-│     Product Description                  │
-│                                          │
-│  Target: 1000  Actual: 850               │
-│  ✗ BELOW TARGET  (-15%)                  │  ← RED badge
+│  [Line 2]  Warning                       │
+│  SKU: DEF456                             │
+│  850 / 1000   ✗ BELOW TARGET            │
 │                                          │
 │  [Perf 85%]   [Avail 92%]               │
+│    Vermelho     Amarelo                  │  ← Vermelho quando abaixo
 └──────────────────────────────────────────┘
 ```
 
 ---
 
-## OEE Panel Simplified
+## Benefícios
 
-### Before:
-- OEE Circle
-- Performance bar
-- Availability bar
-- Quality bar ❌ (remove)
-
-### After:
-- OEE Circle (recalculated without quality)
-- Performance bar
-- Availability bar
-- Total Production stat
-
----
-
-## Performance Rules
-
-- All charts use pre-aggregated data from `useMemo`
-- No heavy joins or recalculations
-- Indexed fields: date, shift_type, production_line
-- Charts render from existing `filteredShifts` array
-- Empty state prevents white screens
-
----
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/charts/DowntimeByCategory.tsx` | Bar chart by category |
-| `src/components/charts/DowntimeByReason.tsx` | Bar chart by reason |
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/dashboard/LineStatusCard.tsx` | Add target indicator |
-| `src/components/dashboard/OEEPanel.tsx` | Remove Quality, simplify |
-| `src/pages/Dashboard.tsx` | Add downtime charts, pass target data |
-
----
-
-## Benefits
-
-1. **Downtime visible everywhere** - Same data source for Dashboard and Downtime page
-2. **Problem analysis** - Charts reveal patterns by category and reason
-3. **Clear target status** - GREEN/RED instantly shows line performance
-4. **Simplified metrics** - Focus on Performance and Production
-5. **Fast loading** - No heavy calculations, uses existing data
-6. **Empty states** - Never shows blank screens
+1. **Trend de Downtime** - Visualização clara da evolução do downtime ao longo da semana
+2. **Cores de Target** - Indicação visual imediata se linha está no target ou não
+3. **Edição no History** - Feedback claro quando edição falha por permissões ou erro
+4. **Consistência** - Todas as cores seguem a mesma lógica: Verde = Bom, Vermelho = Atenção
