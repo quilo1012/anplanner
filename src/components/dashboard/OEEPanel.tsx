@@ -5,22 +5,24 @@ import { cn } from '@/lib/utils';
 interface OEEPanelProps {
   performance: number;
   availability: number;
-  quality: number;
   oee: number;
   shiftType: string;
+  totalProduction?: number;
 }
 
 export function OEEPanel({
   performance,
   availability,
-  quality,
   oee,
   shiftType,
+  totalProduction = 0,
 }: OEEPanelProps) {
+  // Simplified OEE: Performance × Availability / 100
+  const simplifiedOEE = (performance * availability) / 100;
   const getOEEStatus = () => {
-    if (oee >= 85) return { label: 'World Class', color: 'text-success' };
-    if (oee >= 75) return { label: 'Good', color: 'text-primary' };
-    if (oee >= 60) return { label: 'Average', color: 'text-warning' };
+    if (simplifiedOEE >= 85) return { label: 'World Class', color: 'text-success' };
+    if (simplifiedOEE >= 75) return { label: 'Good', color: 'text-primary' };
+    if (simplifiedOEE >= 60) return { label: 'Average', color: 'text-warning' };
     return { label: 'Needs Improvement', color: 'text-destructive' };
   };
 
@@ -43,7 +45,7 @@ export function OEEPanel({
         {/* Main OEE indicator */}
         <div className="flex flex-col items-center">
           <CircularProgress
-            value={oee}
+            value={simplifiedOEE}
             size={110}
             strokeWidth={10}
             label=""
@@ -52,7 +54,7 @@ export function OEEPanel({
             <p className={cn("text-sm font-semibold", oeeStatus.color)}>
               {oeeStatus.label}
             </p>
-            <p className="text-xs text-muted-foreground">Overall Equipment Effectiveness</p>
+            <p className="text-xs text-muted-foreground">Performance × Availability</p>
           </div>
         </div>
         
@@ -73,12 +75,24 @@ export function OEEPanel({
             value={availability}
             description="Uptime ratio"
           />
-          <KPIRow
-            icon={<CheckCircle size={14} />}
-            label="Quality"
-            value={quality}
-            description="Good parts ratio"
-          />
+          
+          {/* Total Production Stat */}
+          {totalProduction > 0 && (
+            <div className="flex items-center gap-3 pt-2 border-t border-border">
+              <div className="text-primary shrink-0">
+                <Activity size={14} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-foreground">Total Production</span>
+                  <span className="text-sm font-bold tabular-nums text-primary">
+                    {totalProduction.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Units produced</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { CircularProgress } from '@/components/ui/circular-progress';
-import { Factory, Play, Pause, AlertTriangle, User, Package } from 'lucide-react';
+import { Factory, Play, Pause, AlertTriangle, User, Package, CheckCircle, XCircle, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LineStatusCardProps {
@@ -14,6 +14,8 @@ interface LineStatusCardProps {
   staffPlanned?: number;
   status: 'running' | 'stopped' | 'warning';
   colorClass: string;
+  realProduction?: number;
+  productionTarget?: number;
 }
 
 const LINE_COLORS: Record<string, string> = {
@@ -52,7 +54,15 @@ export function LineStatusCard({
   staffPlanned = 0,
   status,
   colorClass,
+  realProduction = 0,
+  productionTarget = 0,
 }: LineStatusCardProps) {
+  // Target comparison
+  const hasTargetData = productionTarget > 0;
+  const isOnTarget = realProduction >= productionTarget;
+  const targetDiff = hasTargetData 
+    ? ((realProduction - productionTarget) / productionTarget * 100).toFixed(0)
+    : 0;
   const borderStyle = LINE_COLORS[lineName] || 'border-l-industrial-blue bg-gradient-to-r from-industrial-blue/5 to-transparent';
   const headerColor = LINE_HEADER_COLORS[lineName] || 'bg-industrial-blue';
   
@@ -132,6 +142,36 @@ export function LineStatusCard({
                   {product || 'No product assigned'}
                 </p>
               </div>
+
+              {/* Target indicator */}
+              {hasTargetData && (
+                <div className="flex items-center gap-2 pl-5 mt-1">
+                  <Target size={12} className="text-muted-foreground" />
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">
+                      {realProduction.toLocaleString()} / {productionTarget.toLocaleString()}
+                    </span>
+                    <span className={cn(
+                      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                      isOnTarget 
+                        ? "bg-success/15 text-success border border-success/30" 
+                        : "bg-destructive/15 text-destructive border border-destructive/30"
+                    )}>
+                      {isOnTarget ? (
+                        <>
+                          <CheckCircle size={10} />
+                          +{targetDiff}%
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={10} />
+                          {targetDiff}%
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Staff indicator */}
               {(staffPlanned > 0 || staffActual > 0) && (
