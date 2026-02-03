@@ -8,13 +8,14 @@ import { DowntimeTrendChart } from '@/components/charts/DowntimeTrendChart';
 import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
+import { LeaderPerformanceBoard } from '@/components/charts/LeaderPerformanceBoard';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
 import { DowntimeByReason } from '@/components/charts/DowntimeByReason';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
-import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity } from 'lucide-react';
+import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy } from 'lucide-react';
 
 const LINE_COLORS = [
   'bg-industrial-blue',
@@ -417,6 +418,10 @@ export function Dashboard() {
                   Performance by Leader
                 </h3>
                 <PerformanceByLeader shifts={filteredShifts} />
+              </div>
+
+              <div className="card p-3">
+                <LeaderPerformanceBoard shifts={shifts} currentDate={selectedDate} />
               </div>
 
               <div className="card p-3">
