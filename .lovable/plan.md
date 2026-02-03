@@ -1,227 +1,179 @@
 
-# Plano: Trend de Downtime, Cores de Target e Edição no History
+# Plano: Remover Availability do Dashboard e Verificar Edição no History
 
-## Resumo das Mudanças
+## Resumo
 
-| Funcionalidade | Status Atual | Mudança |
-|----------------|--------------|---------|
-| Trend de Downtime | Não existe | Criar gráfico de linha mostrando tendência de downtime nos últimos 7 dias |
-| Cor de Target | CircularProgress usa performance% | Atualizar para usar comparação Real vs Target |
-| Edição no History | Já funciona para Supervisor/Admin | Verificar e garantir feedback visual |
+O usuário quer:
+1. Remover "Avail" (Availability) do Dashboard
+2. Confirmar que Supervisor e Admin podem editar/deletar no History
 
----
+## Análise Atual
 
-## 1. Gráfico de Trend de Downtime (NOVO)
+### Dashboard - Availability
+O metric "Availability" aparece em:
 
-### Criar: `src/components/charts/DowntimeTrendChart.tsx`
+| Local | Arquivo | Mudança Necessária |
+|-------|---------|-------------------|
+| OEE Panel - KPI Row | `OEEPanel.tsx` linha 72-77 | Remover a linha de Availability |
+| LineStatusCard - Círculo "Avail" | `LineStatusCard.tsx` linha 199-204 | Remover o CircularProgress de Avail |
+| OEE Calculation | `OEEPanel.tsx` linha 21 | Ajustar OEE para usar só Performance |
 
-Componente de gráfico de linha similar ao `PerformanceTrendChart`, mas para downtime:
-
-```
-+--------------------------------------------------+
-|  Downtime Trend (Last 7 Days)                    |
-|  ┌────────────────────────────────────────────┐  |
-|  │     *                                       │  |
-|  │    / \                  *                   │  |
-|  │   /   \      *         / \                  │  |
-|  │  /     \    / \       /   \                 │  |
-|  │ *       \  /   *-----*     *                │  |
-|  │          \/                                 │  |
-|  │ Jan 28  29   30   31   Feb 1   2    3      │  |
-|  └────────────────────────────────────────────┘  |
-|        DAY Shift    NIGHT Shift                  |
-+--------------------------------------------------+
-```
-
-Lógica:
-- Agrupa downtimes por data e turno (DAY/NIGHT)
-- Mostra últimos 7 dias
-- Duas linhas: uma para cada turno
-- Eixo Y: minutos de downtime
-
-### Integrar no Dashboard.tsx
-
-Adicionar o novo gráfico na seção de charts, ao lado do Performance Trend.
-
----
-
-## 2. Correção de Cores no LineStatusCard
-
-### Problema Atual
-O componente `CircularProgress` usa a performance percentual (90%/70%/abaixo) para determinar cores, mas o requisito é comparar **Produção Real vs Target**.
-
-### Solução
-Modificar `LineStatusCard.tsx` para:
-
-1. Adicionar prop opcional `useTargetColors?: boolean`
-2. Quando `useTargetColors=true` e `hasTargetData`:
-   - Passar uma cor customizada para o CircularProgress baseada em `isOnTarget`
-   - Verde se `realProduction >= productionTarget`
-   - Vermelho se `realProduction < productionTarget`
-
-### Mudança no CircularProgress
-Adicionar prop opcional `colorOverride` para permitir cor forçada:
+### History - Edit/Delete
+A funcionalidade JÁ ESTÁ IMPLEMENTADA:
 
 ```typescript
-interface CircularProgressProps {
-  // ... existing props
-  colorOverride?: 'success' | 'destructive' | 'warning';
-}
-```
-
-### Resultado Visual
-
-| Situação | Cor do Círculo |
-|----------|----------------|
-| Produção >= Target | Verde (success) |
-| Produção < Target | Vermelho (destructive) |
-| Sem dados de target | Usa lógica atual (performance %) |
-
----
-
-## 3. Edição no History (Verificação)
-
-### Status Atual
-O código já permite edição para Supervisor e Admin:
-
-```typescript
-// src/pages/History.tsx linha 31-32
+// src/pages/History.tsx - linhas 31-32
 const canEdit = hasRole(['supervisor', 'admin']);
 const canDelete = hasRole(['supervisor', 'admin']);
 ```
 
-E o botão de edição existe:
-```typescript
-{canEdit && (
-  <button onClick={() => handleEdit(shift)} ...>
-    <Edit size={14} /> Edit
-  </button>
-)}
-```
-
-### Problema Identificado
-O `EditShiftDialog.tsx` existe e funciona, mas pode não estar dando feedback visual adequado quando o resultado do `updateShift` retorna erro.
-
-### Melhoria
-Atualizar o `handleSubmit` do `EditShiftDialog` para usar o novo retorno de `updateShift`:
-
-```typescript
-const result = await updateShift(shift.id, {...});
-if (!result.success) {
-  toast.error(`Failed to update: ${result.error}`);
-  return;
-}
-toast.success('Shift updated successfully');
-```
+Botões de Edit/Delete já existem para:
+- View Mobile (cards) - linhas 308-329
+- View Desktop (tabela) - linhas 410-433
+- Dialogs de confirmação integrados - linhas 522-534
 
 ---
 
-## Arquivos a Criar
+## Mudanças Propostas
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `src/components/charts/DowntimeTrendChart.tsx` | Gráfico de tendência de downtime |
+### 1. Remover Availability do OEEPanel
+
+**Arquivo:** `src/components/dashboard/OEEPanel.tsx`
+
+Antes:
+```typescript
+<KPIRow
+  icon={<TrendingUp size={14} />}
+  label="Performance"
+  value={performance}
+  description="Speed efficiency"
+/>
+<KPIRow
+  icon={<Gauge size={14} />}
+  label="Availability"   ❌ REMOVER
+  value={availability}
+  description="Uptime ratio"
+/>
+```
+
+Depois:
+```typescript
+<KPIRow
+  icon={<TrendingUp size={14} />}
+  label="Performance"
+  value={performance}
+  description="Speed efficiency"
+/>
+// Availability removido
+```
+
+Também ajustar o cálculo do OEE simplificado:
+```typescript
+// Antes: const simplifiedOEE = (performance * availability) / 100;
+// Depois: const simplifiedOEE = performance; // Só Performance
+```
+
+Atualizar o texto descritivo:
+```typescript
+// Antes: <p>Performance × Availability</p>
+// Depois: <p>Overall Performance</p>
+```
+
+### 2. Remover Availability do LineStatusCard
+
+**Arquivo:** `src/components/dashboard/LineStatusCard.tsx`
+
+Remover o segundo CircularProgress (Avail):
+```typescript
+{/* Right: KPI circles */}
+<div className="flex items-center gap-2 shrink-0">
+  <CircularProgress
+    value={performance}
+    size={52}
+    strokeWidth={5}
+    label="Perf"
+    colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
+  />
+  {/* REMOVER o CircularProgress de Avail abaixo */}
+  <CircularProgress
+    value={availability}
+    size={52}
+    strokeWidth={5}
+    label="Avail"
+  />
+</div>
+```
+
+### 3. Limpar Props Não Usadas
+
+Após remover Availability:
+- Remover prop `availability` de `LineStatusCardProps` (opcional, pode manter por compatibilidade)
+- Remover prop `availability` de `OEEPanelProps` (opcional)
+
+---
+
+## Layout Final do Dashboard
+
+### OEE Panel (Simplificado)
+```
+┌──────────────────────────┐
+│  Shift OEE               │
+│  DAY Shift               │
+├──────────────────────────┤
+│                          │
+│      [   85%   ]         │  ← Círculo com Performance
+│        Good              │
+│    Overall Performance   │
+│                          │
+├──────────────────────────┤
+│  📈 Performance   85.0%  │  ← Só esta linha
+│  █████████░░░░           │
+│                          │
+│  📦 Total Production     │
+│     1,234 Units          │
+└──────────────────────────┘
+```
+
+### LineStatusCard (Simplificado)
+```
+┌──────────────────────────────────────────────────────────┐
+│  [Line 1]  │  ● Running  👤 Leader                       │
+│   DAY      │  📦 SKU12345                     ┌────────┐ │
+│            │     Product Description          │ 105%   │ │
+│            │  🎯 1050 / 1000  ✓ +5%          │  Perf  │ │
+│            │  Staff: 5/5                      └────────┘ │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Arquivos a Modificar
 
 | Arquivo | Mudanças |
 |---------|----------|
-| `src/components/ui/circular-progress.tsx` | Adicionar prop `colorOverride` |
-| `src/components/dashboard/LineStatusCard.tsx` | Passar cores baseadas em target para CircularProgress |
-| `src/pages/Dashboard.tsx` | Adicionar DowntimeTrendChart na seção de gráficos |
-| `src/components/history/EditShiftDialog.tsx` | Usar retorno de resultado para feedback de erro |
+| `src/components/dashboard/OEEPanel.tsx` | Remover Availability KPI, ajustar OEE calc |
+| `src/components/dashboard/LineStatusCard.tsx` | Remover CircularProgress de Avail |
 
 ---
 
-## Detalhes Técnicos
+## Sobre Edição no History
 
-### DowntimeTrendChart.tsx
+A edição e exclusão para Supervisor e Admin JÁ FUNCIONAM:
 
-```typescript
-interface DowntimeTrendChartProps {
-  shifts: ShiftReport[];
-}
+1. **Verificação de Role**: `hasRole(['supervisor', 'admin'])` 
+2. **Botões Visíveis**: Edit (lápis) e Delete (lixeira) aparecem para roles autorizados
+3. **EditShiftDialog**: Dialog completo para editar campos do shift
+4. **DeleteConfirmDialog**: Modal de confirmação com aviso sobre dados deletados
 
-// Agrupa por data e turno
-// Últimos 7 dias
-// Usa LineChart do Recharts
-// Duas linhas: DAY (azul) e NIGHT (roxo)
-// Eixo Y: minutos totais de downtime
-```
-
-### CircularProgress.tsx - Mudança
-
-```typescript
-// Adicionar prop
-colorOverride?: 'success' | 'destructive' | 'warning';
-
-// Modificar getColor():
-const getColor = () => {
-  if (colorOverride) {
-    const colorMap = {
-      success: 'hsl(var(--success))',
-      destructive: 'hsl(var(--destructive))',
-      warning: 'hsl(var(--warning))',
-    };
-    return colorMap[colorOverride];
-  }
-  // lógica atual...
-};
-```
-
-### LineStatusCard.tsx - Mudança
-
-Na seção dos KPI circles:
-```typescript
-<CircularProgress
-  value={performance}
-  size={52}
-  strokeWidth={5}
-  label="Perf"
-  colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
-/>
-```
-
----
-
-## Fluxo Visual Final
-
-### Dashboard com Downtime Trend:
-```
-┌─────────────────────────────────────────────────────┐
-│  Performance Trend (Last 7 Days)                    │
-└─────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────┐
-│  Downtime Trend (Last 7 Days)  ← NOVO               │
-└─────────────────────────────────────────────────────┘
-```
-
-### LineStatusCard com Cores Corrigidas:
-```
-┌──────────────────────────────────────────┐
-│  [Line 1]  Running                       │
-│  SKU: ABC123                             │
-│  1050 / 1000  ✓ ON TARGET               │
-│                                          │
-│  [Perf 105%]  [Avail 98%]               │
-│      Verde       Amarelo                 │  ← Cores baseadas em target
-└──────────────────────────────────────────┘
-
-┌──────────────────────────────────────────┐
-│  [Line 2]  Warning                       │
-│  SKU: DEF456                             │
-│  850 / 1000   ✗ BELOW TARGET            │
-│                                          │
-│  [Perf 85%]   [Avail 92%]               │
-│    Vermelho     Amarelo                  │  ← Vermelho quando abaixo
-└──────────────────────────────────────────┘
-```
+Se não estiver funcionando, o problema pode ser:
+- Usuário não está com role correta no banco de dados
+- Sessão precisa ser atualizada após mudança de role
 
 ---
 
 ## Benefícios
 
-1. **Trend de Downtime** - Visualização clara da evolução do downtime ao longo da semana
-2. **Cores de Target** - Indicação visual imediata se linha está no target ou não
-3. **Edição no History** - Feedback claro quando edição falha por permissões ou erro
-4. **Consistência** - Todas as cores seguem a mesma lógica: Verde = Bom, Vermelho = Atenção
+1. **Dashboard mais limpo** - Foco em Performance e Produção
+2. **Menos métricas confusas** - Availability removido por simplicidade
+3. **History funcional** - Edit/Delete já implementados corretamente
+4. **Cards compactos** - Mais espaço para informação relevante
