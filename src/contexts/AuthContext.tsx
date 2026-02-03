@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import { createContext, useContext, ReactNode, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const isInitializing = useRef(true);
 
   // Fetch user profile and role from database
   const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
@@ -76,7 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      return null;
+      // Fallback: create user from Supabase Auth data when profile doesn't exist yet
+      return {
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+        role: (roleData?.role as UserRole) || 'operator',
+        createdAt: supabaseUser.created_at || new Date().toISOString(),
+      };
     } catch (error) {
       console.error('Error fetching user data:', error);
       return null;
@@ -149,13 +157,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    initializeAuth();
+    initializeAuth().finally(() => {
+      isInitializing.current = false;
+    });
 
     // Set up auth state listener for subsequent changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
 
+        // Skip events during initialization to prevent race conditions
+        if (isInitializing.current) return;
+        
         // Skip initial session event since we handle it above
         if (event === 'INITIAL_SESSION') return;
 
