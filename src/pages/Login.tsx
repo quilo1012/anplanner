@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LogIn, Eye, EyeOff, AlertCircle, UserPlus, Loader2, Mail, Lock, User } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
-  const { login, signup, isLoading: authLoading } = useAuth();
+  const { login, signup, isLoading: authLoading, isAuthenticated } = useAuth();
+  
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
