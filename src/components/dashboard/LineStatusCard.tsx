@@ -187,20 +187,14 @@ export function LineStatusCard({
               )}
             </div>
             
-            {/* Right: KPI circles */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Right: KPI circle */}
+            <div className="shrink-0">
               <CircularProgress
                 value={performance}
                 size={52}
                 strokeWidth={5}
                 label="Perf"
                 colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
-              />
-              <CircularProgress
-                value={availability}
-                size={52}
-                strokeWidth={5}
-                label="Avail"
               />
             </div>
           </div>
