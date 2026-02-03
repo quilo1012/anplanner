@@ -1,169 +1,117 @@
 
 
-# Plano: Dashboard Simplificado + Planner com Target/Produção Unificado
+# Correção do Login: Redirecionamento Automático + Race Condition
 
-## Resumo das Mudanças
+## Problemas Identificados
 
-### 1. Dashboard - Remoção de Elementos Não Utilizados
-Remover os seguintes componentes do layout "Intouch" que não estão funcionais:
+### 1. Ausência de Redirecionamento Automático
+Quando um usuário já autenticado acessa `/login`, ele vê o formulário ao invés de ser redirecionado automaticamente para o Dashboard.
 
-| Componente | Status Atual | Ação |
-|------------|--------------|------|
-| ActionButtons (Start/End/Suspend/Scrap/Stop) | Apenas mostra "Coming soon" | **REMOVER** |
-| WelcomeScreen | Apenas exibe mensagem de boas-vindas | **REMOVER** |
-| Trend Alerts (alertas de performance) | Funcional mas opcional | **MANTER** (pode remover se preferir) |
-| Charts/Gráficos | Funcionais | **MANTER** (toggle existente) |
-| OEE Panel | Funcional | **MANTER** |
-| Line Status Cards | Funcional | **MANTER** |
+### 2. Race Condition no AuthContext
+O `onAuthStateChange` e `initializeAuth` podem conflitar, causando:
+- Requisições duplicadas ao banco
+- Estados inconsistentes durante a inicialização
+- Erros "AbortError: The operation was aborted"
 
-### 2. Planner - Adicionar Campos de Target e Produção Real
-Permitir capturar **na mesma tela** os valores de:
-- **Production Target** (quantidade esperada)
-- **Real Production** (quantidade alcançada)
-
-Atualmente o Planner salva `productionTarget: 0` e `realProduction: 0` fixos.
-
-### 3. Unificar Produção do Shift
-Quando salvar múltiplos SKUs para uma linha:
-- Atualmente: Cada SKU cria um registro separado na tabela `shifts`
-- **Novo comportamento**: Continua salvando separado (cada SKU = 1 registro), mas cada um terá seu próprio Target e Real Production
-
----
-
-## Estrutura Atual da Tabela `shifts`
-
-A tabela já possui os campos necessários:
-
-```text
-shifts
-├── id (uuid, PK)
-├── date (date)
-├── shift_type (text) - 'day' ou 'night'
-├── production_line (text)
-├── line_leader (text)
-├── product_name (text)
-├── sku (text)
-├── planned_quantity (integer) - TARGET ✓
-├── real_production (integer) - PRODUÇÃO REAL ✓
-├── performance (numeric) - calculado automaticamente
-├── comments (text)
-├── staff_planned / staff_actual
-└── created_at / updated_at
-```
-
-**Não é necessária alteração no banco de dados** - apenas expor os campos no formulário.
+### 3. Falta de Fallback no fetchUserData
+Se a tabela `profiles` não retornar dados (por timing ou erro), o usuário fica em estado de loading infinito.
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. Dashboard.tsx
-**Remoções:**
-- Remover import e uso do `WelcomeScreen`
-- Remover import e uso do `ActionButtons`
-- Remover os handlers `handleStartJob`, `handleEndJob`, etc.
+### 1. Login.tsx
+**Mudanças:**
+- Adicionar `useEffect` para verificar se já está autenticado
+- Extrair `isAuthenticated` do hook `useAuth()`
+- Redirecionar automaticamente para `/` se autenticado
 
-### 2. SkuRowForm.tsx
-**Adições:**
-- Adicionar campos `Target` e `Real Production` em cada linha de SKU
-- Atualizar interface `SkuRow` para incluir esses campos
-
-### 3. types/planner.ts
-**Adições:**
-- Atualizar `SkuRow` para incluir:
-  - `productionTarget: number`
-  - `realProduction: number`
-
-### 4. Planner.tsx
-**Alterações:**
-- Passar `productionTarget` e `realProduction` de cada SKU ao salvar
-- Calcular performance automaticamente: `(real / target) * 100`
+### 2. AuthContext.tsx
+**Mudanças:**
+- Adicionar `useRef` para controlar se inicialização está em andamento
+- Bloquear `onAuthStateChange` durante a inicialização
+- Adicionar fallback quando profile não existe (criar User com dados do auth.users)
+- Garantir que `isLoading` sempre seja `false` após qualquer erro
 
 ---
 
-## Detalhes de Implementação
+## Detalhes Técnicos
 
-### Dashboard.tsx - Elementos Removidos
-
-```text
-ANTES:
-- <WelcomeScreen />
-- <ActionButtons ... />
-- Handlers: handleStartJob, handleEndJob, handleSuspendJob, etc.
-
-DEPOIS:
-- Dashboard inicia direto nos filtros e cards
-- Layout mais limpo e focado nos dados
-```
-
-### SkuRowForm.tsx - Novo Layout
-
-Cada card de produto terá:
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│ Product #1                                         [X]  │
-├─────────────────────────────────────────────────────────┤
-│  SKU *              │  Product Name (auto-filled)       │
-│  [_______________]  │  [___________________________]    │
-├─────────────────────────────────────────────────────────┤
-│  Target             │  Real Production                  │
-│  [________] units   │  [__________] units               │
-└─────────────────────────────────────────────────────────┘
-```
-
-### types/planner.ts - Interface Atualizada
+### Login.tsx - Alterações
 
 ```typescript
-export interface SkuRow {
-  id: string;
-  sku: string;
-  product: string;
-  productionTarget: number;  // NOVO
-  realProduction: number;    // NOVO
+// Linha 1: Adicionar useEffect ao import
+import { useState, useEffect } from 'react';
+
+// Linha 8: Extrair isAuthenticated
+const { login, signup, isLoading: authLoading, isAuthenticated } = useAuth();
+
+// Após linha 8: Adicionar useEffect para redirecionamento
+useEffect(() => {
+  if (!authLoading && isAuthenticated) {
+    navigate('/', { replace: true });
+  }
+}, [authLoading, isAuthenticated, navigate]);
+```
+
+### AuthContext.tsx - Alterações
+
+```typescript
+// Linha 1: Adicionar useRef ao import
+import { createContext, useContext, ReactNode, useState, useEffect, useRef } from 'react';
+
+// Após linha 41: Adicionar ref de controle
+const isInitializing = useRef(true);
+
+// No useEffect, modificar lógica:
+// 1. Marcar isInitializing.current = false após inicialização
+// 2. No onAuthStateChange, verificar if (isInitializing.current) return;
+
+// No fetchUserData, adicionar fallback:
+if (!profile) {
+  // Criar usuário com dados básicos do Supabase Auth
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+    role: 'operator' as UserRole,
+    createdAt: supabaseUser.created_at || new Date().toISOString(),
+  };
 }
-
-export const createEmptySkuRow = (): SkuRow => ({
-  id: `sku-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-  sku: '',
-  product: '',
-  productionTarget: 0,       // NOVO
-  realProduction: 0,         // NOVO
-});
-```
-
-### Planner.tsx - Salvar com Quantidades
-
-```typescript
-// Ao criar ShiftFormData para cada SKU:
-const formData: ShiftFormData = {
-  // ... outros campos
-  productionTarget: row.productionTarget, // Usar valor do formulário
-  realProduction: row.realProduction,     // Usar valor do formulário
-  // performance é calculado automaticamente no ShiftContext
-};
 ```
 
 ---
 
-## Fluxo de Uso Esperado
+## Fluxo Corrigido
 
-1. **Supervisor acessa Planner**
-2. **Preenche informações do turno** (data, shift, linha, líder)
-3. **Adiciona SKUs** com botão "+ Add SKU"
-4. **Para cada SKU, preenche:**
-   - SKU (obrigatório) - auto-completa Product Name
-   - Target (quantidade esperada)
-   - Real Production (quantidade produzida)
-5. **Salva** - cada SKU vira um registro no banco
-6. **Dashboard** exibe os dados com performance calculada
+### Cenário 1: Usuário não logado acessa /login
+1. AuthContext carrega, `isLoading = true`
+2. `getSession()` retorna null
+3. `isLoading = false`, `user = null`
+4. Login.tsx renderiza formulário
+
+### Cenário 2: Usuário logado acessa /login
+1. AuthContext carrega, `isLoading = true`
+2. `getSession()` retorna sessão válida
+3. `fetchUserData()` busca profile
+4. `isLoading = false`, `user = {...}`
+5. **NOVO:** useEffect em Login.tsx detecta `isAuthenticated = true`
+6. **NOVO:** Redireciona para `/` automaticamente
+
+### Cenário 3: Usuário faz login no formulário
+1. `handleSubmit()` chama `login()`
+2. Supabase autentica com sucesso
+3. `fetchUserData()` busca profile
+4. Se profile não existe → **NOVO:** usa fallback com dados do auth.users
+5. `setUser()` atualiza estado
+6. `navigate('/')` redireciona
 
 ---
 
 ## Benefícios
 
-1. **Dashboard mais limpo** - sem botões que não funcionam
-2. **Workflow unificado** - planejar e reportar na mesma tela
-3. **Performance automática** - calculada ao salvar (real/target × 100)
-4. **Sem alteração de banco** - aproveita estrutura existente
+1. **Sem flash da página de login** - Redirecionamento antes de renderizar formulário
+2. **Sem race conditions** - Controle explícito via useRef
+3. **Resiliência** - Fallback garante login mesmo sem profile completo
+4. **Debug facilitado** - Logs claros de erro
 
