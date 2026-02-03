@@ -70,6 +70,8 @@ export function Planner() {
             id: editId,
             sku: shift.sku,
             product: shift.product,
+            productionTarget: shift.productionTarget || 0,
+            realProduction: shift.realProduction || 0,
           }],
           observations: shift.observations,
           structuredDowntimes: shift.structuredDowntimes || [],
@@ -173,8 +175,8 @@ export function Planner() {
           lineLeader: formState.lineLeader,
           product: row.product,
           sku: row.sku,
-          productionTarget: 0, // Planner does NOT capture quantities
-          realProduction: 0,   // Planner does NOT capture quantities
+          productionTarget: row.productionTarget,
+          realProduction: row.realProduction,
           observations: formState.observations,
           downtimes: [],
           structuredDowntimes: formState.structuredDowntimes,
@@ -196,8 +198,8 @@ export function Planner() {
             lineLeader: formState.lineLeader,
             product: row.product,
             sku: row.sku,
-            productionTarget: 0, // Planner does NOT capture quantities
-            realProduction: 0,   // Planner does NOT capture quantities
+            productionTarget: row.productionTarget,
+            realProduction: row.realProduction,
             observations: formState.observations,
             downtimes: [],
             structuredDowntimes: formState.structuredDowntimes,
