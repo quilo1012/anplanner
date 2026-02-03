@@ -215,6 +215,8 @@ export function Planner() {
         await updateShift(editId, formData);
       } else {
         // Save each SKU row as independent record - NEVER overwrites others
+        // Downtimes are only saved with the FIRST shift to avoid duplicates
+        let isFirstShift = true;
         for (const row of formState.skuRows) {
           if (!row.sku.trim()) continue; // Skip empty rows
           
@@ -229,13 +231,15 @@ export function Planner() {
             realProduction: row.realProduction,
             observations: formState.observations,
             downtimes: [],
-            structuredDowntimes: formState.structuredDowntimes,
+            // Only attach downtimes to the first shift to prevent duplicates
+            structuredDowntimes: isFirstShift ? formState.structuredDowntimes : [],
             monitoringPhoto: formState.monitoringPhoto,
             photoFilename: formState.photoFilename,
             staffPlanned: formState.staffPlanned,
             staffActual: formState.staffActual,
           };
           await addShift(formData);
+          isFirstShift = false;
         }
       }
       navigate('/history');
