@@ -9,6 +9,8 @@ import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
+import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
+import { DowntimeByReason } from '@/components/charts/DowntimeByReason';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
 import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity } from 'lucide-react';
@@ -92,6 +94,10 @@ export function Dashboard() {
       const totalDowntime = lineShifts.reduce((sum, s) => sum + s.totalDowntime, 0);
       const availability = Math.min(100, 100 - (totalDowntime / (8 * 60)) * 100);
       
+      // Aggregate production for target comparison
+      const totalRealProduction = lineShifts.reduce((sum, s) => sum + s.realProduction, 0);
+      const totalProductionTarget = lineShifts.reduce((sum, s) => sum + s.productionTarget, 0);
+      
       return {
         line,
         totalShifts: lineShifts.length,
@@ -105,6 +111,8 @@ export function Dashboard() {
         availability: Math.max(0, availability),
         colorClass: LINE_COLORS[index % LINE_COLORS.length],
         status: avgPerformance >= 90 ? 'running' : avgPerformance >= 70 ? 'warning' : 'stopped',
+        realProduction: totalRealProduction,
+        productionTarget: totalProductionTarget,
       };
     }).sort((a, b) => a.line.localeCompare(b.line));
   }, [filteredShifts]);
@@ -280,6 +288,8 @@ export function Dashboard() {
                   staffPlanned={line.staffPlanned}
                   status={line.status as 'running' | 'stopped' | 'warning'}
                   colorClass={line.colorClass}
+                  realProduction={line.realProduction}
+                  productionTarget={line.productionTarget}
                 />
               ))
             ) : (
@@ -298,23 +308,13 @@ export function Dashboard() {
             <OEEPanel
               performance={stats.avgPerformance}
               availability={stats.availability}
-              quality={stats.quality}
               oee={stats.oee}
               shiftType={selectedShift}
+              totalProduction={stats.totalProduction}
             />
             
             {/* Quick Stats */}
             <div className="space-y-2">
-              <div className="bg-card border border-border rounded-lg p-3">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                  <Package size={14} />
-                  Total Production
-                </div>
-                <p className="text-xl font-bold text-foreground tabular-nums">
-                  {stats.totalProduction.toLocaleString()}
-                </p>
-              </div>
-              
               <div className="bg-card border border-border rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
                   <Clock size={14} />
@@ -424,6 +424,23 @@ export function Dashboard() {
                   Daily Summary
                 </h3>
                 <DailyProductionSummary shifts={filteredShifts} />
+              </div>
+
+              {/* Downtime Charts */}
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <Clock size={16} />
+                  Downtime by Category
+                </h3>
+                <DowntimeByCategory shifts={filteredShifts} />
+              </div>
+
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
+                  <AlertTriangle size={16} />
+                  Top Downtime Reasons
+                </h3>
+                <DowntimeByReason shifts={filteredShifts} />
               </div>
             </div>
 
