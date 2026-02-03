@@ -2,7 +2,13 @@ import { useState, useMemo } from 'react';
 import { ShiftReport } from '@/types/shift';
 import { format, parseISO, subDays } from 'date-fns';
 import { Trophy, Medal, Award, Check, X, Calendar } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface LeaderPerformanceBoardProps {
   shifts: ShiftReport[];
@@ -19,21 +25,59 @@ interface LeaderStats {
   isOnTarget: boolean;
 }
 
+type PeriodType = 'day' | 'week' | '15days' | 'month';
+
+const periodLabels: Record<PeriodType, string> = {
+  day: 'Day',
+  week: 'Week',
+  '15days': '15d',
+  month: 'Month',
+};
+
 export function LeaderPerformanceBoard({ shifts, currentDate }: LeaderPerformanceBoardProps) {
-  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
+  const [periodFilter, setPeriodFilter] = useState<PeriodType>('day');
 
   const filteredShifts = useMemo(() => {
-    if (viewMode === 'day') {
-      return shifts.filter(s => s.date === currentDate);
+    let result = shifts;
+    
+    // Shift filter
+    if (shiftFilter !== 'ALL') {
+      result = result.filter(s => s.shift === shiftFilter);
     }
-    // Week: last 7 days
+    
+    // Period filter
     const currentDateParsed = parseISO(currentDate);
-    const weekStart = subDays(currentDateParsed, 6);
-    return shifts.filter(s => {
-      const date = parseISO(s.date);
-      return date >= weekStart && date <= currentDateParsed;
-    });
-  }, [shifts, currentDate, viewMode]);
+    
+    switch (periodFilter) {
+      case 'day':
+        result = result.filter(s => s.date === currentDate);
+        break;
+      case 'week':
+        const weekStart = subDays(currentDateParsed, 6);
+        result = result.filter(s => {
+          const date = parseISO(s.date);
+          return date >= weekStart && date <= currentDateParsed;
+        });
+        break;
+      case '15days':
+        const twoWeeksStart = subDays(currentDateParsed, 14);
+        result = result.filter(s => {
+          const date = parseISO(s.date);
+          return date >= twoWeeksStart && date <= currentDateParsed;
+        });
+        break;
+      case 'month':
+        const monthStart = subDays(currentDateParsed, 29);
+        result = result.filter(s => {
+          const date = parseISO(s.date);
+          return date >= monthStart && date <= currentDateParsed;
+        });
+        break;
+    }
+    
+    return result;
+  }, [shifts, currentDate, shiftFilter, periodFilter]);
 
   const leaderStats = useMemo(() => {
     const byLeader: Record<string, ShiftReport[]> = {};
@@ -85,12 +129,16 @@ export function LeaderPerformanceBoard({ shifts, currentDate }: LeaderPerformanc
 
   const dateDisplay = useMemo(() => {
     const currentDateParsed = parseISO(currentDate);
-    if (viewMode === 'day') {
-      return format(currentDateParsed, 'EEEE, MMM d, yyyy');
-    }
-    const weekStart = subDays(currentDateParsed, 6);
-    return `${format(weekStart, 'MMM d')} - ${format(currentDateParsed, 'MMM d, yyyy')} (Last 7 Days)`;
-  }, [currentDate, viewMode]);
+    
+    const displays: Record<PeriodType, string> = {
+      day: format(currentDateParsed, 'EEEE, MMM d, yyyy'),
+      week: `${format(subDays(currentDateParsed, 6), 'MMM d')} - ${format(currentDateParsed, 'MMM d, yyyy')} (7 Days)`,
+      '15days': `${format(subDays(currentDateParsed, 14), 'MMM d')} - ${format(currentDateParsed, 'MMM d, yyyy')} (15 Days)`,
+      month: `${format(subDays(currentDateParsed, 29), 'MMM d')} - ${format(currentDateParsed, 'MMM d, yyyy')} (30 Days)`,
+    };
+    
+    return displays[periodFilter];
+  }, [currentDate, periodFilter]);
 
   const getPositionIcon = (position: number) => {
     switch (position) {
@@ -119,40 +167,57 @@ export function LeaderPerformanceBoard({ shifts, currentDate }: LeaderPerformanc
 
   return (
     <div>
-      {/* Header with toggle */}
-      <div className="flex items-center justify-between mb-3">
+      {/* Header with filters */}
+      <div className="space-y-2 mb-3">
+        {/* Title */}
         <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
           <Trophy size={16} />
           Leader Performance Board
         </h3>
-        <div className="flex rounded-lg border border-border overflow-hidden">
-          <button
-            onClick={() => setViewMode('day')}
-            className={`px-3 py-1 text-xs font-medium transition-colors ${
-              viewMode === 'day'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-card hover:bg-muted text-foreground'
-            }`}
-          >
-            Day
-          </button>
-          <button
-            onClick={() => setViewMode('week')}
-            className={`px-3 py-1 text-xs font-medium transition-colors ${
-              viewMode === 'week'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-card hover:bg-muted text-foreground'
-            }`}
-          >
-            Week
-          </button>
+        
+        {/* Filters */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Shift Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Shift:</span>
+            <Select value={shiftFilter} onValueChange={(v) => setShiftFilter(v as typeof shiftFilter)}>
+              <SelectTrigger className="w-20 h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value="DAY">Day</SelectItem>
+                <SelectItem value="NIGHT">Night</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Period Filter */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            {(['day', 'week', '15days', 'month'] as const).map((period) => (
+              <button
+                key={period}
+                onClick={() => setPeriodFilter(period)}
+                className={`px-2 py-1 text-xs font-medium transition-colors ${
+                  periodFilter === period
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card hover:bg-muted text-foreground'
+                }`}
+              >
+                {periodLabels[period]}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Date display */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-        <Calendar size={14} />
-        {dateDisplay}
+        
+        {/* Date Range Display */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Calendar size={14} />
+          {dateDisplay}
+          {shiftFilter !== 'ALL' && (
+            <span className="text-primary font-medium">({shiftFilter} shift)</span>
+          )}
+        </div>
       </div>
 
       {/* Leader list */}
@@ -203,8 +268,8 @@ export function LeaderPerformanceBoard({ shifts, currentDate }: LeaderPerformanc
                 ) : (
                   <X size={16} className="text-destructive" />
                 )}
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {viewMode === 'day' 
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {periodFilter === 'day' 
                     ? `${leader.lineCount} line${leader.lineCount !== 1 ? 's' : ''}`
                     : `${leader.shiftCount} shift${leader.shiftCount !== 1 ? 's' : ''}`
                   }
@@ -219,8 +284,8 @@ export function LeaderPerformanceBoard({ shifts, currentDate }: LeaderPerformanc
         </div>
       )}
 
-      {/* Week summary */}
-      {viewMode === 'week' && summaryStats && (
+      {/* Summary for multi-day periods */}
+      {periodFilter !== 'day' && summaryStats && (
         <div className="mt-3 pt-3 border-t border-border flex items-center justify-center gap-4 text-xs text-muted-foreground">
           <span>
             Average: <strong className="text-foreground">{summaryStats.avgPerformance}%</strong>
