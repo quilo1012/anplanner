@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { 
   StructuredDowntime, 
@@ -10,6 +11,85 @@ interface StructuredDowntimeFormProps {
   downtimes: StructuredDowntime[];
   onChange: (downtimes: StructuredDowntime[]) => void;
   downtimeThreshold?: number; // minutes
+}
+
+// Parse flexible duration input: "90", "1:30", "1h30m", "1.5"
+function parseDuration(input: string): number {
+  const trimmed = input.trim();
+  if (!trimmed) return 0;
+  
+  // Format HH:MM (1:30 → 90)
+  if (trimmed.includes(':')) {
+    const [hours, minutes] = trimmed.split(':').map(s => parseInt(s) || 0);
+    return (hours * 60) + minutes;
+  }
+  
+  // Format decimal (1.5 → 90)
+  if (trimmed.includes('.')) {
+    return Math.round(parseFloat(trimmed) * 60);
+  }
+  
+  // Format with 'h' and 'm' (1h30m → 90)
+  const hMatch = trimmed.match(/(\d+)h/i);
+  const mMatch = trimmed.match(/(\d+)m/i);
+  if (hMatch || mMatch) {
+    const hours = hMatch ? parseInt(hMatch[1]) : 0;
+    const minutes = mMatch ? parseInt(mMatch[1]) : 0;
+    return (hours * 60) + minutes;
+  }
+  
+  // Direct number (90 → 90)
+  return parseInt(trimmed) || 0;
+}
+
+// Format minutes to readable string
+function formatDuration(minutes: number): string {
+  if (minutes <= 0) return '';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+// Duration input component with flexible parsing
+function DurationInput({ value, onChange }: { value: number; onChange: (val: number) => void }) {
+  const [inputValue, setInputValue] = useState(value > 0 ? String(value) : '');
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setInputValue(raw);
+  };
+  
+  const handleBlur = () => {
+    const parsed = parseDuration(inputValue);
+    onChange(parsed);
+    // Update display to show parsed value if different
+    if (parsed > 0) {
+      setInputValue(String(parsed));
+    }
+  };
+  
+  const formatted = parseDuration(inputValue);
+  
+  return (
+    <div>
+      <label className="label text-xs">Duration</label>
+      <input
+        type="text"
+        value={inputValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        className="input-field text-sm"
+        placeholder="Ex: 90 ou 1:30"
+      />
+      {formatted > 0 && (
+        <p className="text-xs text-muted-foreground mt-1">
+          = {formatted} min ({formatDuration(formatted)})
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function StructuredDowntimeForm({ 
@@ -145,17 +225,10 @@ export function StructuredDowntimeForm({
                   </div>
 
                   {/* Duration */}
-                  <div>
-                    <label className="label text-xs">Duration (min)</label>
-                    <input
-                      type="number"
-                      value={downtime.duration || ''}
-                      onChange={e => updateDowntime(downtime.id, 'duration', parseInt(e.target.value) || 0)}
-                      min="0"
-                      className="input-field text-sm"
-                      placeholder="0"
-                    />
-                  </div>
+                  <DurationInput
+                    value={downtime.duration}
+                    onChange={(val) => updateDowntime(downtime.id, 'duration', val)}
+                  />
 
                   {/* Comment */}
                   <div>
