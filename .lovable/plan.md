@@ -1,187 +1,106 @@
 
-# Correção: Downtime Visível na Dashboard e Página Downtime + Formato HH:MM
+# Correção: Downtime - Incompatibilidade entre Código e Banco de Dados
 
-## Problemas Identificados
+## Problema Encontrado
 
-| Problema | Causa Raiz |
-|----------|-----------|
-| Downtime não aparece na página Downtime | Tabela `structured_downtimes` está **vazia** - downtimes não estão sendo salvos |
-| Downtime não aparece na Dashboard | Mesmo problema - não há dados para exibir |
-| Não aceita formato 1:30 | Campo é `type="number"` - só aceita inteiros |
+A tabela `structured_downtimes` tem uma constraint que só aceita categorias específicas, mas o código está enviando valores diferentes:
 
-## Análise Técnica
+| Banco de Dados (Permitido) | Código (Enviado) | Status |
+|---------------------------|------------------|--------|
+| `machine` | `maintenance` | Rejeitado |
+| `material` | `quality` | Rejeitado |
+| `people` | `health_safety` | Rejeitado |
+| `process` | `warehouse` | Rejeitado |
+| `other` | `staff` | Rejeitado |
+| `other` | `other` | Aceito |
 
-### Por que os Downtimes não estão salvando?
-
-Ao salvar múltiplas SKU rows, o sistema chama `addShift()` para **cada SKU**, passando os **mesmos downtimes**. Isso causa:
-
-1. **Primeira SKU**: Salva shift → salva downtimes ✅
-2. **Segunda SKU**: Salva shift → tenta salvar mesmos downtimes → **IDs duplicados** ou conflito
-
-O problema está na lógica de que downtimes pertencem à **linha/turno**, não ao SKU individual.
+### Erro no Log do Banco:
+```
+"new row for relation 'structured_downtimes' violates check constraint 'structured_downtimes_category_check'"
+```
 
 ---
 
-## Solução Proposta
+## Solução: Atualizar Constraint do Banco
 
-### 1. Corrigir Lógica de Salvamento de Downtimes
+A melhor abordagem é atualizar a constraint do banco para aceitar as categorias definidas no código, pois as categorias do código são mais descritivas e específicas para o contexto industrial.
 
-**Mudança no Planner.tsx:**
-- Downtimes devem ser salvos apenas UMA VEZ, no primeiro shift
-- SKU rows subsequentes não devem tentar inserir downtimes novamente
+### Migration SQL Necessária:
 
-```text
-Antes:
-  SKU 1 → addShift({structuredDowntimes: [...]})
-  SKU 2 → addShift({structuredDowntimes: [...]})  ❌ Duplicado
-  
-Depois:
-  SKU 1 → addShift({structuredDowntimes: [...]})
-  SKU 2 → addShift({structuredDowntimes: []})     ✅ Sem downtimes
+```sql
+-- Remover constraint antiga
+ALTER TABLE structured_downtimes 
+DROP CONSTRAINT IF EXISTS structured_downtimes_category_check;
+
+-- Adicionar nova constraint com categorias corretas
+ALTER TABLE structured_downtimes 
+ADD CONSTRAINT structured_downtimes_category_check 
+CHECK (category = ANY (ARRAY[
+  'maintenance'::text, 
+  'quality'::text, 
+  'health_safety'::text, 
+  'warehouse'::text, 
+  'staff'::text, 
+  'other'::text
+]));
 ```
 
-### 2. Campo Duration com Suporte a HH:MM
+---
 
-**Mudança no StructuredDowntimeForm.tsx:**
-- Trocar `type="number"` por `type="text"` com parsing inteligente
-- Aceitar formatos: "90", "1:30", "1h30", "1.5"
-- Converter automaticamente para minutos
-- Exibir total formatado: "1h 30m (90 min)"
+## Mudanças Adicionais
+
+### 1. Campo Duration - Formato HH:MM
+Já implementado na última mudança. O componente `DurationInput` aceita:
+- `"90"` - minutos diretos
+- `"1:30"` - formato hora:minutos
+- `"1.5"` - formato decimal
+- `"1h30m"` - formato explícito
+
+### 2. Verificação Após Correção
+
+Uma vez que a constraint seja atualizada:
+- **Dashboard**: Exibirá `totalDowntime` calculado automaticamente
+- **Página Downtime**: Listará todos os registros da tabela `structured_downtimes`
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. Planner.tsx
-**Mudanças:**
-- Ao salvar múltiplas SKU rows, passar downtimes apenas no primeiro shift
-- Downtimes ficam vinculados ao primeiro shift do grupo
+### 1. Migração SQL (via ferramenta de migração)
+- Atualizar constraint `structured_downtimes_category_check`
 
-### 2. StructuredDowntimeForm.tsx
-**Mudanças:**
-- Criar função `parseDuration(input)` para converter múltiplos formatos
-- Mudar campo de `type="number"` para `type="text"`
-- Adicionar placeholder explicativo: "Ex: 90 ou 1:30"
-- Manter estado interno como string, converter para número ao atualizar
-
-### 3. Dashboard.tsx
-**Verificação:**
-- Dashboard já busca `totalDowntime` do shift, que é calculado a partir de `structuredDowntimes`
-- Uma vez que os downtimes estejam salvos, aparecerão automaticamente
-
-### 4. Downtime.tsx
-**Verificação:**
-- Página já extrai downtimes de `shift.structuredDowntimes`
-- Uma vez que os downtimes estejam salvos, aparecerão automaticamente
+### 2. Nenhuma mudança de código necessária
+- O código TypeScript já usa as categorias corretas
+- O `ShiftContext.tsx` já salva corretamente quando a constraint permite
 
 ---
 
-## Detalhes Técnicos
-
-### parseDuration - Conversão Flexível
-
-```typescript
-function parseDuration(input: string): number {
-  const trimmed = input.trim();
-  
-  // Formato HH:MM (1:30 → 90)
-  if (trimmed.includes(':')) {
-    const [hours, minutes] = trimmed.split(':').map(s => parseInt(s) || 0);
-    return (hours * 60) + minutes;
-  }
-  
-  // Formato decimal (1.5 → 90)
-  if (trimmed.includes('.')) {
-    return Math.round(parseFloat(trimmed) * 60);
-  }
-  
-  // Formato com 'h' e 'm' (1h30m → 90)
-  const hMatch = trimmed.match(/(\d+)h/i);
-  const mMatch = trimmed.match(/(\d+)m/i);
-  if (hMatch || mMatch) {
-    const hours = hMatch ? parseInt(hMatch[1]) : 0;
-    const minutes = mMatch ? parseInt(mMatch[1]) : 0;
-    return (hours * 60) + minutes;
-  }
-  
-  // Número direto (90 → 90)
-  return parseInt(trimmed) || 0;
-}
-```
-
-### Planner.tsx - Correção do Loop
-
-```typescript
-// No handleSubmit, modificar o loop:
-let firstShiftId: string | null = null;
-
-for (let i = 0; i < formState.skuRows.length; i++) {
-  const row = formState.skuRows[i];
-  if (!row.sku.trim()) continue;
-  
-  const formData: ShiftFormData = {
-    // ... outros campos
-    // Downtimes só no PRIMEIRO shift
-    structuredDowntimes: i === 0 ? formState.structuredDowntimes : [],
-  };
-  
-  await addShift(formData);
-}
-```
-
----
-
-## Fluxo Corrigido
-
-### Cenário: Usuário adiciona 3 SKUs com 2 downtimes
+## Fluxo Após Correção
 
 ```text
-1. Usuário preenche:
-   - Linha: 5
-   - Turno: DAY
-   - SKU 1: ABC123, Target: 1000
-   - SKU 2: DEF456, Target: 500
-   - SKU 3: GHI789, Target: 200
-   - Downtime 1: Maintenance, 30min
-   - Downtime 2: Quality, 15min
+1. Usuário adiciona Downtime no Planner
+   → Categoria: "maintenance", Reason: "cleaning", Duration: "1:30"
 
-2. Ao salvar:
-   - Shift 1 (ABC123) → salva com downtimes [30min, 15min]
-   - Shift 2 (DEF456) → salva SEM downtimes
-   - Shift 3 (GHI789) → salva SEM downtimes
+2. Sistema converte duração
+   → 90 minutos
 
-3. Na página Downtime:
-   - Exibe 2 entradas para Linha 5, DAY, vinculadas ao Shift 1
+3. Ao salvar shift
+   → INSERT INTO structured_downtimes (category: "maintenance", reason: "cleaning", duration: 90)
+   → Aceito pela nova constraint
 
-4. Na Dashboard:
-   - Linha 5 mostra totalDowntime: 45 min
-```
+4. Dashboard
+   → Busca shifts com totalDowntime calculado
+   → Exibe: "Total Downtime: 90 min"
 
----
-
-## Interface Atualizada - Duration
-
-```text
-Antes:
-┌─────────────────┐
-│ Duration (min)  │
-│ [___________90] │ ← type="number", só aceita inteiros
-└─────────────────┘
-
-Depois:
-┌─────────────────────────┐
-│ Duration               │
-│ [1:30____________]     │ ← type="text", aceita múltiplos formatos
-│ = 90 min               │ ← Preview do valor convertido
-└─────────────────────────┘
+5. Página Downtime
+   → Lista entrada com categoria "Maintenance Issues", 90 min
 ```
 
 ---
 
 ## Benefícios
 
-1. **Downtimes salvos corretamente** - Cada registro fica vinculado a um shift específico
-2. **Visibilidade na Dashboard** - totalDowntime calculado automaticamente
-3. **Visibilidade na página Downtime** - Entradas aparecem com todos os detalhes
-4. **Entrada flexível** - Operadores podem usar "1:30" ou "90" conforme preferência
-5. **Sem duplicação** - Downtimes não são inseridos múltiplas vezes
+1. **Downtimes salvos corretamente** - Constraint aceita categorias do código
+2. **Visibilidade imediata** - Dashboard e Downtime page mostram dados
+3. **Entrada flexível** - Formato HH:MM já implementado
+4. **Categorias descritivas** - Nomes mais claros para operadores
