@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
-import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { useShifts } from '@/contexts/ShiftContext';
 import { ShiftReport, ShiftType, SHIFT_TYPES } from '@/types/shift';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
@@ -12,9 +11,7 @@ import { DailyProductionSummary } from '@/components/charts/DailyProductionSumma
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
-import { ActionButtons } from '@/components/dashboard/ActionButtons';
-import { Activity, TrendingUp, AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, TableIcon, Calendar, Filter, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity } from 'lucide-react';
 
 const LINE_COLORS = [
   'bg-industrial-blue',
@@ -153,13 +150,6 @@ export function Dashboard() {
 
   const hasOptionalFilters = selectedLine || selectedLeader;
 
-  // Action button handlers
-  const handleStartJob = () => toast.info('Start Job - Feature coming soon');
-  const handleEndJob = () => toast.info('End Job - Feature coming soon');
-  const handleSuspendJob = () => toast.info('Suspend Job - Feature coming soon');
-  const handleEnterScrap = () => toast.info('Enter Scrap - Feature coming soon');
-  const handleEnterStop = () => toast.info('Enter Stop - Feature coming soon');
-
   if (isLoading) {
     return (
       <>
@@ -176,21 +166,6 @@ export function Dashboard() {
       <Header title="Production Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(selectedDate)}`} />
 
       <div className="flex-1 overflow-auto p-3 sm:p-5 print:p-0">
-        {/* Welcome Message - hide on print */}
-        <div className="no-print mb-3">
-          <WelcomeScreen />
-        </div>
-
-        {/* Action Buttons - Industrial Style */}
-        <div className="no-print mb-3">
-          <ActionButtons
-            onStartJob={handleStartJob}
-            onEndJob={handleEndJob}
-            onSuspendJob={handleSuspendJob}
-            onEnterScrap={handleEnterScrap}
-            onEnterStop={handleEnterStop}
-          />
-        </div>
 
         {/* Global Filters - Compact */}
         <div className="card p-3 mb-3 no-print">
@@ -455,7 +430,7 @@ export function Dashboard() {
             {/* Daily Summary Table */}
             <div className="card p-3 mb-3">
               <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
-                <TableIcon size={16} />
+                <Table size={16} />
                 Daily Summary Table
               </h3>
               <DailySummaryTable shifts={filteredShifts} />

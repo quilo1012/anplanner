@@ -1,4 +1,4 @@
-import { Plus, Trash2, Package, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 
@@ -9,8 +9,7 @@ interface SkuRowFormProps {
   errors?: Record<string, string>;
 }
 
-// Planner SKU Form - PLANNING ONLY (no production quantities)
-// Behaves exactly like downtime entries: unlimited rows, + button, independent saves
+// Planner SKU Form - Now captures Target and Real Production per SKU
 export function SkuRowForm({ 
   skuRows, 
   onChange, 
@@ -18,19 +17,17 @@ export function SkuRowForm({
   errors = {}
 }: SkuRowFormProps) {
   const addSkuRow = () => {
-    // Add new independent row - does NOT affect existing rows
     onChange([...skuRows, createEmptySkuRow()]);
   };
 
   const removeSkuRow = (id: string) => {
-    // Remove only this specific row
     onChange(skuRows.filter(row => row.id !== id));
   };
 
   const updateSkuRow = (
     id: string, 
     field: keyof SkuRow, 
-    value: string
+    value: string | number
   ) => {
     onChange(
       skuRows.map(row => 
@@ -47,6 +44,12 @@ export function SkuRowForm({
           : row
       )
     );
+  };
+
+  // Calculate performance for display
+  const calculatePerformance = (target: number, real: number): number => {
+    if (target <= 0) return 0;
+    return Math.round((real / target) * 100);
   };
 
   return (
@@ -81,6 +84,8 @@ export function SkuRowForm({
         <div className="space-y-3">
           {skuRows.map((row, index) => {
             const hasSkuError = !row.sku.trim() && errors[`sku_${row.id}`];
+            const performance = calculatePerformance(row.productionTarget, row.realProduction);
+            const performanceColor = performance >= 100 ? 'text-green-600' : performance >= 80 ? 'text-yellow-600' : 'text-red-600';
             
             return (
               <div
@@ -91,6 +96,11 @@ export function SkuRowForm({
                   <span className="text-sm font-medium text-foreground flex items-center gap-2">
                     <Package size={14} className="text-primary" />
                     Product #{index + 1}
+                    {row.productionTarget > 0 && (
+                      <span className={`text-xs font-bold ${performanceColor}`}>
+                        ({performance}%)
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"
@@ -102,7 +112,8 @@ export function SkuRowForm({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* SKU and Product Name Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                   {/* SKU */}
                   <div>
                     <label className="label text-xs">
@@ -144,6 +155,51 @@ export function SkuRowForm({
                   </div>
                 </div>
 
+                {/* Target and Real Production Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-border">
+                  {/* Target */}
+                  <div>
+                    <label className="label text-xs flex items-center gap-1">
+                      <Target size={12} className="text-primary" />
+                      Production Target
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={row.productionTarget || ''}
+                        onChange={e => updateSkuRow(row.id, 'productionTarget', parseInt(e.target.value) || 0)}
+                        placeholder="0"
+                        min="0"
+                        className="input-field text-sm pr-12"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        units
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Real Production */}
+                  <div>
+                    <label className="label text-xs flex items-center gap-1">
+                      <TrendingUp size={12} className="text-green-600" />
+                      Real Production
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={row.realProduction || ''}
+                        onChange={e => updateSkuRow(row.id, 'realProduction', parseInt(e.target.value) || 0)}
+                        placeholder="0"
+                        min="0"
+                        className="input-field text-sm pr-12"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        units
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Warning for empty SKU */}
                 {!row.sku.trim() && (
                   <div className="mt-2 flex items-center gap-1 text-xs text-warning">
@@ -159,8 +215,8 @@ export function SkuRowForm({
 
       {/* Info banner */}
       <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm text-muted-foreground">
-        <p className="font-medium text-foreground mb-1">Planning Mode</p>
-        <p>Each SKU is saved as an independent record. You can add unlimited products per line and shift.</p>
+        <p className="font-medium text-foreground mb-1">Production Tracking</p>
+        <p>Enter the target quantity and actual production for each SKU. Performance is calculated automatically.</p>
       </div>
     </div>
   );
