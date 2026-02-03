@@ -17,8 +17,8 @@ export function OEEPanel({
   shiftType,
   totalProduction = 0,
 }: OEEPanelProps) {
-  // Simplified OEE: Performance × Availability / 100
-  const simplifiedOEE = (performance * availability) / 100;
+  // Simplified OEE: Just Performance
+  const simplifiedOEE = performance;
   const getOEEStatus = () => {
     if (simplifiedOEE >= 85) return { label: 'World Class', color: 'text-success' };
     if (simplifiedOEE >= 75) return { label: 'Good', color: 'text-primary' };
@@ -54,7 +54,7 @@ export function OEEPanel({
             <p className={cn("text-sm font-semibold", oeeStatus.color)}>
               {oeeStatus.label}
             </p>
-            <p className="text-xs text-muted-foreground">Performance × Availability</p>
+            <p className="text-xs text-muted-foreground">Overall Performance</p>
           </div>
         </div>
         
@@ -68,12 +68,6 @@ export function OEEPanel({
             label="Performance"
             value={performance}
             description="Speed efficiency"
-          />
-          <KPIRow
-            icon={<Gauge size={14} />}
-            label="Availability"
-            value={availability}
-            description="Uptime ratio"
           />
           
           {/* Total Production Stat */}
