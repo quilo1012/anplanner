@@ -11,11 +11,12 @@ interface Product {
 interface ProductSearchProps {
   value: string;
   onChange: (sku: string, product?: { sku: string; name: string }) => void;
+  onFoundStatusChange?: (found: boolean) => void;  // Callback when SKU found status changes
   disabled?: boolean;
   placeholder?: string;
 }
 
-export function ProductSearch({ value, onChange, disabled, placeholder = "Type SKU to search..." }: ProductSearchProps) {
+export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, placeholder = "Type SKU to search..." }: ProductSearchProps) {
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState<Product[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -73,7 +74,11 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
         
         // Check if exact SKU match exists
         const exactMatch = data?.find(p => p.product_code.toLowerCase() === query.toLowerCase());
-        setSkuNotFound(!exactMatch && query.length >= 2);
+        const isFound = !!exactMatch;
+        setSkuNotFound(!isFound && query.length >= 2);
+        
+        // Notify parent of found status
+        onFoundStatusChange?.(isFound);
         
         if (exactMatch && !selectedProduct) {
           // Auto-select if exact match
@@ -100,6 +105,7 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
     setIsOpen(true);
     setSelectedProduct(null);
     setSkuNotFound(false);
+    onFoundStatusChange?.(false);  // Reset found status on change
     onChange(newValue);
   };
 
@@ -108,6 +114,7 @@ export function ProductSearch({ value, onChange, disabled, placeholder = "Type S
     setSelectedProduct(product);
     setSkuNotFound(false);
     setIsOpen(false);
+    onFoundStatusChange?.(true);  // Found in DB
     onChange(product.product_code, { 
       sku: product.product_code, 
       name: product.product_description 

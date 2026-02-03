@@ -5,6 +5,8 @@ export interface SkuRow {
   product: string;
   productionTarget: number;
   realProduction: number;
+  isNewProduct?: boolean;  // Flag to save new product to catalog
+  isFoundInDb?: boolean;   // Flag to track if SKU was found in database
 }
 
 export interface PlannerFormData {
