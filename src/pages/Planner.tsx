@@ -116,11 +116,20 @@ export function Planner() {
   };
 
   const handleExcelImport = async (entries: ShiftFormData[]) => {
+    let hasError = false;
     for (const entry of entries) {
-      await addShift(entry);
+      const result = await addShift(entry);
+      if (!result.success) {
+        toast.error(`Failed to import: ${result.error}`);
+        hasError = true;
+        break;
+      }
     }
-    setShowExcelUpload(false);
-    navigate('/history');
+    if (!hasError) {
+      toast.success('Import completed successfully!');
+      setShowExcelUpload(false);
+      navigate('/history');
+    }
   };
 
   const validate = (): boolean => {
@@ -192,6 +201,7 @@ export function Planner() {
           }
         }
       }
+
       // If editing, update single shift
       if (editId && formState.skuRows.length === 1) {
         const row = formState.skuRows[0];
@@ -212,13 +222,16 @@ export function Planner() {
           staffPlanned: formState.staffPlanned,
           staffActual: formState.staffActual,
         };
-        await updateShift(editId, formData);
+        const result = await updateShift(editId, formData);
+        if (!result.success) {
+          toast.error(`Failed to update shift: ${result.error}`);
+          return;
+        }
       } else {
-        // Save each SKU row as independent record - NEVER overwrites others
-        // Downtimes are only saved with the FIRST shift to avoid duplicates
+        // Save each SKU row as independent record
         let isFirstShift = true;
         for (const row of formState.skuRows) {
-          if (!row.sku.trim()) continue; // Skip empty rows
+          if (!row.sku.trim()) continue;
           
           const formData: ShiftFormData = {
             date: formState.date,
@@ -231,20 +244,27 @@ export function Planner() {
             realProduction: row.realProduction,
             observations: formState.observations,
             downtimes: [],
-            // Only attach downtimes to the first shift to prevent duplicates
             structuredDowntimes: isFirstShift ? formState.structuredDowntimes : [],
             monitoringPhoto: formState.monitoringPhoto,
             photoFilename: formState.photoFilename,
             staffPlanned: formState.staffPlanned,
             staffActual: formState.staffActual,
           };
-          await addShift(formData);
+          
+          const result = await addShift(formData);
+          if (!result.success) {
+            toast.error(`Failed to save shift: ${result.error}`);
+            return;
+          }
           isFirstShift = false;
         }
       }
+
+      toast.success(editId ? 'Shift updated successfully!' : 'Shift saved successfully!');
       navigate('/history');
     } catch (error) {
       console.error('Error saving shift:', error);
+      toast.error('An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
     }

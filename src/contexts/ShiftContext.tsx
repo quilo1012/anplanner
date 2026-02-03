@@ -3,13 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { ShiftReport, ShiftFormData, StructuredDowntime, ShiftType } from '@/types/shift';
 import { useAuth } from './AuthContext';
 
+interface ShiftOperationResult {
+  success: boolean;
+  error?: string;
+}
+
 interface ShiftContextType {
   shifts: ShiftReport[];
   isLoading: boolean;
   error: string | null;
-  addShift: (data: ShiftFormData) => Promise<void>;
-  updateShift: (id: string, data: ShiftFormData) => Promise<void>;
-  deleteShift: (id: string) => Promise<void>;
+  addShift: (data: ShiftFormData) => Promise<ShiftOperationResult>;
+  updateShift: (id: string, data: ShiftFormData) => Promise<ShiftOperationResult>;
+  deleteShift: (id: string) => Promise<ShiftOperationResult>;
   getShiftById: (id: string) => ShiftReport | undefined;
   refreshShifts: () => Promise<void>;
 }
@@ -182,8 +187,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addShift = async (data: ShiftFormData) => {
-    if (!user) return;
+  const addShift = async (data: ShiftFormData): Promise<ShiftOperationResult> => {
+    if (!user) return { success: false, error: 'User not authenticated' };
 
     try {
       const performance = calculatePerformance(data.realProduction, data.productionTarget);
@@ -219,7 +224,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       if (shiftError) {
         console.error('Error adding shift:', shiftError);
-        return;
+        return { success: false, error: shiftError.message };
       }
 
       // Insert structured downtimes
@@ -238,17 +243,20 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
         if (downtimeError) {
           console.error('Error adding downtimes:', downtimeError);
+          // Non-critical, shift was saved
         }
       }
 
       await refreshShifts();
+      return { success: true };
     } catch (error) {
       console.error('Error adding shift:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
-  const updateShift = async (id: string, data: ShiftFormData) => {
-    if (!user) return;
+  const updateShift = async (id: string, data: ShiftFormData): Promise<ShiftOperationResult> => {
+    if (!user) return { success: false, error: 'User not authenticated' };
 
     try {
       const performance = calculatePerformance(data.realProduction, data.productionTarget);
@@ -284,7 +292,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       if (shiftError) {
         console.error('Error updating shift:', shiftError);
-        return;
+        return { success: false, error: shiftError.message };
       }
 
       // Delete existing downtimes and insert new ones
@@ -312,12 +320,14 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       await refreshShifts();
+      return { success: true };
     } catch (error) {
       console.error('Error updating shift:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
-  const deleteShift = async (id: string) => {
+  const deleteShift = async (id: string): Promise<ShiftOperationResult> => {
     try {
       const { error } = await supabase
         .from('shifts')
@@ -326,12 +336,14 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('Error deleting shift:', error);
-        return;
+        return { success: false, error: error.message };
       }
 
       await refreshShifts();
+      return { success: true };
     } catch (error) {
       console.error('Error deleting shift:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
