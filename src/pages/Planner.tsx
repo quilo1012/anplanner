@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ShiftFormData, ShiftType, StructuredDowntime, SHIFT_TYPES } from '@/types/shift';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PlannerFormState {
   date: string;
@@ -165,6 +167,31 @@ export function Planner() {
     setIsSubmitting(true);
 
     try {
+      // Save new products to catalog if flagged
+      for (const row of formState.skuRows) {
+        if (row.isNewProduct && row.sku.trim() && row.product.trim()) {
+          // Check if already exists
+          const { data: existing } = await supabase
+            .from('products')
+            .select('product_code')
+            .eq('product_code', row.sku)
+            .maybeSingle();
+          
+          if (!existing) {
+            const { error } = await supabase.from('products').insert({
+              product_code: row.sku,
+              product_description: row.product,
+            });
+            
+            if (error) {
+              console.error('Error saving new product:', error);
+              toast.error(`Failed to save product ${row.sku} to catalog`);
+            } else {
+              toast.success(`Product ${row.sku} saved to catalog`);
+            }
+          }
+        }
+      }
       // If editing, update single shift
       if (editId && formState.skuRows.length === 1) {
         const row = formState.skuRows[0];

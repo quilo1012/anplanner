@@ -1,6 +1,7 @@
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
+import { Checkbox } from './ui/checkbox';
 
 interface SkuRowFormProps {
   skuRows: SkuRow[];
@@ -41,6 +42,26 @@ export function SkuRowForm({
       skuRows.map(row => 
         row.id === rowId 
           ? { ...row, sku, product: product?.name || row.product } 
+          : row
+      )
+    );
+  };
+
+  const handleFoundStatusChange = (rowId: string, found: boolean) => {
+    onChange(
+      skuRows.map(row => 
+        row.id === rowId 
+          ? { ...row, isFoundInDb: found, isNewProduct: !found ? row.isNewProduct : false } 
+          : row
+      )
+    );
+  };
+
+  const handleSaveToDbToggle = (rowId: string, checked: boolean) => {
+    onChange(
+      skuRows.map(row => 
+        row.id === rowId 
+          ? { ...row, isNewProduct: checked } 
           : row
       )
     );
@@ -123,6 +144,7 @@ export function SkuRowForm({
                       <ProductSearch
                         value={row.sku}
                         onChange={(sku, product) => handleProductSelect(row.id, sku, product)}
+                        onFoundStatusChange={(found) => handleFoundStatusChange(row.id, found)}
                         placeholder="Search SKU..."
                       />
                     ) : (
@@ -137,23 +159,47 @@ export function SkuRowForm({
                     )}
                   </div>
 
-                  {/* Product Name */}
+                  {/* Product Name - Editable when SKU not found in DB */}
                   <div>
                     <label className="label text-xs">
                       Product Name
-                      <span className="text-xs text-muted-foreground ml-1">(auto-filled from SKU)</span>
+                      {row.isFoundInDb ? (
+                        <span className="text-xs text-muted-foreground ml-1">(auto-filled)</span>
+                      ) : row.sku.trim().length >= 2 ? (
+                        <span className="text-xs text-warning ml-1">(manual entry)</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground ml-1">(auto-filled from SKU)</span>
+                      )}
                     </label>
                     <input
                       type="text"
                       value={row.product}
                       onChange={e => updateSkuRow(row.id, 'product', e.target.value)}
-                      placeholder="Auto-filled from database"
-                      className="input-field text-sm bg-muted"
+                      placeholder={row.isFoundInDb ? "Auto-filled from database" : "Enter product name"}
+                      className={`input-field text-sm ${row.isFoundInDb ? 'bg-muted' : ''}`}
                       maxLength={100}
-                      readOnly
+                      readOnly={row.isFoundInDb}
                     />
                   </div>
                 </div>
+
+                {/* Save to catalog checkbox - Only show when SKU not found and has value */}
+                {!row.isFoundInDb && row.sku.trim().length >= 2 && (
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-warning/10 border border-warning/30 rounded-md">
+                    <Checkbox
+                      id={`save-${row.id}`}
+                      checked={row.isNewProduct || false}
+                      onCheckedChange={(checked) => handleSaveToDbToggle(row.id, !!checked)}
+                    />
+                    <label 
+                      htmlFor={`save-${row.id}`} 
+                      className="text-sm text-foreground flex items-center gap-1 cursor-pointer"
+                    >
+                      <Save size={12} className="text-primary" />
+                      Save to product catalog
+                    </label>
+                  </div>
+                )}
 
                 {/* Target and Real Production Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-border">
