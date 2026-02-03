@@ -1,4 +1,4 @@
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
@@ -222,6 +222,12 @@ export function SkuRowForm({
                         units
                       </span>
                     </div>
+                    {row.productionTarget > 0 && (
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Clock size={10} />
+                        {(row.productionTarget / 570).toFixed(2)} units/min
+                      </div>
+                    )}
                   </div>
 
                   {/* Real Production */}
@@ -243,6 +249,12 @@ export function SkuRowForm({
                         units
                       </span>
                     </div>
+                    {row.realProduction > 0 && (
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Clock size={10} />
+                        {(row.realProduction / 570).toFixed(2)} units/min
+                      </div>
+                    )}
                   </div>
                 </div>
 
