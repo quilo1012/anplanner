@@ -9,17 +9,13 @@ interface ProductCsvUploadProps {
 }
 
 interface ParsedProduct {
-  sku: string;
-  name: string;
-  price?: number;
-  description?: string;
+  product_code: string;
+  product_description: string;
 }
 
 // Header aliases for flexible column matching
-const SKU_ALIASES = ['sku', 'codigo', 'código', 'code', 'product code', 'product_code', 'productcode', 'item code', 'item_code'];
-const NAME_ALIASES = ['name', 'nome', 'product', 'produto', 'product description', 'description', 'product name', 'product_name', 'productname', 'item', 'item name'];
-const PRICE_ALIASES = ['price', 'preço', 'preco', 'valor', 'unit price', 'unit_price'];
-const DESC_ALIASES = ['description', 'descrição', 'descricao', 'desc', 'details', 'notes'];
+const CODE_ALIASES = ['sku', 'codigo', 'código', 'code', 'product code', 'product_code', 'productcode', 'item code', 'item_code'];
+const DESC_ALIASES = ['name', 'nome', 'product', 'produto', 'product description', 'description', 'product name', 'product_name', 'productname', 'item', 'item name', 'descrição', 'descricao'];
 
 // Remove BOM and invisible characters from string
 function cleanString(str: string): string {
@@ -71,16 +67,14 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
     const headerLine = lines[0];
     const headers = parseCSVLine(headerLine);
     
-    const skuIndex = findColumnIndex(headers, SKU_ALIASES);
-    const nameIndex = findColumnIndex(headers, NAME_ALIASES);
-    const priceIndex = findColumnIndex(headers, PRICE_ALIASES);
+    const codeIndex = findColumnIndex(headers, CODE_ALIASES);
     const descIndex = findColumnIndex(headers, DESC_ALIASES);
 
-    if (skuIndex === -1) {
-      throw new Error('CSV must have a SKU column (e.g., "sku", "codigo", "code")');
+    if (codeIndex === -1) {
+      throw new Error('CSV must have a Code/SKU column (e.g., "sku", "codigo", "code", "product_code")');
     }
-    if (nameIndex === -1) {
-      throw new Error('CSV must have a Name column (e.g., "name", "product", "description")');
+    if (descIndex === -1) {
+      throw new Error('CSV must have a Description column (e.g., "name", "product", "description")');
     }
 
     // Use Map for deduplication (last occurrence wins)
@@ -94,34 +88,19 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
         
         const values = parseCSVLine(line);
 
-        const sku = cleanString(values[skuIndex] || '');
-        const name = cleanString(values[nameIndex] || '');
+        const product_code = cleanString(values[codeIndex] || '');
+        const product_description = cleanString(values[descIndex] || '');
 
-        // Skip rows with empty SKU or name
-        if (!sku || !name) {
+        // Skip rows with empty code or description
+        if (!product_code || !product_description) {
           skippedRows++;
           continue;
         }
 
-        const product: ParsedProduct = { sku, name };
-        
-        if (priceIndex !== -1 && values[priceIndex]) {
-          const priceStr = cleanString(values[priceIndex]);
-          const price = parseFloat(priceStr.replace(/[^0-9.-]/g, ''));
-          if (!isNaN(price) && price >= 0) {
-            product.price = price;
-          }
-        }
-        
-        if (descIndex !== -1 && values[descIndex]) {
-          const desc = cleanString(values[descIndex]);
-          if (desc) {
-            product.description = desc;
-          }
-        }
+        const product: ParsedProduct = { product_code, product_description };
 
         // Store in map (overwrites duplicates)
-        productMap.set(sku.toLowerCase(), product);
+        productMap.set(product_code.toLowerCase(), product);
       } catch (rowError) {
         console.warn(`Skipping malformed row ${i + 1}:`, rowError);
         skippedRows++;
@@ -184,7 +163,7 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
       const products = parseCSV(content);
 
       if (products.length === 0) {
-        throw new Error('No valid products found in CSV. Ensure columns "sku" and "name" exist with data.');
+        throw new Error('No valid products found in CSV. Ensure columns for code/SKU and description/name exist with data.');
       }
 
       setProgress(20);
@@ -207,12 +186,10 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
             .from('products')
             .upsert(
               batch.map(p => ({
-                sku: p.sku,
-                name: p.name,
-                price: p.price || null,
-                description: p.description || null,
+                product_code: p.product_code,
+                product_description: p.product_description,
               })),
-              { onConflict: 'sku', ignoreDuplicates: false }
+              { onConflict: 'product_code', ignoreDuplicates: false }
             );
 
           if (insertError) {
@@ -253,12 +230,12 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[hsl(var(--card))] rounded-lg shadow-xl max-w-md w-full">
-        <div className="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between">
+      <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-4 border-b border-border flex items-center justify-between">
           <h3 className="font-semibold text-lg">Import Products from CSV</h3>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-[hsl(var(--muted))] rounded transition-colors"
+            className="p-1.5 hover:bg-muted rounded transition-colors"
           >
             <X size={20} />
           </button>
@@ -268,18 +245,15 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
           {!result ? (
             <>
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-[hsl(var(--muted))] rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileSpreadsheet size={32} className="text-[hsl(var(--primary))]" />
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileSpreadsheet size={32} className="text-primary" />
                 </div>
                 <h4 className="font-medium mb-2">Upload CSV File</h4>
-                <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                  Required columns: <strong>sku</strong> and <strong>name</strong>
+                <p className="text-sm text-muted-foreground">
+                  Required columns: <strong>product_code</strong> (or SKU) and <strong>product_description</strong> (or name)
                 </p>
-                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                  Optional: price, description
-                </p>
-                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2 italic">
-                  Accepts various header formats (SKU, Codigo, Code, etc.)
+                <p className="text-xs text-muted-foreground mt-2 italic">
+                  Accepts various header formats (SKU, Codigo, Code, Name, Description, etc.)
                 </p>
               </div>
 
@@ -292,18 +266,18 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
                   disabled={isUploading}
                   className="hidden"
                 />
-                <div className={`border-2 border-dashed border-[hsl(var(--border))] rounded-lg p-6 text-center cursor-pointer hover:border-[hsl(var(--primary))] transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <div className={`border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   {isUploading ? (
                     <div className="flex flex-col items-center gap-3">
-                      <Loader2 size={24} className="animate-spin text-[hsl(var(--primary))]" />
+                      <Loader2 size={24} className="animate-spin text-primary" />
                       <span className="text-sm">{progressText}</span>
                       <Progress value={progress} className="w-full h-2" />
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <Upload size={24} className="text-[hsl(var(--muted-foreground))]" />
+                      <Upload size={24} className="text-muted-foreground" />
                       <span className="text-sm">Click to select CSV file</span>
-                      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                      <span className="text-xs text-muted-foreground">
                         Supports 1000+ products
                       </span>
                     </div>
@@ -312,25 +286,25 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
               </label>
 
               {error && (
-                <div className="mt-4 p-3 bg-[hsl(0,85%,95%)] border border-[hsl(0,60%,85%)] rounded-lg flex items-start gap-2">
-                  <AlertCircle size={16} className="text-[hsl(var(--destructive))] mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
+                <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
+                  <AlertCircle size={16} className="text-destructive mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-destructive">{error}</p>
                 </div>
               )}
             </>
           ) : (
             <div className="text-center">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                result.failed === 0 ? 'bg-[hsl(145,65%,92%)]' : 'bg-[hsl(40,95%,90%)]'
+                result.failed === 0 ? 'bg-success/10' : 'bg-warning/10'
               }`}>
-                <CheckCircle size={32} className={result.failed === 0 ? 'text-[hsl(var(--success))]' : 'text-[hsl(40,80%,40%)]'} />
+                <CheckCircle size={32} className={result.failed === 0 ? 'text-success' : 'text-warning'} />
               </div>
               <h4 className="font-medium mb-2">Import Complete</h4>
-              <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                <span className="text-[hsl(var(--success))] font-medium">{result.success}</span> products imported successfully
+              <p className="text-sm text-muted-foreground">
+                <span className="text-success font-medium">{result.success}</span> products imported successfully
               </p>
               {result.failed > 0 && (
-                <p className="text-sm text-[hsl(var(--destructive))] mt-1">
+                <p className="text-sm text-destructive mt-1">
                   {result.failed} products failed
                 </p>
               )}
@@ -338,7 +312,7 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
           )}
         </div>
 
-        <div className="p-4 border-t border-[hsl(var(--border))] flex justify-end">
+        <div className="p-4 border-t border-border flex justify-end">
           <button onClick={onClose} className="btn-secondary">
             Close
           </button>
