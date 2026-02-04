@@ -95,7 +95,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
       }
     };
 
-    const debounce = setTimeout(searchProducts, 300);
+    const debounce = setTimeout(searchProducts, 500);
     return () => clearTimeout(debounce);
   }, [query]);
 
