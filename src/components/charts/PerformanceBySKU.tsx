@@ -14,18 +14,54 @@ interface PerformanceBySKUProps {
   shifts: ShiftReport[];
 }
 
+// Clean SKU data to extract code and product name
+const cleanSkuData = (rawSku: string): { code: string; name: string } => {
+  if (!rawSku) return { code: '-', name: '' };
+  
+  // Format: "CODE;DESCRIPTION     [HS CODE:XXXXX];;"
+  const parts = rawSku.split(';');
+  const code = parts[0]?.trim() || rawSku;
+  
+  // Extract name without HS CODE
+  let name = parts[1] || '';
+  name = name.replace(/\s*\[HS CODE:[^\]]+\]/gi, '').trim();
+  
+  return { code, name };
+};
+
+// Custom tooltip component
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { code: string; name: string; total: number } }> }) => {
+  if (!active || !payload?.[0]) return null;
+  
+  const data = payload[0].payload;
+  return (
+    <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+      <p className="font-semibold text-sm text-foreground">{data.code}</p>
+      {data.name && (
+        <p className="text-xs text-muted-foreground mt-0.5">{data.name}</p>
+      )}
+      <p className="text-sm mt-2 text-foreground">
+        <span className="font-medium">{data.total.toLocaleString()}</span> units
+      </p>
+    </div>
+  );
+};
+
 export function PerformanceBySKU({ shifts }: PerformanceBySKUProps) {
   const chartData = useMemo(() => {
-    const bySku: Record<string, number> = {};
+    const bySku: Record<string, { code: string; name: string; total: number }> = {};
     
     shifts.forEach(s => {
       if (s.sku) {
-        bySku[s.sku] = (bySku[s.sku] || 0) + s.realProduction;
+        const { code, name } = cleanSkuData(s.sku);
+        if (!bySku[code]) {
+          bySku[code] = { code, name, total: 0 };
+        }
+        bySku[code].total += s.realProduction;
       }
     });
 
-    return Object.entries(bySku)
-      .map(([sku, total]) => ({ sku, total }))
+    return Object.values(bySku)
       .sort((a, b) => b.total - a.total)
       .slice(0, 10); // Top 10 SKUs
   }, [shifts]);
@@ -50,21 +86,15 @@ export function PerformanceBySKU({ shifts }: PerformanceBySKUProps) {
           <XAxis 
             type="number"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+            tickFormatter={(value) => value.toLocaleString()}
           />
           <YAxis 
-            dataKey="sku" 
+            dataKey="code" 
             type="category"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
             width={75}
           />
-          <Tooltip 
-            contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
-            }}
-            formatter={(value: number) => [value.toLocaleString(), 'Units']}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Bar 
             dataKey="total" 
             fill="hsl(var(--primary))" 
