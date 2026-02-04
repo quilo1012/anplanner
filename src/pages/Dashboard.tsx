@@ -175,11 +175,11 @@ export function Dashboard() {
     <>
       <Header title="Production Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(selectedDate)}`} />
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6 print:p-0">
+      <div className="flex-1 overflow-auto p-3 sm:p-4 print:p-0">
 
         {/* Global Filters - Compact */}
-        <div className="card p-3 mb-3 no-print">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="card p-2 mb-2 no-print">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <Filter size={16} className="text-primary shrink-0" />
               <span className="text-xs font-semibold text-foreground hidden sm:inline">Filters:</span>
