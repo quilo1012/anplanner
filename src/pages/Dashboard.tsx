@@ -306,7 +306,7 @@ export function Dashboard() {
           </div>
 
           {/* OEE Panel - Fixed Right Column */}
-          <div className="hidden lg:flex flex-col gap-3 w-64 shrink-0">
+          <div className="hidden lg:flex flex-col gap-2 w-56 shrink-0">
             <OEEPanel
               performance={stats.avgPerformance}
               availability={stats.availability}
