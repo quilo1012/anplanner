@@ -1,174 +1,155 @@
 
+# Plano: Correcao da Sidebar e Login
 
-# Plano: Melhorar Performance by SKU
+## Problemas Identificados
 
-## Problema Identificado
+### 1. Sidebar - Layout com Margem Incorreta
 
-Os SKUs estão armazenados com formato complexo:
+**Problema**: No `Layout.tsx` linha 17, o conteudo principal usa `lg:ml-0`, mas a sidebar e `fixed` com largura de 256px (`w-64`). Isso faz com que o conteudo principal fique EMBAIXO da sidebar fixa, nao ao lado.
+
+**Codigo atual**:
 ```
-BEEFXPBLUERAS;BEEF-XP 1.8KG BLUE RASPBERRY     [HS CODE:2106102090];;
-```
-
-Isso torna o gráfico ilegível e confuso.
-
----
-
-## Solução Proposta
-
-### 1. Criar função de limpeza de SKU
-
-Extrair apenas o **código limpo** (primeira parte antes do `;`):
-
-```
-Antes: BEEFXPBLUERAS;BEEF-XP 1.8KG BLUE RASPBERRY     [HS CODE:2106102090];;
-Depois: BEEFXPBLUERAS
+<main className="flex-1 flex flex-col overflow-hidden lg:ml-0 pt-14 lg:pt-0">
 ```
 
-### 2. Melhorar visualização do gráfico
-
-| Melhoria | Descrição |
-|----------|-----------|
-| SKU limpo | Mostrar apenas o código (ex: `CW2S`) |
-| Tooltip melhorado | Mostrar nome do produto no hover |
-| Ordenação | Top 10 por produção total |
-| Labels | Formatar valores com separador de milhares |
-
----
-
-## Layout Visual
-
-### Antes (Atual)
+**Correcao necessaria**:
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│  Performance by SKU                                                  │
-├──────────────────────────────────────────────────────────────────────┤
-│  BEEFXPBLUERAS;BEEF-XP 1.8K...  ████████████████  15,000            │
-│  CMS6;CRITICAL MASS 6KG  ST...  █████████████     12,000            │
-│  CW2S;CRITICAL WHEY 2KG ST...   ██████████        10,000            │
-└──────────────────────────────────────────────────────────────────────┘
+<main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
 ```
 
-### Depois (Proposto)
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  Production by SKU (Top 10)                                          │
-├──────────────────────────────────────────────────────────────────────┤
-│  BEEFXPBLUERAS  ████████████████████  15,000 units                  │
-│  CMS6           █████████████████     12,000 units                  │
-│  CW2S           ██████████████        10,000 units                  │
-│  CW2V           ████████████          8,500 units                   │
-│  ...                                                                 │
-├──────────────────────────────────────────────────────────────────────┤
-│  [Tooltip: CW2S - CRITICAL WHEY 2KG STRAWBERRY | 10,000 units]      │
-└──────────────────────────────────────────────────────────────────────┘
-```
+### 2. Login - Falha na Persistencia da Sessao
 
----
+**Problema**: Quando `fetchUserData` retorna `null` (caso o profile nao seja encontrado imediatamente), o `user` fica como `null`, tornando `isAuthenticated = false`, e o usuario e redirecionado de volta ao login.
 
-## Mudanças Técnicas
+A funcao `fetchUserData` no `AuthContext.tsx` retorna `null` em caso de erro ao buscar o profile (linha 54-57), mesmo quando o usuario autenticou com sucesso no Supabase Auth.
 
-### Função de Extração de SKU
-
+**Codigo problemico** (linha 54-57):
 ```typescript
-const cleanSkuData = (rawSku: string): { code: string; name: string } => {
-  if (!rawSku) return { code: '-', name: '' };
-  
-  // Format: "CODE;DESCRIPTION     [HS CODE:XXXXX];;"
-  const parts = rawSku.split(';');
-  const code = parts[0]?.trim() || rawSku;
-  
-  // Extract name without HS CODE
-  let name = parts[1] || '';
-  name = name.replace(/\s*\[HS CODE:[^\]]+\]/gi, '').trim();
-  
-  return { code, name };
+if (profileError) {
+  console.error('Error fetching profile:', profileError);
+  return null;  // <-- Isso faz isAuthenticated = false
+}
+```
+
+**Correcao**: A funcao ja tem um fallback (linhas 80-87), mas ele so e executado se `profileError` for null. Precisamos garantir que o fallback seja usado mesmo quando ha erro de profile.
+
+---
+
+## Implementacao
+
+### Arquivo 1: `src/components/Layout.tsx`
+
+Alterar linha 17 para adicionar margem esquerda no desktop:
+
+```tsx
+<main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
+```
+
+### Arquivo 2: `src/contexts/AuthContext.tsx`
+
+Melhorar a funcao `fetchUserData` para:
+1. Nao retornar `null` quando houver erro no profile - usar o fallback
+2. Adicionar logs melhores para debug
+3. Garantir que o usuario autenticado sempre receba um objeto User valido
+
+**Codigo atual** (linhas 45-92):
+```typescript
+const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', supabaseUser.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      return null;  // PROBLEMA: retorna null mesmo com usuario autenticado
+    }
+    // ...resto do codigo
+  }
+}
+```
+
+**Codigo corrigido**:
+```typescript
+const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
+  try {
+    // Fetch profile (may fail on first login before trigger runs)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', supabaseUser.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      // Continue to fallback instead of returning null
+    }
+
+    // Fetch role (may not exist yet for new users)
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', supabaseUser.id)
+      .maybeSingle();
+
+    if (roleError) {
+      console.error('Error fetching role:', roleError);
+    }
+
+    // If profile exists, use it
+    if (profile) {
+      return {
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        role: (roleData?.role as UserRole) || 'operator',
+        createdAt: profile.created_at,
+      };
+    }
+
+    // Fallback: create user from Supabase Auth data
+    // This ensures login works even if profile trigger hasn't run yet
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+      role: (roleData?.role as UserRole) || 'operator',
+      createdAt: supabaseUser.created_at || new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    
+    // Even on error, return a basic user object to prevent auth loop
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+      role: 'operator',
+      createdAt: supabaseUser.created_at || new Date().toISOString(),
+    };
+  }
 };
 ```
 
-### Dados do Gráfico Melhorados
+---
 
-```typescript
-const chartData = useMemo(() => {
-  const bySku: Record<string, { code: string; name: string; total: number }> = {};
-  
-  shifts.forEach(s => {
-    if (s.sku) {
-      const { code, name } = cleanSkuData(s.sku);
-      if (!bySku[code]) {
-        bySku[code] = { code, name, total: 0 };
-      }
-      bySku[code].total += s.realProduction;
-    }
-  });
+## Resumo das Mudancas
 
-  return Object.values(bySku)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
-}, [shifts]);
-```
-
-### Tooltip Personalizado
-
-```typescript
-<Tooltip 
-  content={({ payload }) => {
-    if (!payload?.[0]) return null;
-    const data = payload[0].payload;
-    return (
-      <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
-        <p className="font-semibold text-sm">{data.code}</p>
-        {data.name && <p className="text-xs text-muted-foreground">{data.name}</p>}
-        <p className="text-sm mt-1">{data.total.toLocaleString()} units</p>
-      </div>
-    );
-  }}
-/>
-```
+| Arquivo | Alteracao | Motivo |
+|---------|-----------|--------|
+| `Layout.tsx` | Alterar `lg:ml-0` para `lg:ml-64` | Compensar a largura da sidebar fixa |
+| `AuthContext.tsx` | Remover `return null` apos erro de profile | Garantir que usuario autenticado sempre tenha sessao valida |
+| `AuthContext.tsx` | Adicionar fallback no catch | Prevenir loop de login mesmo em erros inesperados |
 
 ---
 
-## Arquivo a Modificar
+## Apos a Implementacao
 
-| Arquivo | Mudanças |
-|---------|----------|
-| `src/components/charts/PerformanceBySKU.tsx` | Limpeza de SKU, tooltip melhorado |
-
----
-
-## Sugestões Adicionais de Melhoria
-
-### Curto Prazo (Incluído neste plano)
-
-1. **SKU limpo** - Extrair só o código
-2. **Tooltip informativo** - Mostrar nome do produto
-3. **Labels formatados** - Separador de milhares
-4. **Título atualizado** - "Production by SKU (Top 10)"
-
-### Médio Prazo (Futuras melhorias)
-
-| Melhoria | Benefício |
-|----------|-----------|
-| **Filtro de período** | Ver produção por SKU da semana/mês |
-| **Drill-down** | Clicar no SKU e ver detalhes por dia |
-| **Performance %** | Mostrar % real vs target por SKU |
-| **Cores por status** | Verde se atingiu meta, vermelho se não |
-| **Comparativo** | Comparar SKU atual vs período anterior |
-
-### Longo Prazo
-
-| Feature | Descrição |
-|---------|-----------|
-| **SKU Trends** | Gráfico de linha mostrando evolução de produção por SKU |
-| **SKU Efficiency** | UPM médio por SKU (quais são mais rápidos de produzir) |
-| **Pareto Analysis** | 80/20 - quais SKUs representam 80% da produção |
-| **SKU Downtime** | Tempo de downtime associado a cada SKU |
-
----
-
-## Benefícios Imediatos
-
-1. **Legibilidade** - SKUs curtos e claros no gráfico
-2. **Contexto** - Nome do produto visível no tooltip
-3. **Foco** - Top 10 mais produzidos em destaque
-4. **Profissional** - Valores formatados corretamente
-
+1. **Testar sidebar**: A sidebar deve ficar sempre visivel com textos e icones no desktop
+2. **Testar login no site publicado**: 
+   - Fazer login com email/senha
+   - Verificar que redireciona para o Dashboard
+   - Nao deve pedir login novamente
+3. **Republicar o site** para que as mudancas aparecam em `shiftreportapp.lovable.app`
