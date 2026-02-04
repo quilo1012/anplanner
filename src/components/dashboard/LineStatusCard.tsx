@@ -101,21 +101,21 @@ export function LineStatusCard({
       <div className="flex items-stretch">
         {/* Line Header Badge */}
         <div className={cn(
-          "flex items-center justify-center px-4 min-w-[100px]",
+          "flex items-center justify-center px-3 min-w-[80px]",
           headerColor,
           "text-white"
         )}>
-          <div className="text-center">
-            <Factory size={20} className="mx-auto mb-1" />
-            <span className="text-xs font-bold uppercase tracking-wide block">{lineName}</span>
+          <div className="text-center py-2">
+            <Factory size={16} className="mx-auto mb-0.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wide block">{lineName}</span>
             {shift && (
-              <span className="text-[10px] opacity-80 block">{shift} Shift</span>
+              <span className="text-[9px] opacity-80 block">{shift}</span>
             )}
           </div>
         </div>
         
         {/* Main Content */}
-        <div className="flex-1 p-3 min-w-0">
+        <div className="flex-1 p-2 min-w-0">
           <div className="flex items-start justify-between gap-3">
             {/* Left: Product Info */}
             <div className="flex-1 min-w-0 space-y-2">
