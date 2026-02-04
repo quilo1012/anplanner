@@ -1,17 +1,7 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Upload, FileSpreadsheet, X, Check, AlertTriangle } from 'lucide-react';
-import { ShiftFormData, ShiftType, SHIFT_TYPES } from '@/types/shift';
-
-interface ExcelRow {
-  Date: string;
-  Shift: string;
-  'Production Line': string;
-  'Line Leader'?: string;
-  'Product Name': string;
-  SKU?: string;
-  'Planned Quantity': number;
-}
+import { ShiftFormData, ShiftType } from '@/types/shift';
 
 interface ParsedEntry {
   date: string;
@@ -37,7 +27,16 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
-  const parseDate = (value: any): string | null => {
+  // Convert Excel serial date to YYYY-MM-DD
+  const excelDateToString = (serial: number): string => {
+    // Excel epoch is 1900-01-01, but Excel incorrectly treats 1900 as a leap year
+    // So we need to subtract 1 for dates after Feb 28, 1900
+    const utcDays = Math.floor(serial - 25569);
+    const date = new Date(utcDays * 86400 * 1000);
+    return date.toISOString().split('T')[0];
+  };
+
+  const parseDate = (value: unknown): string | null => {
     if (!value) return null;
     
     // If it's already a string in YYYY-MM-DD format
@@ -47,22 +46,30 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
     
     // If it's a number (Excel date serial)
     if (typeof value === 'number') {
-      const date = XLSX.SSF.parse_date_code(value);
-      if (date) {
-        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+      try {
+        return excelDateToString(value);
+      } catch {
+        return null;
       }
     }
     
+    // If it's a Date object (ExcelJS returns Date for date cells)
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+    
     // Try parsing as date string
-    const parsed = new Date(value);
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toISOString().split('T')[0];
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split('T')[0];
+      }
     }
     
     return null;
   };
 
-  const parseShift = (value: any): ShiftType | null => {
+  const parseShift = (value: unknown): ShiftType | null => {
     if (!value) return null;
     const normalized = String(value).toUpperCase().trim();
     // Primary DAY/NIGHT mapping
@@ -72,6 +79,31 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
     if (normalized === 'A' || normalized === 'B') return 'DAY';
     if (normalized === 'C') return 'NIGHT';
     return null;
+  };
+
+  // Safely get cell value from ExcelJS cell
+  const getCellValue = (cell: ExcelJS.Cell | undefined): unknown => {
+    if (!cell) return undefined;
+    const value = cell.value;
+    
+    // Handle rich text
+    if (value && typeof value === 'object' && 'richText' in value) {
+      return (value as ExcelJS.CellRichTextValue).richText
+        .map((rt) => rt.text)
+        .join('');
+    }
+    
+    // Handle formula results
+    if (value && typeof value === 'object' && 'result' in value) {
+      return (value as ExcelJS.CellFormulaValue).result;
+    }
+    
+    // Handle hyperlinks
+    if (value && typeof value === 'object' && 'text' in value) {
+      return (value as ExcelJS.CellHyperlinkValue).text;
+    }
+    
+    return value;
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,49 +125,92 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
     setFileName(file.name);
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
-
-      if (jsonData.length === 0) {
-        setError('No data found in the Excel file');
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+      
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        setError('No worksheet found in the Excel file');
         setIsLoading(false);
         return;
       }
 
-      // Parse and validate each row
-      const parsed: ParsedEntry[] = jsonData.map((row) => {
+      // Get headers from first row
+      const headerRow = worksheet.getRow(1);
+      const headers: Record<string, number> = {};
+      headerRow.eachCell((cell, colNumber) => {
+        const value = getCellValue(cell);
+        if (value) {
+          headers[String(value).trim()] = colNumber;
+        }
+      });
+
+      // Check for required columns
+      const requiredColumns = ['Date', 'Shift', 'Production Line', 'Product Name', 'Planned Quantity'];
+      const missingColumns = requiredColumns.filter(col => !headers[col]);
+      if (missingColumns.length > 0) {
+        setError(`Missing required columns: ${missingColumns.join(', ')}`);
+        setIsLoading(false);
+        return;
+      }
+
+      const parsed: ParsedEntry[] = [];
+      
+      // Process data rows (starting from row 2)
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Skip header row
+        
         const errors: string[] = [];
         
-        const date = parseDate(row.Date);
+        const dateValue = getCellValue(row.getCell(headers['Date']));
+        const date = parseDate(dateValue);
         if (!date) errors.push('Invalid or missing Date');
         
-        const shift = parseShift(row.Shift);
+        const shiftValue = getCellValue(row.getCell(headers['Shift']));
+        const shift = parseShift(shiftValue);
         if (!shift) errors.push('Invalid Shift (use DAY/NIGHT)');
         
-        const productionLine = row['Production Line']?.toString().trim();
+        const productionLineValue = getCellValue(row.getCell(headers['Production Line']));
+        const productionLine = productionLineValue?.toString().trim();
         if (!productionLine) errors.push('Missing Production Line');
         
-        const product = row['Product Name']?.toString().trim();
+        const productValue = getCellValue(row.getCell(headers['Product Name']));
+        const product = productValue?.toString().trim();
         if (!product) errors.push('Missing Product Name');
         
-        const target = Number(row['Planned Quantity']);
+        const targetValue = getCellValue(row.getCell(headers['Planned Quantity']));
+        const target = Number(targetValue);
         if (isNaN(target) || target <= 0) errors.push('Invalid Planned Quantity');
 
-        return {
+        const leaderValue = headers['Line Leader'] 
+          ? getCellValue(row.getCell(headers['Line Leader']))
+          : undefined;
+        const lineLeader = leaderValue?.toString().trim() || 'TBD';
+
+        const skuValue = headers['SKU'] 
+          ? getCellValue(row.getCell(headers['SKU']))
+          : undefined;
+        const sku = skuValue?.toString().trim() || '';
+
+        parsed.push({
           date: date || '',
           shift: shift || 'DAY',
           productionLine: productionLine || '',
-          lineLeader: row['Line Leader']?.toString().trim() || 'TBD',
+          lineLeader,
           product: product || '',
-          sku: row.SKU?.toString().trim() || '',
+          sku,
           productionTarget: target > 0 ? target : 0,
           isValid: errors.length === 0,
           errors,
-        };
+        });
       });
+
+      if (parsed.length === 0) {
+        setError('No data found in the Excel file');
+        setIsLoading(false);
+        return;
+      }
 
       setParsedData(parsed);
     } catch (err) {
