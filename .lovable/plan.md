@@ -1,121 +1,66 @@
 
-# Plano: Dashboard Industrial Profissional com Relogio e Correcao da Sidebar
+# Plano: Corrigir Menu Mobile Coberto pelo Header
 
-## Problemas Identificados
+## Problema Identificado
 
-### 1. Sidebar no Modo Light (Daylight)
-O conteudo principal do app usa `lg:ml-0` no `Layout.tsx`, mas a Sidebar e `fixed` com `w-64`. Isso significa que no desktop, o conteudo principal fica **embaixo** da sidebar fixa, nao ao lado dela. Por isso voce so ve a sidebar quando passa o mouse - o conteudo esta cobrindo ela!
+No mobile, quando o usuario abre o menu (tres linhas), o Header da pagina (com relogio, titulo "New Shift Report", etc.) fica NA FRENTE do menu, cobrindo os itens de navegacao como o Dashboard.
 
-**Correcao**: Alterar `lg:ml-0` para `lg:ml-64` no Layout.tsx
+### Causa Raiz - Conflito de Z-Index
 
-### 2. Dashboard - Design Industrial
-O Header atual e muito simples. Vou criar um design mais profissional estilo "SCADA/HMI industrial" com:
-- Barra de status superior mais elaborada
-- Relogio digital ao vivo com segundos
-- Indicadores de status do sistema
-- Gradientes e cores industriais
+| Componente | z-index | Arquivo |
+|------------|---------|---------|
+| Mobile Header (barra superior) | z-40 | MobileMenu.tsx linha 32 |
+| Menu Overlay (fundo + nav) | z-30 | MobileMenu.tsx linha 49 |
+| Header da pagina (relogio) | z-40 | Header.tsx linha 12 |
+
+O problema: O Menu Overlay tem `z-30`, mas o Header das paginas tem `z-40`. Como o Header e `sticky top-0`, ele fica posicionado acima do overlay do menu, cobrindo os itens de navegacao.
 
 ---
 
-## Implementacao
+## Solucao
 
-### Arquivo 1: `src/components/Layout.tsx`
+Aumentar o z-index do Menu Overlay para ficar ACIMA do Header das paginas.
 
-**Alterar linha 17**: Adicionar margem esquerda para compensar a sidebar fixa
+### Arquivo a Modificar: `src/components/MobileMenu.tsx`
+
+**Alteracao na linha 49:**
 
 ```tsx
 // Antes:
-<main className="flex-1 flex flex-col overflow-hidden lg:ml-0 pt-14 lg:pt-0">
+<div className="lg:hidden fixed inset-0 z-30 pt-14">
 
 // Depois:
-<main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
+<div className="lg:hidden fixed inset-0 z-50 pt-14">
 ```
 
-### Arquivo 2: `src/components/Header.tsx`
+### Explicacao
 
-Reescrever completamente o Header com design industrial profissional:
+- Mudando de `z-30` para `z-50`, o overlay do menu ficara ACIMA de:
+  - Mobile Header (`z-40`) - que e correto, pois o botao X precisa funcionar
+  - Page Header (`z-40`) - que e o que estava causando o problema
 
-```text
-Estrutura do novo Header:
+### Hierarquia de Z-Index Corrigida
 
-+------------------------------------------------------------------+
-|  [Logo]  |  PRODUCTION DASHBOARD    |  [Data] [Relogio Vivo]    |
-|          |  DAY Shift               |   04 Feb 2026  14:35:22   |
-+------------------------------------------------------------------+
-|  [Indicador Status: SYSTEM ONLINE]  |  [Dark/Light Toggle]      |
-+------------------------------------------------------------------+
-```
-
-**Novos recursos**:
-- Relogio digital ao vivo com atualizacao a cada segundo
-- Data formatada em ingles (04 Feb 2026)
-- Borda esquerda colorida (industrial cyan)
-- Indicador de status do sistema
-- Layout em duas linhas para melhor hierarquia visual
-- Fonte monospacada para numeros (estilo industrial)
-
-### Arquivo 3: Componente `LiveClock.tsx` (Novo)
-
-Criar componente de relogio ao vivo reutilizavel:
-
-```tsx
-// Funcionalidades:
-- useState para armazenar a hora atual
-- useEffect com setInterval para atualizar a cada 1000ms
-- Cleanup do interval no unmount
-- Formato 24h: HH:MM:SS
-- Estilo tabular-nums para alinhamento perfeito
-```
+| Componente | z-index | Comportamento |
+|------------|---------|---------------|
+| Menu Overlay + Backdrop | z-50 | Camada mais alta quando menu esta aberto |
+| Mobile Header | z-40 | Sempre visivel no topo |
+| Page Header | z-40 | Sticky dentro do conteudo, coberto pelo menu |
 
 ---
 
-## Detalhes do Design Industrial
-
-### Paleta de Cores
-- Fundo do header: `bg-card` com gradiente sutil
-- Borda esquerda: `border-l-4 border-primary` (azul industrial)
-- Texto principal: `text-foreground`
-- Texto secundario: `text-muted-foreground`
-- Relogio: `text-primary` com fonte monospacada
-
-### Tipografia
-- Titulo: `text-xl font-bold uppercase tracking-wide`
-- Subtitulo: `text-sm text-muted-foreground`
-- Relogio: `font-mono text-2xl font-bold tabular-nums`
-- Data: `text-sm font-medium`
-
-### Elementos Visuais
-- Shadow mais pronunciado: `shadow-lg`
-- Borda inferior: `border-b-2 border-primary/20`
-- Icone de status pulsante
-- Separadores verticais entre secoes
-
----
-
-## Arquivos a Criar/Modificar
+## Arquivo
 
 | Arquivo | Acao | Descricao |
 |---------|------|-----------|
-| `src/components/Layout.tsx` | Modificar | Ajustar margem lg:ml-64 |
-| `src/components/LiveClock.tsx` | Criar | Componente de relogio ao vivo |
-| `src/components/Header.tsx` | Modificar | Redesign industrial completo |
+| `src/components/MobileMenu.tsx` | Modificar | Alterar z-30 para z-50 na linha 49 |
 
 ---
 
 ## Resultado Esperado
 
-Apos a implementacao:
-
-1. **Sidebar**: Sempre visivel no desktop (light e dark mode), com texto e icones aparecendo permanentemente
-
-2. **Header Industrial**:
-   - Logo Applied Nutrition a esquerda
-   - Titulo "PRODUCTION DASHBOARD" centralizado
-   - Relogio digital ao vivo (ex: 14:35:22) a direita
-   - Data atual (ex: 04 Feb 2026) ao lado do relogio
-   - Toggle de tema (dark/light)
-   - Visual industrial com cores e fontes apropriadas
-
-3. **Responsividade**:
-   - Mobile: Header compacto com relogio menor
-   - Desktop: Header completo com todos os elementos
+Apos a correcao:
+1. Ao abrir o menu mobile (tres linhas), o menu aparecera corretamente
+2. Todos os itens de navegacao (Dashboard, Planner, Downtime, History, Admin) serao visiveis
+3. O Header da pagina (com relogio) ficara ATRAS do menu overlay
+4. O botao X para fechar o menu continuara funcionando normalmente
