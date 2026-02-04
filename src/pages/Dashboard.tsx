@@ -272,9 +272,9 @@ export function Dashboard() {
         </div>
 
         {/* Main Layout: Lines + OEE Panel */}
-        <div className="flex gap-3 mb-3">
+        <div className="flex gap-2 mb-2">
           {/* Line Status Cards */}
-          <div className="flex-1 space-y-2 min-w-0">
+          <div className="flex-1 space-y-1.5 min-w-0">
             {lineStats.length > 0 ? (
               lineStats.map((line) => (
                 <LineStatusCard
