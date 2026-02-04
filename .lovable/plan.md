@@ -1,116 +1,143 @@
 
-# Plano: Correcao de Erros no History + Performance + Layout
+# Plano: Maximizar Area de Informacao e Eliminar Espaco em Branco
 
 ## Problemas Identificados
 
-### 1. Editar/Deletar no History Nao Funciona
-**Causa**: As politicas RLS do banco de dados estao mais restritivas que a interface:
-- DELETE shifts: Somente ADMIN pode deletar
-- DELETE downtimes: Somente ADMIN pode deletar
-- A interface mostra botoes de delete para SUPERVISOR, mas o banco rejeita silenciosamente
+Apos analisar o codigo, identifiquei as seguintes fontes de espaco em branco:
 
-**Solucao**: Atualizar as politicas RLS para permitir que SUPERVISORS tambem possam deletar registros
+1. **Header muito alto**: O Header atual tem 2 linhas (64px + 32px = 96px total)
+   - Linha principal: Logo, titulo, relogio
+   - Status bar: "System Online", "Production Monitoring Active", versao
 
-### 2. Carregamento Lento dos SKUs no Planner
-**Causa**: O componente `ProductSearch` faz uma busca no banco a cada 300ms enquanto o usuario digita (debounce de 300ms linha 98). Para muitos produtos, isso pode ser lento.
+2. **Padding excessivo**: O conteudo do Dashboard usa `p-4 sm:p-6` que pode ser reduzido
 
-**Solucao**: 
-- Aumentar o debounce para 500ms
-- Limitar os resultados iniciais
-- Adicionar cache local dos produtos
-
-### 3. Espaco em Branco Nao Utilizado
-**Causa**: O layout usa `max-w-4xl` no Planner e margens conservadoras em todas as paginas, deixando muito espaco vazio em telas grandes.
-
-**Solucao**:
-- Aumentar `max-w-4xl` para `max-w-6xl` ou `max-w-7xl` no Planner
-- Ajustar paddings e margens para melhor aproveitamento
-- Expandir os cards no Dashboard para usar mais espaco horizontal
+3. **Gaps entre elementos**: Os espacos entre cards (`gap-3`, `mb-3`) podem ser compactados
 
 ---
 
-## Implementacao
+## Solucao Proposta
 
-### Parte 1: Corrigir RLS para DELETE (Banco de Dados)
+### 1. Compactar o Header (de 2 linhas para 1 linha)
 
-Criar nova migration SQL para adicionar politicas de DELETE para supervisors:
+Unificar a barra principal e status bar em uma unica linha mais eficiente:
 
-```sql
--- Atualizar politica de delete em shifts para incluir supervisors
-DROP POLICY IF EXISTS "Admins can delete shifts" ON public.shifts;
-CREATE POLICY "Supervisors and admins can delete shifts"
-  ON public.shifts FOR DELETE
-  USING (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'supervisor'::app_role));
-
--- Atualizar politica de delete em structured_downtimes para incluir supervisors
-DROP POLICY IF EXISTS "Admins can delete downtimes" ON public.structured_downtimes;
-CREATE POLICY "Supervisors and admins can delete downtimes"
-  ON public.structured_downtimes FOR DELETE
-  USING (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'supervisor'::app_role));
+**De (96px total):**
+```text
++------------------------------------------------------------------+
+| [Logo] | PRODUCTION DASHBOARD | [Data] [Relogio] | [Theme]       |  64px
++------------------------------------------------------------------+
+| [Status: Online] | Production Monitoring | v1.2.0                |  32px
++------------------------------------------------------------------+
 ```
 
-### Parte 2: Melhorar Performance do ProductSearch
+**Para (48-56px total):**
+```text
++------------------------------------------------------------------+
+| [Logo] | TITLE + Subtitle | [Status] | [Relogio] [Data] | Theme |  48-56px
++------------------------------------------------------------------+
+```
 
-**Arquivo**: `src/components/ProductSearch.tsx`
+### 2. Reduzir Padding do Conteudo
 
-Alteracoes:
-- Aumentar debounce de 300ms para 500ms (linha 98)
-- Adicionar "Loading..." visual enquanto carrega
-- Melhorar a query para usar index (product_code primeiro)
+| Elemento | Atual | Novo |
+|----------|-------|------|
+| Dashboard container | `p-4 sm:p-6` | `p-3 sm:p-4` |
+| Cards gap | `gap-3 mb-3` | `gap-2 mb-2` |
+| Filter bar | `p-3` | `p-2` |
 
-### Parte 3: Expandir Layout Para Usar Mais Espaco
+### 3. Compactar Line Status Cards
 
-**Arquivo**: `src/pages/Planner.tsx`
-- Alterar `max-w-4xl` para `max-w-6xl` (linha 109)
-
-**Arquivo**: `src/pages/Dashboard.tsx`
-- Ajustar padding de `p-3 sm:p-5` para `p-4 sm:p-6` (linha 178)
-- Aumentar o panel OEE de `w-52` para `w-64` (linha 309)
-
-**Arquivo**: `src/pages/History.tsx`
-- Aumentar padding de `p-4 sm:p-6` para `p-4 sm:p-8` (linha 136)
-
-**Arquivo**: `src/components/Header.tsx`
-- Ajustar padding para melhor aproveitamento
+- Reduzir padding interno dos cards
+- Diminuir tamanho do icone de fabrica
+- Otimizar informacoes para ocupar menos altura
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Tipo | Descricao |
-|---------|------|-----------|
-| Migration SQL | Database | Atualizar RLS para permitir DELETE por supervisors |
-| `src/components/ProductSearch.tsx` | Codigo | Aumentar debounce, melhorar performance |
-| `src/pages/Planner.tsx` | Codigo | Expandir max-width para usar mais espaco |
-| `src/pages/Dashboard.tsx` | Codigo | Ajustar layout para mais espaco |
-| `src/pages/History.tsx` | Codigo | Ajustar padding |
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/components/Header.tsx` | Unificar em 1 linha compacta (h-12 ao inves de h-16 + h-8) |
+| `src/pages/Dashboard.tsx` | Reduzir paddings e gaps |
+| `src/components/dashboard/LineStatusCard.tsx` | Compactar layout interno |
+
+---
+
+## Exemplo Visual do Novo Header
+
+```text
+[Logo] PRODUCTION DASHBOARD         [*] Online  04 Feb  14:35:22  [☀]
+       DAY Shift - 04 February 2026
+```
+
+**Caracteristicas:**
+- Altura total: ~48-56px (antes 96px = economia de 40-48px)
+- Indicador de status compacto (apenas ponto verde + "Online")
+- Relogio e data lado a lado
+- Sem barra de status separada
+- Removida informacao "Production Monitoring Active" e versao (redundantes)
 
 ---
 
 ## Resultado Esperado
 
-1. **Edit/Delete no History**: Supervisores e Admins poderao editar e deletar registros sem erros
+| Metrica | Antes | Depois | Economia |
+|---------|-------|--------|----------|
+| Header altura | 96px | 48-56px | ~40-48px |
+| Padding topo conteudo | 24px | 12-16px | ~8-12px |
+| Gap entre cards | 12px | 8px | ~4px por gap |
 
-2. **Performance do SKU Search**: 
-   - Busca mais responsiva com debounce maior
-   - Menos requisicoes ao banco
-
-3. **Layout Expandido**:
-   - Formularios do Planner usarao mais espaco horizontal
-   - Dashboard aproveitara melhor a tela
-   - Menos espacos em branco nao utilizados
+**Total estimado de espaco recuperado: 60-80px verticais**, permitindo que mais informacao seja visivel sem scroll.
 
 ---
 
-## Hierarquia de Permissoes Corrigida
+## Detalhes Tecnicos
 
-| Acao | Operator | Supervisor | Admin |
-|------|----------|------------|-------|
-| Ver shifts | Sim | Sim | Sim |
-| Criar shift | Nao | Sim | Sim |
-| Editar shift | Nao | Sim | Sim |
-| Deletar shift | Nao | Sim | Sim |
-| Ver downtimes | Sim | Sim | Sim |
-| Criar downtime | Sim | Sim | Sim |
-| Editar downtime | Nao | Sim | Sim |
-| Deletar downtime | Nao | Sim | Sim |
+### Header.tsx - Novo Layout
+
+```tsx
+<header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
+  <div className="h-12 sm:h-14 px-3 sm:px-4 flex items-center justify-between border-l-4 border-primary">
+    {/* Logo e Titulo */}
+    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <img src="..." className="h-7 sm:h-8 ..." />
+      <div>
+        <h1 className="text-sm sm:text-base font-bold ...">{title}</h1>
+        <p className="text-[10px] sm:text-xs ...">{subtitle}</p>
+      </div>
+    </div>
+    
+    {/* Status + Relogio + Tema (tudo em 1 linha) */}
+    <div className="flex items-center gap-2 sm:gap-3">
+      <StatusIndicator />  {/* Ponto verde + "Online" */}
+      <LiveClock />
+      <ThemeToggle />
+    </div>
+  </div>
+</header>
+```
+
+### Dashboard.tsx - Reducao de Espacamento
+
+```tsx
+// Container principal
+<div className="flex-1 overflow-auto p-3 sm:p-4 print:p-0">
+
+// Filter bar
+<div className="card p-2 mb-2 no-print">
+
+// Cards layout
+<div className="flex gap-2 mb-2">
+  <div className="flex-1 space-y-1.5 min-w-0">
+```
+
+### LineStatusCard.tsx - Layout Compacto
+
+```tsx
+// Reducao de padding
+<div className="flex-1 p-2 min-w-0">
+
+// Reducao de icone e badge
+<Factory size={16} />
+<span className="text-[10px] font-bold ...">{lineName}</span>
+```
