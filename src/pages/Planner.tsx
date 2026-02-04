@@ -282,8 +282,8 @@ export function Planner() {
         subtitle={isOperator ? 'Enter planned production data' : 'Record and review production data'}
       />
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-8">
+        <div className="max-w-6xl mx-auto space-y-6">
           {/* Action Buttons */}
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">

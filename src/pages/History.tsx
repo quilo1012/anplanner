@@ -133,7 +133,7 @@ export function History() {
         subtitle={`${filteredShifts.length} shift(s) found`}
       />
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-8">
         {/* Filters */}
         <div className="card p-3 sm:p-4 mb-4">
           <div className="mb-3">
