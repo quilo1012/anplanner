@@ -24,23 +24,15 @@ export function LiveClock() {
     return date.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric',
     });
   };
 
   return (
-    <div className="flex items-center gap-3 text-right">
-      <div className="hidden sm:block">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">Date</p>
-        <p className="text-sm font-medium text-foreground">{formatDate(time)}</p>
-      </div>
-      <div className="h-8 w-px bg-border hidden sm:block" />
-      <div>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide hidden sm:block">Time</p>
-        <p className="font-mono text-lg sm:text-xl font-bold tabular-nums text-primary">
-          {formatTime(time)}
-        </p>
-      </div>
+    <div className="flex items-center gap-2 text-right">
+      <span className="hidden sm:inline text-xs text-muted-foreground">{formatDate(time)}</span>
+      <span className="font-mono text-sm sm:text-base font-bold tabular-nums text-primary">
+        {formatTime(time)}
+      </span>
     </div>
   );
 }

@@ -145,26 +145,26 @@ export function LineStatusCard({
 
               {/* Target indicator */}
               {hasTargetData && (
-                <div className="flex items-center gap-2 pl-5 mt-1">
-                  <Target size={12} className="text-muted-foreground" />
-                  <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-1.5 pl-4">
+                  <Target size={10} className="text-muted-foreground" />
+                  <div className="flex items-center gap-1.5 text-[11px]">
                     <span className="text-muted-foreground">
-                      {realProduction.toLocaleString()} / {productionTarget.toLocaleString()}
+                      {realProduction.toLocaleString()}/{productionTarget.toLocaleString()}
                     </span>
                     <span className={cn(
-                      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold",
                       isOnTarget 
                         ? "bg-success/15 text-success border border-success/30" 
                         : "bg-destructive/15 text-destructive border border-destructive/30"
                     )}>
                       {isOnTarget ? (
                         <>
-                          <CheckCircle size={10} />
+                          <CheckCircle size={8} />
                           +{targetDiff}%
                         </>
                       ) : (
                         <>
-                          <XCircle size={10} />
+                          <XCircle size={8} />
                           {targetDiff}%
                         </>
                       )}
@@ -173,36 +173,34 @@ export function LineStatusCard({
                 </div>
               )}
 
-              {/* UPM (Units per Minute) */}
-              {hasTargetData && (
-                <div className="flex items-center gap-2 pl-5 mt-1 text-xs text-muted-foreground">
-                  <Clock size={12} />
-                  <span>
-                    {(realProduction / 570).toFixed(2)} / {(productionTarget / 570).toFixed(2)} UPM
+              {/* UPM + Staff inline */}
+              <div className="flex items-center gap-3 pl-4 text-[11px] text-muted-foreground">
+                {hasTargetData && (
+                  <span className="flex items-center gap-1">
+                    <Clock size={10} />
+                    {(realProduction / 570).toFixed(1)}/{(productionTarget / 570).toFixed(1)} UPM
                   </span>
-                </div>
-              )}
-
-              {/* Staff indicator */}
-              {(staffPlanned > 0 || staffActual > 0) && (
-                <div className="flex items-center gap-1 text-xs pl-5">
-                  <span className="text-muted-foreground">Staff:</span>
-                  <span className={cn(
-                    "font-medium",
-                    staffActual < staffPlanned ? "text-warning" : "text-foreground"
-                  )}>
-                    {staffActual}/{staffPlanned}
+                )}
+                {(staffPlanned > 0 || staffActual > 0) && (
+                  <span className="flex items-center gap-1">
+                    Staff:
+                    <span className={cn(
+                      "font-medium",
+                      staffActual < staffPlanned ? "text-warning" : "text-foreground"
+                    )}>
+                      {staffActual}/{staffPlanned}
+                    </span>
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             
             {/* Right: KPI circle */}
             <div className="shrink-0">
               <CircularProgress
                 value={performance}
-                size={52}
-                strokeWidth={5}
+                size={44}
+                strokeWidth={4}
                 label="Perf"
                 colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
               />
