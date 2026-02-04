@@ -1,10 +1,86 @@
 import { useRef, useState } from 'react';
-import { Camera, X, Image, CheckCircle, AlertCircle } from 'lucide-react';
+import { Camera, X, Image, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface PhotoUploadProps {
   photo?: string;
   filename?: string;
   onChange: (photo: string | undefined, filename: string | undefined) => void;
+}
+
+// Component for displaying a photo with secure URL handling
+function PhotoDisplay({ 
+  photo, 
+  filename, 
+  onRemove, 
+  isUrl,
+  uploadSuccess 
+}: { 
+  photo: string;
+  filename?: string;
+  onRemove: () => void;
+  isUrl: boolean;
+  uploadSuccess: boolean;
+}) {
+  const { signedUrl, isLoading } = useSignedUrl(isUrl ? photo : undefined);
+  const [imgError, setImgError] = useState(false);
+  
+  // For base64 photos (not yet uploaded), use the photo directly
+  const displayUrl = isUrl ? (signedUrl || photo) : photo;
+
+  if (isLoading) {
+    return (
+      <div className="relative inline-block">
+        <div className="max-w-xs max-h-48 rounded-lg border border-border flex items-center justify-center p-8 bg-muted">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:opacity-80 transition-opacity"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative inline-block">
+      {imgError ? (
+        <div className="max-w-xs max-h-48 rounded-lg border border-border flex items-center justify-center p-8 bg-muted">
+          <AlertCircle className="text-muted-foreground" size={32} />
+          <span className="text-sm text-muted-foreground ml-2">Failed to load</span>
+        </div>
+      ) : (
+        <img 
+          src={displayUrl} 
+          alt="Monitoring" 
+          className="max-w-xs max-h-48 rounded-lg border border-border object-cover"
+          onError={() => setImgError(true)}
+        />
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:opacity-80 transition-opacity"
+      >
+        <X size={14} />
+      </button>
+      {filename && (
+        <p className="text-xs text-muted-foreground mt-1 truncate max-w-xs flex items-center gap-1">
+          {isUrl && <CheckCircle size={12} className="text-success" />}
+          {filename}
+        </p>
+      )}
+      {uploadSuccess && !isUrl && (
+        <p className="text-xs text-success mt-1 flex items-center gap-1">
+          <CheckCircle size={12} />
+          Photo ready to upload
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function PhotoUpload({ photo, filename, onChange }: PhotoUploadProps) {
@@ -68,32 +144,13 @@ export function PhotoUpload({ photo, filename, onChange }: PhotoUploadProps) {
       </label>
       
       {photo ? (
-        <div className="relative inline-block">
-          <img 
-            src={photo} 
-            alt="Monitoring" 
-            className="max-w-xs max-h-48 rounded-lg border border-border object-cover"
-          />
-          <button
-            type="button"
-            onClick={handleRemove}
-            className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:opacity-80 transition-opacity"
-          >
-            <X size={14} />
-          </button>
-          {filename && (
-            <p className="text-xs text-muted-foreground mt-1 truncate max-w-xs flex items-center gap-1">
-              {isUrl && <CheckCircle size={12} className="text-success" />}
-              {filename}
-            </p>
-          )}
-          {uploadSuccess && !isUrl && (
-            <p className="text-xs text-success mt-1 flex items-center gap-1">
-              <CheckCircle size={12} />
-              Photo ready to upload
-            </p>
-          )}
-        </div>
+        <PhotoDisplay 
+          photo={photo}
+          filename={filename}
+          onRemove={handleRemove}
+          isUrl={!!isUrl}
+          uploadSuccess={uploadSuccess}
+        />
       ) : (
         <div
           onClick={() => inputRef.current?.click()}
