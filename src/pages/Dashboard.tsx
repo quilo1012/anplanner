@@ -342,7 +342,7 @@ export function Dashboard() {
         </div>
 
         {/* Mobile OEE Summary */}
-        <div className="lg:hidden grid grid-cols-4 gap-2 mb-3">
+        <div className="lg:hidden grid grid-cols-4 gap-1.5 mb-2">
           <div className="bg-card border border-border rounded-lg p-2 text-center">
             <p className="text-lg font-bold text-foreground">{stats.oee.toFixed(0)}%</p>
             <p className="text-[10px] text-muted-foreground uppercase">OEE</p>
