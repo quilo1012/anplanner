@@ -14,7 +14,7 @@ export function Layout() {
       <MobileMenu />
       
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden lg:ml-0 pt-14 lg:pt-0">
+      <main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
         <Outlet />
       </main>
     </div>
