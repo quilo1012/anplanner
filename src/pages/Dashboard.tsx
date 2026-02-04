@@ -395,7 +395,7 @@ export function Dashboard() {
         {/* Performance Charts Grid - Collapsible */}
         {showCharts && (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-2">
               <div className="card p-3">
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
                   <Package size={16} />
