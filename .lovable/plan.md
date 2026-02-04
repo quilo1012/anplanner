@@ -1,29 +1,65 @@
 
 
-# Plano: Leader Performance Board com Filtros Avançados
+# Plano: Melhorar Performance by SKU
 
-## Resumo
+## Problema Identificado
 
-Melhorar o **Leader Performance Board** com:
-- Filtro de **Turno (Shift)**: DAY, NIGHT ou ALL
-- Filtros de **Período** expandidos: Dia, Semana (7 dias), Quinzena (15 dias), Mês (30 dias)
-- Layout responsivo com selects compactos
+Os SKUs estão armazenados com formato complexo:
+```
+BEEFXPBLUERAS;BEEF-XP 1.8KG BLUE RASPBERRY     [HS CODE:2106102090];;
+```
+
+Isso torna o gráfico ilegível e confuso.
 
 ---
 
-## Layout Visual Proposto
+## Solução Proposta
+
+### 1. Criar função de limpeza de SKU
+
+Extrair apenas o **código limpo** (primeira parte antes do `;`):
 
 ```
+Antes: BEEFXPBLUERAS;BEEF-XP 1.8KG BLUE RASPBERRY     [HS CODE:2106102090];;
+Depois: BEEFXPBLUERAS
+```
+
+### 2. Melhorar visualização do gráfico
+
+| Melhoria | Descrição |
+|----------|-----------|
+| SKU limpo | Mostrar apenas o código (ex: `CW2S`) |
+| Tooltip melhorado | Mostrar nome do produto no hover |
+| Ordenação | Top 10 por produção total |
+| Labels | Formatar valores com separador de milhares |
+
+---
+
+## Layout Visual
+
+### Antes (Atual)
+```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  🏆 Leader Performance Board                                         │
+│  Performance by SKU                                                  │
 ├──────────────────────────────────────────────────────────────────────┤
-│  Shift: [All ▼]    Period: [Day] [Week] [15 Days] [Month]           │
-│  📅 Monday, Feb 3, 2026                                              │
+│  BEEFXPBLUERAS;BEEF-XP 1.8K...  ████████████████  15,000            │
+│  CMS6;CRITICAL MASS 6KG  ST...  █████████████     12,000            │
+│  CW2S;CRITICAL WHEY 2KG ST...   ██████████        10,000            │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Depois (Proposto)
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Production by SKU (Top 10)                                          │
 ├──────────────────────────────────────────────────────────────────────┤
-│  🥇 1. John Smith          105.2%  ████████████████░░  ✓  2 lines   │
-│  🥈 2. Maria Santos        98.5%   █████████████████░  ✓  1 line    │
-│  🥉 3. Carlos Oliveira     92.3%   ██████████████████░ ✓  2 lines   │
-│     4. Ana Costa           85.0%   ███████████████░░░  ✗  1 line    │
+│  BEEFXPBLUERAS  ████████████████████  15,000 units                  │
+│  CMS6           █████████████████     12,000 units                  │
+│  CW2S           ██████████████        10,000 units                  │
+│  CW2V           ████████████          8,500 units                   │
+│  ...                                                                 │
+├──────────────────────────────────────────────────────────────────────┤
+│  [Tooltip: CW2S - CRITICAL WHEY 2KG STRAWBERRY | 10,000 units]      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -31,134 +67,63 @@ Melhorar o **Leader Performance Board** com:
 
 ## Mudanças Técnicas
 
-### 1. Novos Estados
+### Função de Extração de SKU
 
 ```typescript
-// Turno
-const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
-
-// Período expandido
-type PeriodType = 'day' | 'week' | '15days' | 'month';
-const [periodFilter, setPeriodFilter] = useState<PeriodType>('day');
+const cleanSkuData = (rawSku: string): { code: string; name: string } => {
+  if (!rawSku) return { code: '-', name: '' };
+  
+  // Format: "CODE;DESCRIPTION     [HS CODE:XXXXX];;"
+  const parts = rawSku.split(';');
+  const code = parts[0]?.trim() || rawSku;
+  
+  // Extract name without HS CODE
+  let name = parts[1] || '';
+  name = name.replace(/\s*\[HS CODE:[^\]]+\]/gi, '').trim();
+  
+  return { code, name };
+};
 ```
 
-### 2. Lógica de Filtragem
+### Dados do Gráfico Melhorados
 
 ```typescript
-const filteredShifts = useMemo(() => {
-  let result = shifts;
+const chartData = useMemo(() => {
+  const bySku: Record<string, { code: string; name: string; total: number }> = {};
   
-  // Filtro de turno
-  if (shiftFilter !== 'ALL') {
-    result = result.filter(s => s.shift === shiftFilter);
-  }
-  
-  // Filtro de período
-  const currentDateParsed = parseISO(currentDate);
-  
-  switch (periodFilter) {
-    case 'day':
-      result = result.filter(s => s.date === currentDate);
-      break;
-    case 'week':
-      const weekStart = subDays(currentDateParsed, 6);
-      result = result.filter(s => {
-        const date = parseISO(s.date);
-        return date >= weekStart && date <= currentDateParsed;
-      });
-      break;
-    case '15days':
-      const twoWeeksStart = subDays(currentDateParsed, 14);
-      result = result.filter(s => {
-        const date = parseISO(s.date);
-        return date >= twoWeeksStart && date <= currentDateParsed;
-      });
-      break;
-    case 'month':
-      const monthStart = subDays(currentDateParsed, 29);
-      result = result.filter(s => {
-        const date = parseISO(s.date);
-        return date >= monthStart && date <= currentDateParsed;
-      });
-      break;
-  }
-  
-  return result;
-}, [shifts, currentDate, shiftFilter, periodFilter]);
+  shifts.forEach(s => {
+    if (s.sku) {
+      const { code, name } = cleanSkuData(s.sku);
+      if (!bySku[code]) {
+        bySku[code] = { code, name, total: 0 };
+      }
+      bySku[code].total += s.realProduction;
+    }
+  });
+
+  return Object.values(bySku)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10);
+}, [shifts]);
 ```
 
-### 3. Display de Período
+### Tooltip Personalizado
 
 ```typescript
-const dateDisplay = useMemo(() => {
-  const currentDateParsed = parseISO(currentDate);
-  
-  const periodLabels = {
-    day: format(currentDateParsed, 'EEEE, MMM d, yyyy'),
-    week: `${format(subDays(currentDateParsed, 6), 'MMM d')} - ${format(currentDateParsed, 'MMM d, yyyy')} (7 Days)`,
-    '15days': `${format(subDays(currentDateParsed, 14), 'MMM d')} - ${format(currentDateParsed, 'MMM d, yyyy')} (15 Days)`,
-    month: `${format(subDays(currentDateParsed, 29), 'MMM d')} - ${format(currentDateParsed, 'MMM d, yyyy')} (30 Days)`,
-  };
-  
-  return periodLabels[periodFilter];
-}, [currentDate, periodFilter]);
+<Tooltip 
+  content={({ payload }) => {
+    if (!payload?.[0]) return null;
+    const data = payload[0].payload;
+    return (
+      <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
+        <p className="font-semibold text-sm">{data.code}</p>
+        {data.name && <p className="text-xs text-muted-foreground">{data.name}</p>}
+        <p className="text-sm mt-1">{data.total.toLocaleString()} units</p>
+      </div>
+    );
+  }}
+/>
 ```
-
----
-
-## Componentes de UI
-
-### Filtro de Turno (Select)
-
-```typescript
-<Select value={shiftFilter} onValueChange={(v) => setShiftFilter(v as typeof shiftFilter)}>
-  <SelectTrigger className="w-24 h-8 text-xs">
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="ALL">All</SelectItem>
-    <SelectItem value="DAY">Day</SelectItem>
-    <SelectItem value="NIGHT">Night</SelectItem>
-  </SelectContent>
-</Select>
-```
-
-### Filtro de Período (Toggle Buttons)
-
-```typescript
-<div className="flex rounded-lg border border-border overflow-hidden">
-  {(['day', 'week', '15days', 'month'] as const).map((period) => (
-    <button
-      key={period}
-      onClick={() => setPeriodFilter(period)}
-      className={`px-2 py-1 text-xs font-medium transition-colors ${
-        periodFilter === period
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-card hover:bg-muted text-foreground'
-      }`}
-    >
-      {periodLabels[period]}
-    </button>
-  ))}
-</div>
-```
-
----
-
-## Mapeamento de Labels
-
-| Período | Label Botão | Display Header |
-|---------|-------------|----------------|
-| day | Day | Monday, Feb 3, 2026 |
-| week | Week | Jan 28 - Feb 3, 2026 (7 Days) |
-| 15days | 15d | Jan 20 - Feb 3, 2026 (15 Days) |
-| month | Month | Jan 5 - Feb 3, 2026 (30 Days) |
-
-| Turno | Label |
-|-------|-------|
-| ALL | All |
-| DAY | Day |
-| NIGHT | Night |
 
 ---
 
@@ -166,84 +131,44 @@ const dateDisplay = useMemo(() => {
 
 | Arquivo | Mudanças |
 |---------|----------|
-| `src/components/charts/LeaderPerformanceBoard.tsx` | Adicionar filtros de shift e período expandido |
+| `src/components/charts/PerformanceBySKU.tsx` | Limpeza de SKU, tooltip melhorado |
 
 ---
 
-## Imports Necessários
+## Sugestões Adicionais de Melhoria
 
-```typescript
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { subDays } from 'date-fns'; // já importado
-```
+### Curto Prazo (Incluído neste plano)
 
----
+1. **SKU limpo** - Extrair só o código
+2. **Tooltip informativo** - Mostrar nome do produto
+3. **Labels formatados** - Separador de milhares
+4. **Título atualizado** - "Production by SKU (Top 10)"
 
-## Layout do Header Atualizado
+### Médio Prazo (Futuras melhorias)
 
-```typescript
-<div className="space-y-2 mb-3">
-  {/* Título */}
-  <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-    <Trophy size={16} />
-    Leader Performance Board
-  </h3>
-  
-  {/* Filtros */}
-  <div className="flex items-center gap-3 flex-wrap">
-    {/* Shift Filter */}
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">Shift:</span>
-      <Select ...>...</Select>
-    </div>
-    
-    {/* Period Filter */}
-    <div className="flex rounded-lg border border-border overflow-hidden">
-      <button>Day</button>
-      <button>Week</button>
-      <button>15d</button>
-      <button>Month</button>
-    </div>
-  </div>
-  
-  {/* Date Range Display */}
-  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-    <Calendar size={14} />
-    {dateDisplay}
-    {shiftFilter !== 'ALL' && <span className="text-primary">({shiftFilter} shift)</span>}
-  </div>
-</div>
-```
+| Melhoria | Benefício |
+|----------|-----------|
+| **Filtro de período** | Ver produção por SKU da semana/mês |
+| **Drill-down** | Clicar no SKU e ver detalhes por dia |
+| **Performance %** | Mostrar % real vs target por SKU |
+| **Cores por status** | Verde se atingiu meta, vermelho se não |
+| **Comparativo** | Comparar SKU atual vs período anterior |
+
+### Longo Prazo
+
+| Feature | Descrição |
+|---------|-----------|
+| **SKU Trends** | Gráfico de linha mostrando evolução de produção por SKU |
+| **SKU Efficiency** | UPM médio por SKU (quais são mais rápidos de produzir) |
+| **Pareto Analysis** | 80/20 - quais SKUs representam 80% da produção |
+| **SKU Downtime** | Tempo de downtime associado a cada SKU |
 
 ---
 
-## Resumo Atualizado (para todos os períodos exceto "day")
+## Benefícios Imediatos
 
-```typescript
-{periodFilter !== 'day' && summaryStats && (
-  <div className="mt-3 pt-3 border-t border-border flex items-center justify-center gap-4 text-xs text-muted-foreground">
-    <span>Average: <strong>{summaryStats.avgPerformance}%</strong></span>
-    <span>|</span>
-    <span>Total: <strong>{summaryStats.totalShifts} shifts</strong></span>
-    <span>|</span>
-    <span>On Target: <strong>{summaryStats.onTargetCount}/{summaryStats.totalLeaders}</strong></span>
-  </div>
-)}
-```
-
----
-
-## Benefícios
-
-1. **Flexibilidade total** - Usuário escolhe período que quiser
-2. **Filtro de turno** - Analisa DAY ou NIGHT separadamente
-3. **Comparação justa** - Mesmas condições de turno para ranking
-4. **Visão de longo prazo** - Quinzena e mês mostram tendências
-5. **UI compacta** - Botões e select ocupam pouco espaço
+1. **Legibilidade** - SKUs curtos e claros no gráfico
+2. **Contexto** - Nome do produto visível no tooltip
+3. **Foco** - Top 10 mais produzidos em destaque
+4. **Profissional** - Valores formatados corretamente
 
