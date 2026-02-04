@@ -1,66 +1,116 @@
 
-# Plano: Corrigir Menu Mobile Coberto pelo Header
+# Plano: Correcao de Erros no History + Performance + Layout
 
-## Problema Identificado
+## Problemas Identificados
 
-No mobile, quando o usuario abre o menu (tres linhas), o Header da pagina (com relogio, titulo "New Shift Report", etc.) fica NA FRENTE do menu, cobrindo os itens de navegacao como o Dashboard.
+### 1. Editar/Deletar no History Nao Funciona
+**Causa**: As politicas RLS do banco de dados estao mais restritivas que a interface:
+- DELETE shifts: Somente ADMIN pode deletar
+- DELETE downtimes: Somente ADMIN pode deletar
+- A interface mostra botoes de delete para SUPERVISOR, mas o banco rejeita silenciosamente
 
-### Causa Raiz - Conflito de Z-Index
+**Solucao**: Atualizar as politicas RLS para permitir que SUPERVISORS tambem possam deletar registros
 
-| Componente | z-index | Arquivo |
-|------------|---------|---------|
-| Mobile Header (barra superior) | z-40 | MobileMenu.tsx linha 32 |
-| Menu Overlay (fundo + nav) | z-30 | MobileMenu.tsx linha 49 |
-| Header da pagina (relogio) | z-40 | Header.tsx linha 12 |
+### 2. Carregamento Lento dos SKUs no Planner
+**Causa**: O componente `ProductSearch` faz uma busca no banco a cada 300ms enquanto o usuario digita (debounce de 300ms linha 98). Para muitos produtos, isso pode ser lento.
 
-O problema: O Menu Overlay tem `z-30`, mas o Header das paginas tem `z-40`. Como o Header e `sticky top-0`, ele fica posicionado acima do overlay do menu, cobrindo os itens de navegacao.
+**Solucao**: 
+- Aumentar o debounce para 500ms
+- Limitar os resultados iniciais
+- Adicionar cache local dos produtos
+
+### 3. Espaco em Branco Nao Utilizado
+**Causa**: O layout usa `max-w-4xl` no Planner e margens conservadoras em todas as paginas, deixando muito espaco vazio em telas grandes.
+
+**Solucao**:
+- Aumentar `max-w-4xl` para `max-w-6xl` ou `max-w-7xl` no Planner
+- Ajustar paddings e margens para melhor aproveitamento
+- Expandir os cards no Dashboard para usar mais espaco horizontal
 
 ---
 
-## Solucao
+## Implementacao
 
-Aumentar o z-index do Menu Overlay para ficar ACIMA do Header das paginas.
+### Parte 1: Corrigir RLS para DELETE (Banco de Dados)
 
-### Arquivo a Modificar: `src/components/MobileMenu.tsx`
+Criar nova migration SQL para adicionar politicas de DELETE para supervisors:
 
-**Alteracao na linha 49:**
+```sql
+-- Atualizar politica de delete em shifts para incluir supervisors
+DROP POLICY IF EXISTS "Admins can delete shifts" ON public.shifts;
+CREATE POLICY "Supervisors and admins can delete shifts"
+  ON public.shifts FOR DELETE
+  USING (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'supervisor'::app_role));
 
-```tsx
-// Antes:
-<div className="lg:hidden fixed inset-0 z-30 pt-14">
-
-// Depois:
-<div className="lg:hidden fixed inset-0 z-50 pt-14">
+-- Atualizar politica de delete em structured_downtimes para incluir supervisors
+DROP POLICY IF EXISTS "Admins can delete downtimes" ON public.structured_downtimes;
+CREATE POLICY "Supervisors and admins can delete downtimes"
+  ON public.structured_downtimes FOR DELETE
+  USING (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'supervisor'::app_role));
 ```
 
-### Explicacao
+### Parte 2: Melhorar Performance do ProductSearch
 
-- Mudando de `z-30` para `z-50`, o overlay do menu ficara ACIMA de:
-  - Mobile Header (`z-40`) - que e correto, pois o botao X precisa funcionar
-  - Page Header (`z-40`) - que e o que estava causando o problema
+**Arquivo**: `src/components/ProductSearch.tsx`
 
-### Hierarquia de Z-Index Corrigida
+Alteracoes:
+- Aumentar debounce de 300ms para 500ms (linha 98)
+- Adicionar "Loading..." visual enquanto carrega
+- Melhorar a query para usar index (product_code primeiro)
 
-| Componente | z-index | Comportamento |
-|------------|---------|---------------|
-| Menu Overlay + Backdrop | z-50 | Camada mais alta quando menu esta aberto |
-| Mobile Header | z-40 | Sempre visivel no topo |
-| Page Header | z-40 | Sticky dentro do conteudo, coberto pelo menu |
+### Parte 3: Expandir Layout Para Usar Mais Espaco
+
+**Arquivo**: `src/pages/Planner.tsx`
+- Alterar `max-w-4xl` para `max-w-6xl` (linha 109)
+
+**Arquivo**: `src/pages/Dashboard.tsx`
+- Ajustar padding de `p-3 sm:p-5` para `p-4 sm:p-6` (linha 178)
+- Aumentar o panel OEE de `w-52` para `w-64` (linha 309)
+
+**Arquivo**: `src/pages/History.tsx`
+- Aumentar padding de `p-4 sm:p-6` para `p-4 sm:p-8` (linha 136)
+
+**Arquivo**: `src/components/Header.tsx`
+- Ajustar padding para melhor aproveitamento
 
 ---
 
-## Arquivo
+## Arquivos a Modificar
 
-| Arquivo | Acao | Descricao |
+| Arquivo | Tipo | Descricao |
 |---------|------|-----------|
-| `src/components/MobileMenu.tsx` | Modificar | Alterar z-30 para z-50 na linha 49 |
+| Migration SQL | Database | Atualizar RLS para permitir DELETE por supervisors |
+| `src/components/ProductSearch.tsx` | Codigo | Aumentar debounce, melhorar performance |
+| `src/pages/Planner.tsx` | Codigo | Expandir max-width para usar mais espaco |
+| `src/pages/Dashboard.tsx` | Codigo | Ajustar layout para mais espaco |
+| `src/pages/History.tsx` | Codigo | Ajustar padding |
 
 ---
 
 ## Resultado Esperado
 
-Apos a correcao:
-1. Ao abrir o menu mobile (tres linhas), o menu aparecera corretamente
-2. Todos os itens de navegacao (Dashboard, Planner, Downtime, History, Admin) serao visiveis
-3. O Header da pagina (com relogio) ficara ATRAS do menu overlay
-4. O botao X para fechar o menu continuara funcionando normalmente
+1. **Edit/Delete no History**: Supervisores e Admins poderao editar e deletar registros sem erros
+
+2. **Performance do SKU Search**: 
+   - Busca mais responsiva com debounce maior
+   - Menos requisicoes ao banco
+
+3. **Layout Expandido**:
+   - Formularios do Planner usarao mais espaco horizontal
+   - Dashboard aproveitara melhor a tela
+   - Menos espacos em branco nao utilizados
+
+---
+
+## Hierarquia de Permissoes Corrigida
+
+| Acao | Operator | Supervisor | Admin |
+|------|----------|------------|-------|
+| Ver shifts | Sim | Sim | Sim |
+| Criar shift | Nao | Sim | Sim |
+| Editar shift | Nao | Sim | Sim |
+| Deletar shift | Nao | Sim | Sim |
+| Ver downtimes | Sim | Sim | Sim |
+| Criar downtime | Sim | Sim | Sim |
+| Editar downtime | Nao | Sim | Sim |
+| Deletar downtime | Nao | Sim | Sim |
