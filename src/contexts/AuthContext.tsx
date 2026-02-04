@@ -224,13 +224,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (credentials: LoginCredentials & { name: string }): Promise<{ success: boolean; error?: string }> => {
     try {
+      // Validate name length (server-side also validates, this is for UX)
+      const trimmedName = credentials.name.trim();
+      if (trimmedName.length === 0) {
+        return { success: false, error: 'Name is required' };
+      }
+      if (trimmedName.length > 100) {
+        return { success: false, error: 'Name must be 100 characters or less' };
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: credentials.email,
         password: credentials.password,
         options: {
           emailRedirectTo: window.location.origin,
           data: {
-            name: credentials.name,
+            name: trimmedName,
           },
         },
       });

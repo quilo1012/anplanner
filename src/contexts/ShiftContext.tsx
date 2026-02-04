@@ -175,12 +175,18 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // Create signed URL (valid for 1 hour) - bucket is now private for security
+      const { data: signedUrlData, error: urlError } = await supabase.storage
         .from('monitoring-photos')
-        .getPublicUrl(data.path);
+        .createSignedUrl(data.path, 3600);
 
-      return publicUrl;
+      if (urlError || !signedUrlData) {
+        console.error('Error creating signed URL:', urlError);
+        // Store the path so we can regenerate signed URLs later
+        return data.path;
+      }
+
+      return signedUrlData.signedUrl;
     } catch (error) {
       console.error('Error processing photo:', error);
       return null;

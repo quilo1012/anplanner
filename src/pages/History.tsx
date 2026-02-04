@@ -3,6 +3,7 @@ import { Header } from '@/components/Header';
 import { PrintReport } from '@/components/PrintReport';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
+import { SecureImage } from '@/components/SecureImage';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShiftType, SHIFT_TYPES, ShiftReport, DOWNTIME_CATEGORIES } from '@/types/shift';
@@ -498,7 +499,7 @@ export function History() {
               >
                 <X size={20} />
               </button>
-              <img 
+              <SecureImage 
                 src={previewPhoto} 
                 alt="Monitoring" 
                 className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
