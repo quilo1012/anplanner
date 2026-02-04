@@ -116,29 +116,29 @@ export function LineStatusCard({
         
         {/* Main Content */}
         <div className="flex-1 p-2 min-w-0">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-2">
             {/* Left: Product Info */}
-            <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex-1 min-w-0 space-y-1">
               {/* Status and Leader Row */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <StatusBadge />
                 {leader && (
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <User size={12} />
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <User size={10} />
                     {leader}
                   </span>
                 )}
               </div>
               
               {/* SKU and Product */}
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Package size={14} className="text-primary shrink-0" />
-                  <span className="text-sm font-semibold text-foreground truncate">
+              <div className="space-y-0">
+                <div className="flex items-center gap-1.5">
+                  <Package size={12} className="text-primary shrink-0" />
+                  <span className="text-xs font-semibold text-foreground truncate">
                     {sku || 'No SKU'}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground truncate pl-5" title={product}>
+                <p className="text-[11px] text-muted-foreground truncate pl-4" title={product}>
                   {product || 'No product assigned'}
                 </p>
               </div>
