@@ -1,37 +1,19 @@
 
-# Plano: Correcao da Sidebar e Login
+# Plano: Dashboard Industrial Profissional com Relogio e Correcao da Sidebar
 
 ## Problemas Identificados
 
-### 1. Sidebar - Layout com Margem Incorreta
+### 1. Sidebar no Modo Light (Daylight)
+O conteudo principal do app usa `lg:ml-0` no `Layout.tsx`, mas a Sidebar e `fixed` com `w-64`. Isso significa que no desktop, o conteudo principal fica **embaixo** da sidebar fixa, nao ao lado dela. Por isso voce so ve a sidebar quando passa o mouse - o conteudo esta cobrindo ela!
 
-**Problema**: No `Layout.tsx` linha 17, o conteudo principal usa `lg:ml-0`, mas a sidebar e `fixed` com largura de 256px (`w-64`). Isso faz com que o conteudo principal fique EMBAIXO da sidebar fixa, nao ao lado.
+**Correcao**: Alterar `lg:ml-0` para `lg:ml-64` no Layout.tsx
 
-**Codigo atual**:
-```
-<main className="flex-1 flex flex-col overflow-hidden lg:ml-0 pt-14 lg:pt-0">
-```
-
-**Correcao necessaria**:
-```
-<main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
-```
-
-### 2. Login - Falha na Persistencia da Sessao
-
-**Problema**: Quando `fetchUserData` retorna `null` (caso o profile nao seja encontrado imediatamente), o `user` fica como `null`, tornando `isAuthenticated = false`, e o usuario e redirecionado de volta ao login.
-
-A funcao `fetchUserData` no `AuthContext.tsx` retorna `null` em caso de erro ao buscar o profile (linha 54-57), mesmo quando o usuario autenticou com sucesso no Supabase Auth.
-
-**Codigo problemico** (linha 54-57):
-```typescript
-if (profileError) {
-  console.error('Error fetching profile:', profileError);
-  return null;  // <-- Isso faz isAuthenticated = false
-}
-```
-
-**Correcao**: A funcao ja tem um fallback (linhas 80-87), mas ele so e executado se `profileError` for null. Precisamos garantir que o fallback seja usado mesmo quando ha erro de profile.
+### 2. Dashboard - Design Industrial
+O Header atual e muito simples. Vou criar um design mais profissional estilo "SCADA/HMI industrial" com:
+- Barra de status superior mais elaborada
+- Relogio digital ao vivo com segundos
+- Indicadores de status do sistema
+- Gradientes e cores industriais
 
 ---
 
@@ -39,117 +21,101 @@ if (profileError) {
 
 ### Arquivo 1: `src/components/Layout.tsx`
 
-Alterar linha 17 para adicionar margem esquerda no desktop:
+**Alterar linha 17**: Adicionar margem esquerda para compensar a sidebar fixa
 
 ```tsx
+// Antes:
+<main className="flex-1 flex flex-col overflow-hidden lg:ml-0 pt-14 lg:pt-0">
+
+// Depois:
 <main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
 ```
 
-### Arquivo 2: `src/contexts/AuthContext.tsx`
+### Arquivo 2: `src/components/Header.tsx`
 
-Melhorar a funcao `fetchUserData` para:
-1. Nao retornar `null` quando houver erro no profile - usar o fallback
-2. Adicionar logs melhores para debug
-3. Garantir que o usuario autenticado sempre receba um objeto User valido
+Reescrever completamente o Header com design industrial profissional:
 
-**Codigo atual** (linhas 45-92):
-```typescript
-const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
-  try {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', supabaseUser.id)
-      .maybeSingle();
+```text
+Estrutura do novo Header:
 
-    if (profileError) {
-      console.error('Error fetching profile:', profileError);
-      return null;  // PROBLEMA: retorna null mesmo com usuario autenticado
-    }
-    // ...resto do codigo
-  }
-}
++------------------------------------------------------------------+
+|  [Logo]  |  PRODUCTION DASHBOARD    |  [Data] [Relogio Vivo]    |
+|          |  DAY Shift               |   04 Feb 2026  14:35:22   |
++------------------------------------------------------------------+
+|  [Indicador Status: SYSTEM ONLINE]  |  [Dark/Light Toggle]      |
++------------------------------------------------------------------+
 ```
 
-**Codigo corrigido**:
-```typescript
-const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
-  try {
-    // Fetch profile (may fail on first login before trigger runs)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', supabaseUser.id)
-      .maybeSingle();
+**Novos recursos**:
+- Relogio digital ao vivo com atualizacao a cada segundo
+- Data formatada em ingles (04 Feb 2026)
+- Borda esquerda colorida (industrial cyan)
+- Indicador de status do sistema
+- Layout em duas linhas para melhor hierarquia visual
+- Fonte monospacada para numeros (estilo industrial)
 
-    if (profileError) {
-      console.error('Error fetching profile:', profileError);
-      // Continue to fallback instead of returning null
-    }
+### Arquivo 3: Componente `LiveClock.tsx` (Novo)
 
-    // Fetch role (may not exist yet for new users)
-    const { data: roleData, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', supabaseUser.id)
-      .maybeSingle();
+Criar componente de relogio ao vivo reutilizavel:
 
-    if (roleError) {
-      console.error('Error fetching role:', roleError);
-    }
-
-    // If profile exists, use it
-    if (profile) {
-      return {
-        id: profile.id,
-        email: profile.email,
-        name: profile.name,
-        role: (roleData?.role as UserRole) || 'operator',
-        createdAt: profile.created_at,
-      };
-    }
-
-    // Fallback: create user from Supabase Auth data
-    // This ensures login works even if profile trigger hasn't run yet
-    return {
-      id: supabaseUser.id,
-      email: supabaseUser.email || '',
-      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
-      role: (roleData?.role as UserRole) || 'operator',
-      createdAt: supabaseUser.created_at || new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-    
-    // Even on error, return a basic user object to prevent auth loop
-    return {
-      id: supabaseUser.id,
-      email: supabaseUser.email || '',
-      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
-      role: 'operator',
-      createdAt: supabaseUser.created_at || new Date().toISOString(),
-    };
-  }
-};
+```tsx
+// Funcionalidades:
+- useState para armazenar a hora atual
+- useEffect com setInterval para atualizar a cada 1000ms
+- Cleanup do interval no unmount
+- Formato 24h: HH:MM:SS
+- Estilo tabular-nums para alinhamento perfeito
 ```
 
 ---
 
-## Resumo das Mudancas
+## Detalhes do Design Industrial
 
-| Arquivo | Alteracao | Motivo |
-|---------|-----------|--------|
-| `Layout.tsx` | Alterar `lg:ml-0` para `lg:ml-64` | Compensar a largura da sidebar fixa |
-| `AuthContext.tsx` | Remover `return null` apos erro de profile | Garantir que usuario autenticado sempre tenha sessao valida |
-| `AuthContext.tsx` | Adicionar fallback no catch | Prevenir loop de login mesmo em erros inesperados |
+### Paleta de Cores
+- Fundo do header: `bg-card` com gradiente sutil
+- Borda esquerda: `border-l-4 border-primary` (azul industrial)
+- Texto principal: `text-foreground`
+- Texto secundario: `text-muted-foreground`
+- Relogio: `text-primary` com fonte monospacada
+
+### Tipografia
+- Titulo: `text-xl font-bold uppercase tracking-wide`
+- Subtitulo: `text-sm text-muted-foreground`
+- Relogio: `font-mono text-2xl font-bold tabular-nums`
+- Data: `text-sm font-medium`
+
+### Elementos Visuais
+- Shadow mais pronunciado: `shadow-lg`
+- Borda inferior: `border-b-2 border-primary/20`
+- Icone de status pulsante
+- Separadores verticais entre secoes
 
 ---
 
-## Apos a Implementacao
+## Arquivos a Criar/Modificar
 
-1. **Testar sidebar**: A sidebar deve ficar sempre visivel com textos e icones no desktop
-2. **Testar login no site publicado**: 
-   - Fazer login com email/senha
-   - Verificar que redireciona para o Dashboard
-   - Nao deve pedir login novamente
-3. **Republicar o site** para que as mudancas aparecam em `shiftreportapp.lovable.app`
+| Arquivo | Acao | Descricao |
+|---------|------|-----------|
+| `src/components/Layout.tsx` | Modificar | Ajustar margem lg:ml-64 |
+| `src/components/LiveClock.tsx` | Criar | Componente de relogio ao vivo |
+| `src/components/Header.tsx` | Modificar | Redesign industrial completo |
+
+---
+
+## Resultado Esperado
+
+Apos a implementacao:
+
+1. **Sidebar**: Sempre visivel no desktop (light e dark mode), com texto e icones aparecendo permanentemente
+
+2. **Header Industrial**:
+   - Logo Applied Nutrition a esquerda
+   - Titulo "PRODUCTION DASHBOARD" centralizado
+   - Relogio digital ao vivo (ex: 14:35:22) a direita
+   - Data atual (ex: 04 Feb 2026) ao lado do relogio
+   - Toggle de tema (dark/light)
+   - Visual industrial com cores e fontes apropriadas
+
+3. **Responsividade**:
+   - Mobile: Header compacto com relogio menor
+   - Desktop: Header completo com todos os elementos
