@@ -175,11 +175,11 @@ export function Dashboard() {
     <>
       <Header title="Production Dashboard" subtitle={`${selectedShift} Shift - ${formatDate(selectedDate)}`} />
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6 print:p-0">
+      <div className="flex-1 overflow-auto p-3 sm:p-4 print:p-0">
 
         {/* Global Filters - Compact */}
-        <div className="card p-3 mb-3 no-print">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="card p-2 mb-2 no-print">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <Filter size={16} className="text-primary shrink-0" />
               <span className="text-xs font-semibold text-foreground hidden sm:inline">Filters:</span>
@@ -272,9 +272,9 @@ export function Dashboard() {
         </div>
 
         {/* Main Layout: Lines + OEE Panel */}
-        <div className="flex gap-3 mb-3">
+        <div className="flex gap-2 mb-2">
           {/* Line Status Cards */}
-          <div className="flex-1 space-y-2 min-w-0">
+          <div className="flex-1 space-y-1.5 min-w-0">
             {lineStats.length > 0 ? (
               lineStats.map((line) => (
                 <LineStatusCard
@@ -306,7 +306,7 @@ export function Dashboard() {
           </div>
 
           {/* OEE Panel - Fixed Right Column */}
-          <div className="hidden lg:flex flex-col gap-3 w-64 shrink-0">
+          <div className="hidden lg:flex flex-col gap-2 w-56 shrink-0">
             <OEEPanel
               performance={stats.avgPerformance}
               availability={stats.availability}
@@ -342,7 +342,7 @@ export function Dashboard() {
         </div>
 
         {/* Mobile OEE Summary */}
-        <div className="lg:hidden grid grid-cols-4 gap-2 mb-3">
+        <div className="lg:hidden grid grid-cols-4 gap-1.5 mb-2">
           <div className="bg-card border border-border rounded-lg p-2 text-center">
             <p className="text-lg font-bold text-foreground">{stats.oee.toFixed(0)}%</p>
             <p className="text-[10px] text-muted-foreground uppercase">OEE</p>
@@ -363,7 +363,7 @@ export function Dashboard() {
 
         {/* Trend Alerts */}
         {trendAlerts.length > 0 && (
-          <div className="card mb-3 overflow-hidden">
+          <div className="card mb-2 overflow-hidden">
             <div className="px-3 py-2 border-b border-border bg-destructive/5">
               <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
                 <AlertTriangle size={16} className="text-destructive" />
@@ -395,7 +395,7 @@ export function Dashboard() {
         {/* Performance Charts Grid - Collapsible */}
         {showCharts && (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-2">
               <div className="card p-3">
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm">
                   <Package size={16} />

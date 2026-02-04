@@ -101,70 +101,70 @@ export function LineStatusCard({
       <div className="flex items-stretch">
         {/* Line Header Badge */}
         <div className={cn(
-          "flex items-center justify-center px-4 min-w-[100px]",
+          "flex items-center justify-center px-3 min-w-[80px]",
           headerColor,
           "text-white"
         )}>
-          <div className="text-center">
-            <Factory size={20} className="mx-auto mb-1" />
-            <span className="text-xs font-bold uppercase tracking-wide block">{lineName}</span>
+          <div className="text-center py-2">
+            <Factory size={16} className="mx-auto mb-0.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wide block">{lineName}</span>
             {shift && (
-              <span className="text-[10px] opacity-80 block">{shift} Shift</span>
+              <span className="text-[9px] opacity-80 block">{shift}</span>
             )}
           </div>
         </div>
         
         {/* Main Content */}
-        <div className="flex-1 p-3 min-w-0">
-          <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 p-2 min-w-0">
+          <div className="flex items-start justify-between gap-2">
             {/* Left: Product Info */}
-            <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex-1 min-w-0 space-y-1">
               {/* Status and Leader Row */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <StatusBadge />
                 {leader && (
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <User size={12} />
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <User size={10} />
                     {leader}
                   </span>
                 )}
               </div>
               
               {/* SKU and Product */}
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Package size={14} className="text-primary shrink-0" />
-                  <span className="text-sm font-semibold text-foreground truncate">
+              <div className="space-y-0">
+                <div className="flex items-center gap-1.5">
+                  <Package size={12} className="text-primary shrink-0" />
+                  <span className="text-xs font-semibold text-foreground truncate">
                     {sku || 'No SKU'}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground truncate pl-5" title={product}>
+                <p className="text-[11px] text-muted-foreground truncate pl-4" title={product}>
                   {product || 'No product assigned'}
                 </p>
               </div>
 
               {/* Target indicator */}
               {hasTargetData && (
-                <div className="flex items-center gap-2 pl-5 mt-1">
-                  <Target size={12} className="text-muted-foreground" />
-                  <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-1.5 pl-4">
+                  <Target size={10} className="text-muted-foreground" />
+                  <div className="flex items-center gap-1.5 text-[11px]">
                     <span className="text-muted-foreground">
-                      {realProduction.toLocaleString()} / {productionTarget.toLocaleString()}
+                      {realProduction.toLocaleString()}/{productionTarget.toLocaleString()}
                     </span>
                     <span className={cn(
-                      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold",
                       isOnTarget 
                         ? "bg-success/15 text-success border border-success/30" 
                         : "bg-destructive/15 text-destructive border border-destructive/30"
                     )}>
                       {isOnTarget ? (
                         <>
-                          <CheckCircle size={10} />
+                          <CheckCircle size={8} />
                           +{targetDiff}%
                         </>
                       ) : (
                         <>
-                          <XCircle size={10} />
+                          <XCircle size={8} />
                           {targetDiff}%
                         </>
                       )}
@@ -173,36 +173,34 @@ export function LineStatusCard({
                 </div>
               )}
 
-              {/* UPM (Units per Minute) */}
-              {hasTargetData && (
-                <div className="flex items-center gap-2 pl-5 mt-1 text-xs text-muted-foreground">
-                  <Clock size={12} />
-                  <span>
-                    {(realProduction / 570).toFixed(2)} / {(productionTarget / 570).toFixed(2)} UPM
+              {/* UPM + Staff inline */}
+              <div className="flex items-center gap-3 pl-4 text-[11px] text-muted-foreground">
+                {hasTargetData && (
+                  <span className="flex items-center gap-1">
+                    <Clock size={10} />
+                    {(realProduction / 570).toFixed(1)}/{(productionTarget / 570).toFixed(1)} UPM
                   </span>
-                </div>
-              )}
-
-              {/* Staff indicator */}
-              {(staffPlanned > 0 || staffActual > 0) && (
-                <div className="flex items-center gap-1 text-xs pl-5">
-                  <span className="text-muted-foreground">Staff:</span>
-                  <span className={cn(
-                    "font-medium",
-                    staffActual < staffPlanned ? "text-warning" : "text-foreground"
-                  )}>
-                    {staffActual}/{staffPlanned}
+                )}
+                {(staffPlanned > 0 || staffActual > 0) && (
+                  <span className="flex items-center gap-1">
+                    Staff:
+                    <span className={cn(
+                      "font-medium",
+                      staffActual < staffPlanned ? "text-warning" : "text-foreground"
+                    )}>
+                      {staffActual}/{staffPlanned}
+                    </span>
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             
             {/* Right: KPI circle */}
             <div className="shrink-0">
               <CircularProgress
                 value={performance}
-                size={52}
-                strokeWidth={5}
+                size={44}
+                strokeWidth={4}
                 label="Perf"
                 colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
               />
