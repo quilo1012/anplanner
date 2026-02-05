@@ -1,251 +1,200 @@
 
+# Plano: Corrigir Upload de Foto e Otimizar Layout
 
-# Plano: Ajustes e Correcoes do Sistema
+## Problema 1: Imagem do Monitoramento Nao Esta Sendo Salva
+
+### Causa Raiz
+O erro encontrado nos network logs mostra:
+```
+Status: 400 (Bad Request)
+Error: InvalidKey: Invalid key: 1770298537266-Captura de Tela 2026-02-02 às 21.28.56.png
+```
+
+O Supabase Storage NAO aceita caracteres especiais no nome do arquivo:
+- Espacos
+- Acentos (a, e, i, o, u)
+- Caracteres especiais
+
+### Solucao
+Sanitizar o nome do arquivo antes do upload no `ShiftContext.tsx`:
+
+```tsx
+// Funcao para sanitizar nome de arquivo
+function sanitizeFilename(filename: string): string {
+  return filename
+    .normalize('NFD')                    // Decompose acentos
+    .replace(/[\u0300-\u036f]/g, '')     // Remove diacriticos
+    .replace(/[^a-zA-Z0-9._-]/g, '_')    // Substitui caracteres especiais por _
+    .replace(/_+/g, '_')                 // Remove underscores duplicados
+    .toLowerCase();
+}
+
+// Uso na funcao uploadPhoto:
+const safeName = sanitizeFilename(filename);
+const filePath = `${Date.now()}-${safeName}`;
+```
+
+### Arquivo a Modificar
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/contexts/ShiftContext.tsx` | Adicionar sanitizacao do filename nas linhas 152-194 |
+
+---
+
+## Problema 2: Sidebar Grande, Conteudo Usando Metade do Espaco
+
+### Causa Raiz
+Apos analise do layout:
+
+1. **Sidebar** (`w-64` = 256px) - tamanho adequado
+2. **Main content** - tem `flex-1` mas padding excessivo (`p-4 sm:p-8`)
+3. **History page** - tabela com colunas fixas que nao expandem
+
+O problema real e que o conteudo tem muito padding e a tabela nao aproveita a largura total.
+
+### Solucao
+
+#### Opcao A: Reduzir Sidebar (de 256px para 200-220px)
+```tsx
+// Sidebar.tsx
+<aside className="w-52 ..." >  // 208px ao inves de 256px
+
+// Layout.tsx  
+<main className="... lg:ml-52 ...">
+```
+
+#### Opcao B: Otimizar Area de Conteudo (Recomendada)
+1. Reduzir padding das paginas
+2. Fazer tabela usar 100% da largura
+3. Permitir scroll horizontal apenas quando necessario
+
+```tsx
+// History.tsx
+<div className="flex-1 overflow-auto p-3 sm:p-4">  // era p-4 sm:p-8
+
+// Tabela: usar layout fixo para melhor controle
+<table className="table w-full table-fixed">
+```
+
+### Arquivos a Modificar
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/components/Sidebar.tsx` | Reduzir largura para `w-52` (208px) |
+| `src/components/Layout.tsx` | Atualizar margem para `lg:ml-52` |
+| `src/pages/History.tsx` | Reduzir padding para `p-3 sm:p-4` |
+
+---
 
 ## Resumo das Alteracoes
 
-### 1. Supervisor / History / Planner
+### 1. ShiftContext.tsx - Sanitizar Filename
 
-| Alteracao | Descricao |
-|-----------|-----------|
-| Photo no Edit History | Adicionar upload de foto de monitoramento no EditShiftDialog (apenas ao editar, nao ao criar) |
-| Downtime no History | Adicionar secao para adicionar/editar downtime no EditShiftDialog |
-| Remover Downtime do Planner | Remover a secao StructuredDowntimeForm do Planner (mover para History apenas) |
-| Downtime manual | Permitir digitar reason manualmente quando "Other" selecionado |
-
-### 2. Dashboard
-
-| Alteracao | Descricao |
-|-----------|-----------|
-| Remover status badges | Remover os badges "Running", "Warning", "Stopped" do LineStatusCard |
-
-### 3. Login
-
-| Alteracao | Descricao |
-|-----------|-----------|
-| Logo maior | Aumentar tamanho do logo de h-16 para h-24 ou h-32 |
-| Remover "Applied Nutrition" texto | Remover o h1 com texto "Applied Nutrition" abaixo do logo |
-| Remover "Production Control" | Remover subtitulo do Sidebar e MobileMenu |
-| Corrigir Sign Out | Verificar e corrigir problema no logout (EATS) |
-
-### 4. Mensagens / Textos
-
-| Alteracao | Descricao |
-|-----------|-----------|
-| Remover "Applied Nutrition" | Remover texto do Sidebar header |
-| Ajustar rodape | Mudar para "© 2026 Applied Nutrition. All rights reserved." |
-
-### 5. Navegacao
-
-| Alteracao | Descricao |
-|-----------|-----------|
-| Botao Back | Adicionar botao de voltar no Header ou navegacao |
-
----
-
-## Detalhes de Implementacao
-
-### Parte 1: EditShiftDialog - Adicionar Photo e Downtime
-
-**Arquivo:** `src/components/history/EditShiftDialog.tsx`
-
-Adicionar:
-1. Estado para monitoringPhoto e photoFilename
-2. Componente PhotoUpload no formulario
-3. Componente StructuredDowntimeForm para adicionar/editar downtimes
-4. Atualizar handleSubmit para salvar photo e downtimes
-
+**Antes (linha 164):**
 ```tsx
-// Novos estados
-const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
-const [photoFilename, setPhotoFilename] = useState<string | undefined>();
-const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
-
-// No useEffect
-setMonitoringPhoto(shift.monitoringPhoto);
-setPhotoFilename(shift.photoFilename);
-setStructuredDowntimes(shift.structuredDowntimes || []);
-
-// No formulario, adicionar:
-<PhotoUpload ... />
-<StructuredDowntimeForm ... />
+const filePath = `${Date.now()}-${filename}`;
 ```
 
-### Parte 2: Planner - Remover Downtime Section
-
-**Arquivo:** `src/pages/Planner.tsx`
-
-Remover:
-- Import do StructuredDowntimeForm
-- Estado structuredDowntimes do formState
-- Secao visual do StructuredDowntimeForm (linhas 472-480 aproximadamente)
-- Remover structuredDowntimes do handleSubmit
-
-### Parte 3: Dashboard - Remover Status Badges
-
-**Arquivo:** `src/components/dashboard/LineStatusCard.tsx`
-
-Remover:
-- O componente StatusBadge (linhas 69-93)
-- A chamada `<StatusBadge />` na linha 124
-
-### Parte 4: Login - Redesenhar Layout
-
-**Arquivo:** `src/pages/Login.tsx`
-
-Alteracoes:
+**Depois:**
 ```tsx
-// Logo maior e centralizado
-<img
-  src="/lovable-uploads/c9db809b-a260-417c-b42f-c908f00093c1.jpg"
-  alt="Applied Nutrition"
-  className="h-28 sm:h-32 w-auto rounded-xl shadow-lg"  // era h-16
-/>
+// Adicionar funcao sanitizadora
+function sanitizeFilename(filename: string): string {
+  return filename
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .toLowerCase();
+}
 
-// Remover estas linhas (118-121):
-// <h1 className="text-xl font-bold text-primary tracking-tight">
-//   Applied Nutrition
-// </h1>
-// <p className="text-sm text-muted-foreground mt-1">Shift Report System</p>
+// Na funcao uploadPhoto:
+const safeName = sanitizeFilename(filename);
+const filePath = `${Date.now()}-${safeName}`;
 ```
 
-### Parte 5: Sidebar - Remover Textos
+### 2. Sidebar.tsx - Reduzir Largura
 
-**Arquivo:** `src/components/Sidebar.tsx`
-
-Alteracoes:
+**Antes (linha 19):**
 ```tsx
-// Linha 27-28: Remover "Applied Nutrition" e "Production Control"
-// Manter apenas o icone ou simplificar o header
-
-// Linha 80-82: Atualizar versao/rodape
-<p>© 2026 Applied Nutrition. All rights reserved.</p>
+<aside className="w-64 min-h-screen ...">
 ```
 
-### Parte 6: MobileMenu - Remover "Production Control"
-
-**Arquivo:** `src/components/MobileMenu.tsx`
-
-Alteracao linha 37:
+**Depois:**
 ```tsx
-// De:
-<span className="font-semibold text-sm">Production Control</span>
-// Para:
-<span className="font-semibold text-sm">Shift Report</span>
-// Ou remover completamente
+<aside className="w-52 min-h-screen ...">
 ```
 
-### Parte 7: Header - Adicionar Botao Back
+### 3. Layout.tsx - Atualizar Margem
 
-**Arquivo:** `src/components/Header.tsx`
-
-Adicionar botao de voltar:
+**Antes (linha 17):**
 ```tsx
-import { ArrowLeft } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-
-// No componente:
-const navigate = useNavigate();
-const location = useLocation();
-const canGoBack = location.pathname !== '/';
-
-// No JSX:
-{canGoBack && (
-  <button onClick={() => navigate(-1)} className="btn-secondary p-2">
-    <ArrowLeft size={16} />
-  </button>
-)}
+<main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
 ```
 
-### Parte 8: Corrigir Sign Out
+**Depois:**
+```tsx
+<main className="flex-1 flex flex-col overflow-hidden lg:ml-52 pt-14 lg:pt-0">
+```
 
-**Arquivo:** `src/contexts/AuthContext.tsx`
+### 4. History.tsx - Reduzir Padding
 
-O logout atual parece correto, mas pode haver um problema de redirecionamento. Verificar:
-1. Se o logout limpa completamente o estado
-2. Se redireciona para /login apos logout
+**Antes (linha 136):**
+```tsx
+<div className="flex-1 overflow-auto p-4 sm:p-8">
+```
 
----
-
-## Arquivos a Modificar
-
-| Arquivo | Tipo | Alteracoes |
-|---------|------|------------|
-| `src/components/history/EditShiftDialog.tsx` | Modificar | Adicionar PhotoUpload + StructuredDowntimeForm |
-| `src/pages/Planner.tsx` | Modificar | Remover secao de downtime |
-| `src/components/dashboard/LineStatusCard.tsx` | Modificar | Remover StatusBadge (Running/Warning/Stopped) |
-| `src/pages/Login.tsx` | Modificar | Logo maior, remover textos |
-| `src/components/Sidebar.tsx` | Modificar | Remover "Applied Nutrition", "Production Control", atualizar rodape |
-| `src/components/MobileMenu.tsx` | Modificar | Remover "Production Control" |
-| `src/components/Header.tsx` | Modificar | Adicionar botao Back |
-| `src/contexts/AuthContext.tsx` | Verificar | Corrigir logout se necessario |
+**Depois:**
+```tsx
+<div className="flex-1 overflow-auto p-3 sm:p-4">
+```
 
 ---
 
 ## Resultado Esperado
 
-1. **History Edit**: Supervisor pode adicionar foto e downtime ao editar um shift
-2. **Planner**: Formulario simplificado sem secao de downtime
-3. **Dashboard**: Cards de linha sem badges de status (mais limpo)
-4. **Login**: Logo grande e centralizado como destaque principal
-5. **Navegacao**: Botao Back funcional no header
-6. **Textos**: Rodape padronizado "© 2026 Applied Nutrition. All rights reserved."
+1. **Upload de foto funcionando**: Nomes de arquivo serao sanitizados automaticamente, removendo espacos e acentos antes do upload
+
+2. **Melhor uso do espaco**:
+   - Sidebar: 208px (era 256px) = economia de 48px
+   - Padding reduzido: economia de 16-32px por lado
+   - Total: aproximadamente 100px extras de largura utilizavel
+
+3. **Tabela mais visivel**: Mais colunas visiveis sem scroll horizontal
 
 ---
 
-## Detalhes Tecnicos - EditShiftDialog com Photo e Downtime
+## Detalhes Tecnicos
+
+### Funcao sanitizeFilename Completa
 
 ```tsx
-// Imports adicionais
-import { PhotoUpload } from '@/components/PhotoUpload';
-import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
-import { StructuredDowntime } from '@/types/shift';
-
-// Estados adicionais
-const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
-const [photoFilename, setPhotoFilename] = useState<string | undefined>();
-const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
-
-// useEffect atualizado
-useEffect(() => {
-  if (shift) {
-    // ... estados existentes ...
-    setMonitoringPhoto(shift.monitoringPhoto);
-    setPhotoFilename(shift.photoFilename);
-    setStructuredDowntimes(shift.structuredDowntimes || []);
-  }
-}, [shift]);
-
-// Handler para photo
-const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
-  setMonitoringPhoto(photo);
-  setPhotoFilename(filename);
-};
-
-// handleSubmit atualizado
-const result = await updateShift(shift.id, {
-  // ... campos existentes ...
-  monitoringPhoto,
-  photoFilename,
-  structuredDowntimes,
-});
-
-// JSX - Adicionar antes do DialogFooter:
-<div className="space-y-4 border-t pt-4 mt-4">
-  <h4 className="font-semibold">Monitoring Photo</h4>
-  <PhotoUpload
-    value={monitoringPhoto}
-    filename={photoFilename}
-    onChange={handlePhotoChange}
-  />
-</div>
-
-<div className="space-y-4 border-t pt-4 mt-4">
-  <StructuredDowntimeForm
-    downtimes={structuredDowntimes}
-    onChange={setStructuredDowntimes}
-    downtimeThreshold={60}
-  />
-</div>
+/**
+ * Sanitiza o nome do arquivo para ser compativel com Supabase Storage.
+ * Remove acentos, espacos e caracteres especiais.
+ */
+function sanitizeFilename(filename: string): string {
+  // Separa extensao do nome
+  const lastDot = filename.lastIndexOf('.');
+  const name = lastDot > 0 ? filename.slice(0, lastDot) : filename;
+  const ext = lastDot > 0 ? filename.slice(lastDot) : '';
+  
+  // Sanitiza o nome
+  const safeName = name
+    .normalize('NFD')                    // Decomponhe acentos (e.g., 'é' -> 'e' + marca)
+    .replace(/[\u0300-\u036f]/g, '')     // Remove marcas diacriticas
+    .replace(/[^a-zA-Z0-9._-]/g, '_')    // Substitui caracteres invalidos
+    .replace(/_+/g, '_')                 // Remove underscores consecutivos
+    .replace(/^_|_$/g, '')               // Remove underscores no inicio/fim
+    .toLowerCase()
+    .slice(0, 100);                      // Limita tamanho
+  
+  return safeName + ext.toLowerCase();
+}
 ```
 
+### Teste de Sanitizacao
+
+| Input | Output |
+|-------|--------|
+| `Captura de Tela 2026.png` | `captura_de_tela_2026.png` |
+| `Foto área produção.jpg` | `foto_area_producao.jpg` |
+| `test file (1).PNG` | `test_file_1.png` |
