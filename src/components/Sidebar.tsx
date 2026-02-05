@@ -77,9 +77,9 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Version */}
+      {/* Footer */}
       <div className="px-5 py-3 border-t border-sidebar-border text-xs text-sidebar-foreground/50">
-        <p>Shift Report v1.2.0</p>
+        <p>© 2026 Applied Nutrition. All rights reserved.</p>
       </div>
     </aside>
   );

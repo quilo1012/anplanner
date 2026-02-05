@@ -94,16 +94,15 @@ export function LineStatusCard({
           <div className="flex items-start justify-between gap-2">
             {/* Left: Product Info */}
             <div className="flex-1 min-w-0 space-y-1">
-              {/* Status and Leader Row */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <StatusBadge />
-                {leader && (
+              {/* Leader Row */}
+              {leader && (
+                <div className="flex items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                     <User size={10} />
                     {leader}
                   </span>
-                )}
-              </div>
+                </div>
+              )}
               
               {/* SKU and Product */}
               <div className="space-y-0">

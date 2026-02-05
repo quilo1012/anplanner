@@ -1,5 +1,7 @@
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LiveClock } from '@/components/LiveClock';
+import { ArrowLeft } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
   title: string;
@@ -7,11 +9,24 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const canGoBack = location.pathname !== '/';
+
   return (
     <header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
       <div className="h-12 sm:h-14 px-3 sm:px-4 flex items-center justify-between border-l-4 border-primary">
-        {/* Left: Logo & Title */}
+        {/* Left: Back + Logo & Title */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {canGoBack && (
+            <button
+              onClick={() => navigate(-1)}
+              className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={18} className="text-muted-foreground" />
+            </button>
+          )}
           <img
             alt="Applied Nutrition"
             className="h-7 sm:h-8 w-auto rounded bg-white p-0.5 shrink-0"
