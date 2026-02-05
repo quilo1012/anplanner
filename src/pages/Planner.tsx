@@ -200,7 +200,6 @@ export function Planner() {
           realProduction: row.realProduction,
           observations: formState.observations,
           downtimes: [],
-          structuredDowntimes: formState.structuredDowntimes,
           monitoringPhoto: formState.monitoringPhoto,
           photoFilename: formState.photoFilename,
           staffPlanned: formState.staffPlanned,
