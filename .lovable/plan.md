@@ -1,143 +1,251 @@
 
-# Plano: Maximizar Area de Informacao e Eliminar Espaco em Branco
 
-## Problemas Identificados
+# Plano: Ajustes e Correcoes do Sistema
 
-Apos analisar o codigo, identifiquei as seguintes fontes de espaco em branco:
+## Resumo das Alteracoes
 
-1. **Header muito alto**: O Header atual tem 2 linhas (64px + 32px = 96px total)
-   - Linha principal: Logo, titulo, relogio
-   - Status bar: "System Online", "Production Monitoring Active", versao
+### 1. Supervisor / History / Planner
 
-2. **Padding excessivo**: O conteudo do Dashboard usa `p-4 sm:p-6` que pode ser reduzido
+| Alteracao | Descricao |
+|-----------|-----------|
+| Photo no Edit History | Adicionar upload de foto de monitoramento no EditShiftDialog (apenas ao editar, nao ao criar) |
+| Downtime no History | Adicionar secao para adicionar/editar downtime no EditShiftDialog |
+| Remover Downtime do Planner | Remover a secao StructuredDowntimeForm do Planner (mover para History apenas) |
+| Downtime manual | Permitir digitar reason manualmente quando "Other" selecionado |
 
-3. **Gaps entre elementos**: Os espacos entre cards (`gap-3`, `mb-3`) podem ser compactados
+### 2. Dashboard
+
+| Alteracao | Descricao |
+|-----------|-----------|
+| Remover status badges | Remover os badges "Running", "Warning", "Stopped" do LineStatusCard |
+
+### 3. Login
+
+| Alteracao | Descricao |
+|-----------|-----------|
+| Logo maior | Aumentar tamanho do logo de h-16 para h-24 ou h-32 |
+| Remover "Applied Nutrition" texto | Remover o h1 com texto "Applied Nutrition" abaixo do logo |
+| Remover "Production Control" | Remover subtitulo do Sidebar e MobileMenu |
+| Corrigir Sign Out | Verificar e corrigir problema no logout (EATS) |
+
+### 4. Mensagens / Textos
+
+| Alteracao | Descricao |
+|-----------|-----------|
+| Remover "Applied Nutrition" | Remover texto do Sidebar header |
+| Ajustar rodape | Mudar para "© 2026 Applied Nutrition. All rights reserved." |
+
+### 5. Navegacao
+
+| Alteracao | Descricao |
+|-----------|-----------|
+| Botao Back | Adicionar botao de voltar no Header ou navegacao |
 
 ---
 
-## Solucao Proposta
+## Detalhes de Implementacao
 
-### 1. Compactar o Header (de 2 linhas para 1 linha)
+### Parte 1: EditShiftDialog - Adicionar Photo e Downtime
 
-Unificar a barra principal e status bar em uma unica linha mais eficiente:
+**Arquivo:** `src/components/history/EditShiftDialog.tsx`
 
-**De (96px total):**
-```text
-+------------------------------------------------------------------+
-| [Logo] | PRODUCTION DASHBOARD | [Data] [Relogio] | [Theme]       |  64px
-+------------------------------------------------------------------+
-| [Status: Online] | Production Monitoring | v1.2.0                |  32px
-+------------------------------------------------------------------+
+Adicionar:
+1. Estado para monitoringPhoto e photoFilename
+2. Componente PhotoUpload no formulario
+3. Componente StructuredDowntimeForm para adicionar/editar downtimes
+4. Atualizar handleSubmit para salvar photo e downtimes
+
+```tsx
+// Novos estados
+const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
+const [photoFilename, setPhotoFilename] = useState<string | undefined>();
+const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
+
+// No useEffect
+setMonitoringPhoto(shift.monitoringPhoto);
+setPhotoFilename(shift.photoFilename);
+setStructuredDowntimes(shift.structuredDowntimes || []);
+
+// No formulario, adicionar:
+<PhotoUpload ... />
+<StructuredDowntimeForm ... />
 ```
 
-**Para (48-56px total):**
-```text
-+------------------------------------------------------------------+
-| [Logo] | TITLE + Subtitle | [Status] | [Relogio] [Data] | Theme |  48-56px
-+------------------------------------------------------------------+
+### Parte 2: Planner - Remover Downtime Section
+
+**Arquivo:** `src/pages/Planner.tsx`
+
+Remover:
+- Import do StructuredDowntimeForm
+- Estado structuredDowntimes do formState
+- Secao visual do StructuredDowntimeForm (linhas 472-480 aproximadamente)
+- Remover structuredDowntimes do handleSubmit
+
+### Parte 3: Dashboard - Remover Status Badges
+
+**Arquivo:** `src/components/dashboard/LineStatusCard.tsx`
+
+Remover:
+- O componente StatusBadge (linhas 69-93)
+- A chamada `<StatusBadge />` na linha 124
+
+### Parte 4: Login - Redesenhar Layout
+
+**Arquivo:** `src/pages/Login.tsx`
+
+Alteracoes:
+```tsx
+// Logo maior e centralizado
+<img
+  src="/lovable-uploads/c9db809b-a260-417c-b42f-c908f00093c1.jpg"
+  alt="Applied Nutrition"
+  className="h-28 sm:h-32 w-auto rounded-xl shadow-lg"  // era h-16
+/>
+
+// Remover estas linhas (118-121):
+// <h1 className="text-xl font-bold text-primary tracking-tight">
+//   Applied Nutrition
+// </h1>
+// <p className="text-sm text-muted-foreground mt-1">Shift Report System</p>
 ```
 
-### 2. Reduzir Padding do Conteudo
+### Parte 5: Sidebar - Remover Textos
 
-| Elemento | Atual | Novo |
-|----------|-------|------|
-| Dashboard container | `p-4 sm:p-6` | `p-3 sm:p-4` |
-| Cards gap | `gap-3 mb-3` | `gap-2 mb-2` |
-| Filter bar | `p-3` | `p-2` |
+**Arquivo:** `src/components/Sidebar.tsx`
 
-### 3. Compactar Line Status Cards
+Alteracoes:
+```tsx
+// Linha 27-28: Remover "Applied Nutrition" e "Production Control"
+// Manter apenas o icone ou simplificar o header
 
-- Reduzir padding interno dos cards
-- Diminuir tamanho do icone de fabrica
-- Otimizar informacoes para ocupar menos altura
+// Linha 80-82: Atualizar versao/rodape
+<p>© 2026 Applied Nutrition. All rights reserved.</p>
+```
+
+### Parte 6: MobileMenu - Remover "Production Control"
+
+**Arquivo:** `src/components/MobileMenu.tsx`
+
+Alteracao linha 37:
+```tsx
+// De:
+<span className="font-semibold text-sm">Production Control</span>
+// Para:
+<span className="font-semibold text-sm">Shift Report</span>
+// Ou remover completamente
+```
+
+### Parte 7: Header - Adicionar Botao Back
+
+**Arquivo:** `src/components/Header.tsx`
+
+Adicionar botao de voltar:
+```tsx
+import { ArrowLeft } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+// No componente:
+const navigate = useNavigate();
+const location = useLocation();
+const canGoBack = location.pathname !== '/';
+
+// No JSX:
+{canGoBack && (
+  <button onClick={() => navigate(-1)} className="btn-secondary p-2">
+    <ArrowLeft size={16} />
+  </button>
+)}
+```
+
+### Parte 8: Corrigir Sign Out
+
+**Arquivo:** `src/contexts/AuthContext.tsx`
+
+O logout atual parece correto, mas pode haver um problema de redirecionamento. Verificar:
+1. Se o logout limpa completamente o estado
+2. Se redireciona para /login apos logout
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/Header.tsx` | Unificar em 1 linha compacta (h-12 ao inves de h-16 + h-8) |
-| `src/pages/Dashboard.tsx` | Reduzir paddings e gaps |
-| `src/components/dashboard/LineStatusCard.tsx` | Compactar layout interno |
-
----
-
-## Exemplo Visual do Novo Header
-
-```text
-[Logo] PRODUCTION DASHBOARD         [*] Online  04 Feb  14:35:22  [☀]
-       DAY Shift - 04 February 2026
-```
-
-**Caracteristicas:**
-- Altura total: ~48-56px (antes 96px = economia de 40-48px)
-- Indicador de status compacto (apenas ponto verde + "Online")
-- Relogio e data lado a lado
-- Sem barra de status separada
-- Removida informacao "Production Monitoring Active" e versao (redundantes)
+| Arquivo | Tipo | Alteracoes |
+|---------|------|------------|
+| `src/components/history/EditShiftDialog.tsx` | Modificar | Adicionar PhotoUpload + StructuredDowntimeForm |
+| `src/pages/Planner.tsx` | Modificar | Remover secao de downtime |
+| `src/components/dashboard/LineStatusCard.tsx` | Modificar | Remover StatusBadge (Running/Warning/Stopped) |
+| `src/pages/Login.tsx` | Modificar | Logo maior, remover textos |
+| `src/components/Sidebar.tsx` | Modificar | Remover "Applied Nutrition", "Production Control", atualizar rodape |
+| `src/components/MobileMenu.tsx` | Modificar | Remover "Production Control" |
+| `src/components/Header.tsx` | Modificar | Adicionar botao Back |
+| `src/contexts/AuthContext.tsx` | Verificar | Corrigir logout se necessario |
 
 ---
 
 ## Resultado Esperado
 
-| Metrica | Antes | Depois | Economia |
-|---------|-------|--------|----------|
-| Header altura | 96px | 48-56px | ~40-48px |
-| Padding topo conteudo | 24px | 12-16px | ~8-12px |
-| Gap entre cards | 12px | 8px | ~4px por gap |
-
-**Total estimado de espaco recuperado: 60-80px verticais**, permitindo que mais informacao seja visivel sem scroll.
+1. **History Edit**: Supervisor pode adicionar foto e downtime ao editar um shift
+2. **Planner**: Formulario simplificado sem secao de downtime
+3. **Dashboard**: Cards de linha sem badges de status (mais limpo)
+4. **Login**: Logo grande e centralizado como destaque principal
+5. **Navegacao**: Botao Back funcional no header
+6. **Textos**: Rodape padronizado "© 2026 Applied Nutrition. All rights reserved."
 
 ---
 
-## Detalhes Tecnicos
-
-### Header.tsx - Novo Layout
+## Detalhes Tecnicos - EditShiftDialog com Photo e Downtime
 
 ```tsx
-<header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
-  <div className="h-12 sm:h-14 px-3 sm:px-4 flex items-center justify-between border-l-4 border-primary">
-    {/* Logo e Titulo */}
-    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-      <img src="..." className="h-7 sm:h-8 ..." />
-      <div>
-        <h1 className="text-sm sm:text-base font-bold ...">{title}</h1>
-        <p className="text-[10px] sm:text-xs ...">{subtitle}</p>
-      </div>
-    </div>
-    
-    {/* Status + Relogio + Tema (tudo em 1 linha) */}
-    <div className="flex items-center gap-2 sm:gap-3">
-      <StatusIndicator />  {/* Ponto verde + "Online" */}
-      <LiveClock />
-      <ThemeToggle />
-    </div>
-  </div>
-</header>
+// Imports adicionais
+import { PhotoUpload } from '@/components/PhotoUpload';
+import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
+import { StructuredDowntime } from '@/types/shift';
+
+// Estados adicionais
+const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
+const [photoFilename, setPhotoFilename] = useState<string | undefined>();
+const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
+
+// useEffect atualizado
+useEffect(() => {
+  if (shift) {
+    // ... estados existentes ...
+    setMonitoringPhoto(shift.monitoringPhoto);
+    setPhotoFilename(shift.photoFilename);
+    setStructuredDowntimes(shift.structuredDowntimes || []);
+  }
+}, [shift]);
+
+// Handler para photo
+const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
+  setMonitoringPhoto(photo);
+  setPhotoFilename(filename);
+};
+
+// handleSubmit atualizado
+const result = await updateShift(shift.id, {
+  // ... campos existentes ...
+  monitoringPhoto,
+  photoFilename,
+  structuredDowntimes,
+});
+
+// JSX - Adicionar antes do DialogFooter:
+<div className="space-y-4 border-t pt-4 mt-4">
+  <h4 className="font-semibold">Monitoring Photo</h4>
+  <PhotoUpload
+    value={monitoringPhoto}
+    filename={photoFilename}
+    onChange={handlePhotoChange}
+  />
+</div>
+
+<div className="space-y-4 border-t pt-4 mt-4">
+  <StructuredDowntimeForm
+    downtimes={structuredDowntimes}
+    onChange={setStructuredDowntimes}
+    downtimeThreshold={60}
+  />
+</div>
 ```
 
-### Dashboard.tsx - Reducao de Espacamento
-
-```tsx
-// Container principal
-<div className="flex-1 overflow-auto p-3 sm:p-4 print:p-0">
-
-// Filter bar
-<div className="card p-2 mb-2 no-print">
-
-// Cards layout
-<div className="flex gap-2 mb-2">
-  <div className="flex-1 space-y-1.5 min-w-0">
-```
-
-### LineStatusCard.tsx - Layout Compacto
-
-```tsx
-// Reducao de padding
-<div className="flex-1 p-2 min-w-0">
-
-// Reducao de icone e badge
-<Factory size={16} />
-<span className="text-[10px] font-bold ...">{lineName}</span>
-```
