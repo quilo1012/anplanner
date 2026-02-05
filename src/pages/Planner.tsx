@@ -20,7 +20,6 @@ interface PlannerFormState {
   lineLeader: string;
   skuRows: SkuRow[];
   observations: string;
-  structuredDowntimes: StructuredDowntime[];
   monitoringPhoto?: string;
   photoFilename?: string;
   staffPlanned: number;
