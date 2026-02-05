@@ -99,10 +99,6 @@ export function Planner() {
     setFormState(prev => ({ ...prev, skuRows: rows }));
   };
 
-  const handleStructuredDowntimesChange = (downtimes: StructuredDowntime[]) => {
-    setFormState(prev => ({ ...prev, structuredDowntimes: downtimes }));
-  };
-
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
     setFormState(prev => ({ 
       ...prev, 
