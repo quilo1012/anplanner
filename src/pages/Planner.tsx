@@ -227,7 +227,6 @@ export function Planner() {
             realProduction: row.realProduction,
             observations: formState.observations,
             downtimes: [],
-            structuredDowntimes: isFirstShift ? formState.structuredDowntimes : [],
             monitoringPhoto: formState.monitoringPhoto,
             photoFilename: formState.photoFilename,
             staffPlanned: formState.staffPlanned,
