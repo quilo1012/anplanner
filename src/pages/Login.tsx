@@ -122,9 +122,7 @@ export function Login() {
 
           {/* Title */}
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-foreground">
-              {isSignup ? 'Create Account' : 'Welcome Back'}
-            </h2>
+            
           </div>
 
           {/* Error Message */}
