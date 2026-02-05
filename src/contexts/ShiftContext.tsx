@@ -149,6 +149,27 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   }, [authLoading, refreshShifts]);
 
+  /**
+   * Sanitizes filename for Supabase Storage compatibility.
+   * Removes accents, spaces and special characters.
+   */
+  const sanitizeFilename = (filename: string): string => {
+    const lastDot = filename.lastIndexOf('.');
+    const name = lastDot > 0 ? filename.slice(0, lastDot) : filename;
+    const ext = lastDot > 0 ? filename.slice(lastDot) : '';
+    
+    const safeName = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .toLowerCase()
+      .slice(0, 100);
+    
+    return safeName + ext.toLowerCase();
+  };
+
   const uploadPhoto = async (base64Photo: string, filename: string): Promise<string | null> => {
     try {
       // Convert base64 to blob
@@ -161,7 +182,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      const filePath = `${Date.now()}-${filename}`;
+      const safeName = sanitizeFilename(filename);
+      const filePath = `${Date.now()}-${safeName}`;
 
       const { data, error } = await supabase.storage
         .from('monitoring-photos')

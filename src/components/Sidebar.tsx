@@ -16,7 +16,7 @@ export function Sidebar() {
   const filteredNavItems = navItems.filter(item => hasRole(item.roles as any));
 
   return (
-    <aside className="w-64 min-h-screen bg-sidebar text-sidebar-foreground flex flex-col fixed lg:static h-screen">
+    <aside className="w-52 min-h-screen bg-sidebar text-sidebar-foreground flex flex-col fixed lg:static h-screen">
       {/* Logo Header */}
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
