@@ -451,18 +451,6 @@ export function Planner() {
                   />
                 </div>
 
-                {/* Structured Downtime Section */}
-                <div className="mb-6 p-4 bg-muted rounded-lg">
-                  <StructuredDowntimeForm
-                    downtimes={formState.structuredDowntimes || []}
-                    onChange={handleStructuredDowntimesChange}
-                    downtimeThreshold={60}
-                  />
-                  {errors.downtimes && (
-                    <p className="text-sm text-destructive mt-2">{errors.downtimes}</p>
-                  )}
-                </div>
-
                 {/* Photo Upload */}
                 <div className="p-4 bg-muted rounded-lg">
                   <PhotoUpload

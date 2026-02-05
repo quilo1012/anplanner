@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ShiftReport, ShiftType, SHIFT_TYPES } from '@/types/shift';
+import { ShiftReport, ShiftType, SHIFT_TYPES, StructuredDowntime } from '@/types/shift';
 import { useShifts } from '@/contexts/ShiftContext';
+import { PhotoUpload } from '@/components/PhotoUpload';
+import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
 import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,6 +35,11 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
   const [staffPlanned, setStaffPlanned] = useState(0);
   const [staffActual, setStaffActual] = useState(0);
   const [observations, setObservations] = useState('');
+  
+  // Photo and Downtime state
+  const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
+  const [photoFilename, setPhotoFilename] = useState<string | undefined>();
+  const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
 
   // Reset form when shift changes
   useEffect(() => {
@@ -48,8 +55,16 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
       setStaffPlanned(shift.staffPlanned);
       setStaffActual(shift.staffActual);
       setObservations(shift.observations);
+      setMonitoringPhoto(shift.monitoringPhoto);
+      setPhotoFilename(shift.photoFilename);
+      setStructuredDowntimes(shift.structuredDowntimes || []);
     }
   }, [shift]);
+
+  const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
+    setMonitoringPhoto(photo);
+    setPhotoFilename(filename);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,9 +83,9 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
         realProduction,
         observations,
         downtimes: shift.downtimes,
-        structuredDowntimes: shift.structuredDowntimes,
-        monitoringPhoto: shift.monitoringPhoto,
-        photoFilename: shift.photoFilename,
+        structuredDowntimes,
+        monitoringPhoto,
+        photoFilename,
         staffPlanned,
         staffActual,
       });
@@ -95,11 +110,11 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Shift Record</DialogTitle>
           <DialogDescription>
-            Update the production record details. All linked SKUs and downtimes will be preserved.
+            Update the production record details including photo and downtime records.
           </DialogDescription>
         </DialogHeader>
 
@@ -239,7 +254,26 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
             />
           </div>
 
-          <DialogFooter>
+          {/* Monitoring Photo Section */}
+          <div className="space-y-3 border-t pt-4">
+            <h4 className="font-semibold text-foreground">Monitoring Photo</h4>
+            <PhotoUpload
+              photo={monitoringPhoto}
+              filename={photoFilename}
+              onChange={handlePhotoChange}
+            />
+          </div>
+
+          {/* Downtime Section */}
+          <div className="space-y-3 border-t pt-4">
+            <StructuredDowntimeForm
+              downtimes={structuredDowntimes}
+              onChange={setStructuredDowntimes}
+              downtimeThreshold={60}
+            />
+          </div>
+
+          <DialogFooter className="pt-4">
             <Button
               type="button"
               variant="outline"
