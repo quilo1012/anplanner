@@ -73,7 +73,6 @@ export function Planner() {
             realProduction: shift.realProduction || 0,
           }],
           observations: shift.observations,
-          structuredDowntimes: shift.structuredDowntimes || [],
           monitoringPhoto: shift.monitoringPhoto,
           photoFilename: shift.photoFilename,
           staffPlanned: shift.staffPlanned || 0,
