@@ -33,7 +33,6 @@ const createInitialState = (): PlannerFormState => ({
   lineLeader: '',
   skuRows: [createEmptySkuRow()],
   observations: '',
-  structuredDowntimes: [],
   monitoringPhoto: undefined,
   photoFilename: undefined,
   staffPlanned: 0,
