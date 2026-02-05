@@ -31,10 +31,12 @@ export function MobileMenu() {
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-sidebar text-sidebar-foreground z-40 flex items-center justify-between px-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <Factory size={18} className="text-sidebar-primary-foreground" />
-          </div>
-          <span className="font-semibold text-sm">Production Control</span>
+          <img
+            src="/lovable-uploads/30acb027-2373-44c6-beeb-e940da9f52c7.jpg"
+            alt="Applied Nutrition"
+            className="h-8 w-auto rounded-lg bg-white p-0.5"
+          />
+          <span className="font-semibold text-sm">Shift Report</span>
         </div>
         <button 
           onClick={() => setIsOpen(!isOpen)} 

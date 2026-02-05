@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
-import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
 import { SkuRowForm } from '@/components/SkuRowForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { ExcelUpload } from '@/components/ExcelUpload';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftFormData, ShiftType, StructuredDowntime, SHIFT_TYPES } from '@/types/shift';
+import { ShiftFormData, ShiftType, SHIFT_TYPES } from '@/types/shift';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +20,6 @@ interface PlannerFormState {
   lineLeader: string;
   skuRows: SkuRow[];
   observations: string;
-  structuredDowntimes: StructuredDowntime[];
   monitoringPhoto?: string;
   photoFilename?: string;
   staffPlanned: number;
@@ -35,7 +33,6 @@ const createInitialState = (): PlannerFormState => ({
   lineLeader: '',
   skuRows: [createEmptySkuRow()],
   observations: '',
-  structuredDowntimes: [],
   monitoringPhoto: undefined,
   photoFilename: undefined,
   staffPlanned: 0,
@@ -76,7 +73,6 @@ export function Planner() {
             realProduction: shift.realProduction || 0,
           }],
           observations: shift.observations,
-          structuredDowntimes: shift.structuredDowntimes || [],
           monitoringPhoto: shift.monitoringPhoto,
           photoFilename: shift.photoFilename,
           staffPlanned: shift.staffPlanned || 0,
@@ -101,10 +97,6 @@ export function Planner() {
 
   const handleSkuRowsChange = (rows: SkuRow[]) => {
     setFormState(prev => ({ ...prev, skuRows: rows }));
-  };
-
-  const handleStructuredDowntimesChange = (downtimes: StructuredDowntime[]) => {
-    setFormState(prev => ({ ...prev, structuredDowntimes: downtimes }));
   };
 
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
@@ -154,14 +146,6 @@ export function Planner() {
           newErrors[`sku_${row.id}`] = 'SKU is required';
         }
       });
-    }
-
-    // Validate structured downtimes - "Other" category requires comment
-    const invalidDowntimes = formState.structuredDowntimes?.filter(
-      d => d.category === 'other' && !d.comment?.trim()
-    );
-    if (invalidDowntimes && invalidDowntimes.length > 0) {
-      newErrors.downtimes = 'Comment is required for "Other" category downtimes';
     }
 
     setErrors(newErrors);
@@ -216,7 +200,6 @@ export function Planner() {
           realProduction: row.realProduction,
           observations: formState.observations,
           downtimes: [],
-          structuredDowntimes: formState.structuredDowntimes,
           monitoringPhoto: formState.monitoringPhoto,
           photoFilename: formState.photoFilename,
           staffPlanned: formState.staffPlanned,
@@ -244,7 +227,6 @@ export function Planner() {
             realProduction: row.realProduction,
             observations: formState.observations,
             downtimes: [],
-            structuredDowntimes: isFirstShift ? formState.structuredDowntimes : [],
             monitoringPhoto: formState.monitoringPhoto,
             photoFilename: formState.photoFilename,
             staffPlanned: formState.staffPlanned,
@@ -467,18 +449,6 @@ export function Planner() {
                     maxLength={500}
                     disabled={!canReview}
                   />
-                </div>
-
-                {/* Structured Downtime Section */}
-                <div className="mb-6 p-4 bg-muted rounded-lg">
-                  <StructuredDowntimeForm
-                    downtimes={formState.structuredDowntimes || []}
-                    onChange={handleStructuredDowntimesChange}
-                    downtimeThreshold={60}
-                  />
-                  {errors.downtimes && (
-                    <p className="text-sm text-destructive mt-2">{errors.downtimes}</p>
-                  )}
                 </div>
 
                 {/* Photo Upload */}

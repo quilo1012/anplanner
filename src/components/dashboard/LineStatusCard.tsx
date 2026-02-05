@@ -66,31 +66,6 @@ export function LineStatusCard({
   const borderStyle = LINE_COLORS[lineName] || 'border-l-industrial-blue bg-gradient-to-r from-industrial-blue/5 to-transparent';
   const headerColor = LINE_HEADER_COLORS[lineName] || 'bg-industrial-blue';
   
-  const StatusBadge = () => {
-    switch (status) {
-      case 'running':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-success/15 text-success border border-success/30">
-            <Play size={10} className="fill-current" />
-            Running
-          </span>
-        );
-      case 'stopped':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/30">
-            <Pause size={10} />
-            Stopped
-          </span>
-        );
-      case 'warning':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-warning/15 text-warning border border-warning/30">
-            <AlertTriangle size={10} />
-            Warning
-          </span>
-        );
-    }
-  };
 
   return (
     <div className={cn(
@@ -119,16 +94,15 @@ export function LineStatusCard({
           <div className="flex items-start justify-between gap-2">
             {/* Left: Product Info */}
             <div className="flex-1 min-w-0 space-y-1">
-              {/* Status and Leader Row */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <StatusBadge />
-                {leader && (
+              {/* Leader Row */}
+              {leader && (
+                <div className="flex items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                     <User size={10} />
                     {leader}
                   </span>
-                )}
-              </div>
+                </div>
+              )}
               
               {/* SKU and Product */}
               <div className="space-y-0">

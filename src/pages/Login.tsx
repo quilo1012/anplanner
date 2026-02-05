@@ -106,19 +106,15 @@ export function Login() {
       <div className="w-full max-w-md">
         {/* Login Card */}
         <div className="bg-card rounded-xl border border-border shadow-xl p-6 sm:p-8">
-          {/* Logo & Branding */}
-          <div className="text-center mb-6">
-            <div className="mx-auto mb-4 flex justify-center">
+          {/* Logo - Prominent Display */}
+          <div className="text-center mb-8">
+            <div className="mx-auto flex justify-center">
               <img
                 src="/lovable-uploads/c9db809b-a260-417c-b42f-c908f00093c1.jpg"
                 alt="Applied Nutrition"
-                className="h-16 w-auto rounded-lg shadow-md"
+                className="h-28 sm:h-32 w-auto rounded-xl shadow-lg"
               />
             </div>
-            <h1 className="text-xl font-bold text-primary tracking-tight">
-              Applied Nutrition
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">Shift Report System</p>
           </div>
 
           {/* Title */}
