@@ -20,12 +20,13 @@ export function Sidebar() {
       {/* Logo Header */}
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <Factory size={24} className="text-sidebar-primary-foreground" />
-          </div>
+          <img
+            src="/lovable-uploads/30acb027-2373-44c6-beeb-e940da9f52c7.jpg"
+            alt="Applied Nutrition"
+            className="h-10 w-auto rounded-lg bg-white p-0.5"
+          />
           <div>
-            <h1 className="text-base font-bold leading-tight text-sidebar-foreground">Applied Nutrition</h1>
-            <p className="text-xs text-sidebar-foreground/70">Production Control</p>
+            <h1 className="text-base font-bold leading-tight text-sidebar-foreground">Shift Report</h1>
           </div>
         </div>
       </div>
