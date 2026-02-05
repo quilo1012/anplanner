@@ -148,14 +148,6 @@ export function Planner() {
       });
     }
 
-    // Validate structured downtimes - "Other" category requires comment
-    const invalidDowntimes = formState.structuredDowntimes?.filter(
-      d => d.category === 'other' && !d.comment?.trim()
-    );
-    if (invalidDowntimes && invalidDowntimes.length > 0) {
-      newErrors.downtimes = 'Comment is required for "Other" category downtimes';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
