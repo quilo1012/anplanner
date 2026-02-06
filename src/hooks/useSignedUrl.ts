@@ -21,17 +21,18 @@ export function useSignedUrl(path: string | undefined, expiresIn: number = 3600)
       return;
     }
 
-    // If it's already a signed URL or a data URL, use it directly
-    if (path.startsWith('data:') || path.includes('token=')) {
+    // For base64 data URLs, use directly (not uploaded yet)
+    if (path.startsWith('data:')) {
       setSignedUrl(path);
       return;
     }
 
-    // If it's a full URL but not signed, try to extract the path
+    // Extract the file path from any URL format
     let storagePath = path;
-    if (path.includes('/storage/v1/object/public/')) {
-      // Extract path from public URL format
-      const match = path.match(/\/monitoring-photos\/(.+)$/);
+    
+    // Handle signed or public URLs: extract path before ?token= or after /monitoring-photos/
+    if (path.includes('/monitoring-photos/')) {
+      const match = path.match(/\/monitoring-photos\/([^?]+)/);
       if (match) {
         storagePath = match[1];
       }
@@ -49,15 +50,14 @@ export function useSignedUrl(path: string | undefined, expiresIn: number = 3600)
         if (urlError) {
           console.error('Error creating signed URL:', urlError);
           setError(urlError.message);
-          // Fallback: try using the original path
-          setSignedUrl(path);
+          setSignedUrl(null);
         } else if (data) {
           setSignedUrl(data.signedUrl);
         }
       } catch (err) {
         console.error('Error fetching signed URL:', err);
         setError(err instanceof Error ? err.message : 'Failed to get signed URL');
-        setSignedUrl(path);
+        setSignedUrl(null);
       } finally {
         setIsLoading(false);
       }
