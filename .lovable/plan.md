@@ -1,200 +1,185 @@
 
-# Plano: Corrigir Upload de Foto e Otimizar Layout
+# Plano: Corrigir Exibicao de Fotos do Monitoramento
 
-## Problema 1: Imagem do Monitoramento Nao Esta Sendo Salva
+## Problema Identificado
 
-### Causa Raiz
-O erro encontrado nos network logs mostra:
+Atraves da analise dos network logs e codigo, identifiquei a causa raiz:
+
+### Upload funciona corretamente
+Os logs mostram que as imagens estao sendo salvas com sucesso:
 ```
-Status: 400 (Bad Request)
-Error: InvalidKey: Invalid key: 1770298537266-Captura de Tela 2026-02-02 às 21.28.56.png
+monitoring_photo_url: "https://...supabase.co/storage/v1/object/sign/monitoring-photos/...?token=..."
 ```
 
-O Supabase Storage NAO aceita caracteres especiais no nome do arquivo:
-- Espacos
-- Acentos (a, e, i, o, u)
-- Caracteres especiais
+### Problema: URLs Assinadas Expiram
 
-### Solucao
-Sanitizar o nome do arquivo antes do upload no `ShiftContext.tsx`:
+1. **No upload**: O sistema salva uma URL assinada com validade de 1 hora no banco de dados
+2. **Ao exibir**: O hook `useSignedUrl` verifica se a URL ja tem `token=` e a usa diretamente
+3. **Resultado**: Apos 1 hora, a URL expira e a imagem nao carrega mais
 
+**Codigo problematico em `useSignedUrl.ts` (linha 25):**
 ```tsx
-// Funcao para sanitizar nome de arquivo
-function sanitizeFilename(filename: string): string {
-  return filename
-    .normalize('NFD')                    // Decompose acentos
-    .replace(/[\u0300-\u036f]/g, '')     // Remove diacriticos
-    .replace(/[^a-zA-Z0-9._-]/g, '_')    // Substitui caracteres especiais por _
-    .replace(/_+/g, '_')                 // Remove underscores duplicados
-    .toLowerCase();
+if (path.startsWith('data:') || path.includes('token=')) {
+  setSignedUrl(path);  // USA URL EXPIRADA!
+  return;
+}
+```
+
+---
+
+## Solucao
+
+### 1. Armazenar APENAS o Path, nao a URL Assinada
+
+Mudar o `ShiftContext.tsx` para salvar apenas o path do arquivo (ex: `1770299217210-foto.png`) ao inves da URL assinada completa.
+
+**De:**
+```tsx
+return signedUrlData.signedUrl;  // Salva URL assinada (expira)
+```
+
+**Para:**
+```tsx
+return data.path;  // Salva apenas o path (permanente)
+```
+
+### 2. Corrigir o Hook `useSignedUrl`
+
+Atualizar a logica para:
+- Extrair o path de URLs assinadas antigas
+- Sempre regenerar uma nova signed URL
+
+**Logica corrigida:**
+```tsx
+// Extrair path de URLs assinadas ou publicas
+let storagePath = path;
+
+// Se a URL contem '/monitoring-photos/', extrair o path
+if (path.includes('/monitoring-photos/')) {
+  const match = path.match(/\/monitoring-photos\/([^?]+)/);
+  if (match) {
+    storagePath = match[1];
+  }
 }
 
-// Uso na funcao uploadPhoto:
-const safeName = sanitizeFilename(filename);
-const filePath = `${Date.now()}-${safeName}`;
+// Sempre regenerar signed URL (mesmo se tinha token=)
+const { data, error } = await supabase.storage
+  .from('monitoring-photos')
+  .createSignedUrl(storagePath, 3600);
 ```
 
-### Arquivo a Modificar
+---
+
+## Arquivos a Modificar
+
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/contexts/ShiftContext.tsx` | Adicionar sanitizacao do filename nas linhas 152-194 |
-
----
-
-## Problema 2: Sidebar Grande, Conteudo Usando Metade do Espaco
-
-### Causa Raiz
-Apos analise do layout:
-
-1. **Sidebar** (`w-64` = 256px) - tamanho adequado
-2. **Main content** - tem `flex-1` mas padding excessivo (`p-4 sm:p-8`)
-3. **History page** - tabela com colunas fixas que nao expandem
-
-O problema real e que o conteudo tem muito padding e a tabela nao aproveita a largura total.
-
-### Solucao
-
-#### Opcao A: Reduzir Sidebar (de 256px para 200-220px)
-```tsx
-// Sidebar.tsx
-<aside className="w-52 ..." >  // 208px ao inves de 256px
-
-// Layout.tsx  
-<main className="... lg:ml-52 ...">
-```
-
-#### Opcao B: Otimizar Area de Conteudo (Recomendada)
-1. Reduzir padding das paginas
-2. Fazer tabela usar 100% da largura
-3. Permitir scroll horizontal apenas quando necessario
-
-```tsx
-// History.tsx
-<div className="flex-1 overflow-auto p-3 sm:p-4">  // era p-4 sm:p-8
-
-// Tabela: usar layout fixo para melhor controle
-<table className="table w-full table-fixed">
-```
-
-### Arquivos a Modificar
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/Sidebar.tsx` | Reduzir largura para `w-52` (208px) |
-| `src/components/Layout.tsx` | Atualizar margem para `lg:ml-52` |
-| `src/pages/History.tsx` | Reduzir padding para `p-3 sm:p-4` |
-
----
-
-## Resumo das Alteracoes
-
-### 1. ShiftContext.tsx - Sanitizar Filename
-
-**Antes (linha 164):**
-```tsx
-const filePath = `${Date.now()}-${filename}`;
-```
-
-**Depois:**
-```tsx
-// Adicionar funcao sanitizadora
-function sanitizeFilename(filename: string): string {
-  return filename
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/_+/g, '_')
-    .toLowerCase();
-}
-
-// Na funcao uploadPhoto:
-const safeName = sanitizeFilename(filename);
-const filePath = `${Date.now()}-${safeName}`;
-```
-
-### 2. Sidebar.tsx - Reduzir Largura
-
-**Antes (linha 19):**
-```tsx
-<aside className="w-64 min-h-screen ...">
-```
-
-**Depois:**
-```tsx
-<aside className="w-52 min-h-screen ...">
-```
-
-### 3. Layout.tsx - Atualizar Margem
-
-**Antes (linha 17):**
-```tsx
-<main className="flex-1 flex flex-col overflow-hidden lg:ml-64 pt-14 lg:pt-0">
-```
-
-**Depois:**
-```tsx
-<main className="flex-1 flex flex-col overflow-hidden lg:ml-52 pt-14 lg:pt-0">
-```
-
-### 4. History.tsx - Reduzir Padding
-
-**Antes (linha 136):**
-```tsx
-<div className="flex-1 overflow-auto p-4 sm:p-8">
-```
-
-**Depois:**
-```tsx
-<div className="flex-1 overflow-auto p-3 sm:p-4">
-```
-
----
-
-## Resultado Esperado
-
-1. **Upload de foto funcionando**: Nomes de arquivo serao sanitizados automaticamente, removendo espacos e acentos antes do upload
-
-2. **Melhor uso do espaco**:
-   - Sidebar: 208px (era 256px) = economia de 48px
-   - Padding reduzido: economia de 16-32px por lado
-   - Total: aproximadamente 100px extras de largura utilizavel
-
-3. **Tabela mais visivel**: Mais colunas visiveis sem scroll horizontal
+| `src/contexts/ShiftContext.tsx` | Salvar apenas `data.path` ao inves de `signedUrl` |
+| `src/hooks/useSignedUrl.ts` | Corrigir extracao de path e sempre regenerar URL |
 
 ---
 
 ## Detalhes Tecnicos
 
-### Funcao sanitizeFilename Completa
+### ShiftContext.tsx - Salvar Path ao inves de URL
 
+**Linha 200-211, mudar de:**
 ```tsx
-/**
- * Sanitiza o nome do arquivo para ser compativel com Supabase Storage.
- * Remove acentos, espacos e caracteres especiais.
- */
-function sanitizeFilename(filename: string): string {
-  // Separa extensao do nome
-  const lastDot = filename.lastIndexOf('.');
-  const name = lastDot > 0 ? filename.slice(0, lastDot) : filename;
-  const ext = lastDot > 0 ? filename.slice(lastDot) : '';
-  
-  // Sanitiza o nome
-  const safeName = name
-    .normalize('NFD')                    // Decomponhe acentos (e.g., 'é' -> 'e' + marca)
-    .replace(/[\u0300-\u036f]/g, '')     // Remove marcas diacriticas
-    .replace(/[^a-zA-Z0-9._-]/g, '_')    // Substitui caracteres invalidos
-    .replace(/_+/g, '_')                 // Remove underscores consecutivos
-    .replace(/^_|_$/g, '')               // Remove underscores no inicio/fim
-    .toLowerCase()
-    .slice(0, 100);                      // Limita tamanho
-  
-  return safeName + ext.toLowerCase();
+// Create signed URL (valid for 1 hour)
+const { data: signedUrlData, error: urlError } = await supabase.storage
+  .from('monitoring-photos')
+  .createSignedUrl(data.path, 3600);
+
+if (urlError || !signedUrlData) {
+  return data.path;
 }
+
+return signedUrlData.signedUrl;
 ```
 
-### Teste de Sanitizacao
+**Para:**
+```tsx
+// Return just the path - signed URL will be generated when displaying
+return data.path;
+```
 
-| Input | Output |
-|-------|--------|
-| `Captura de Tela 2026.png` | `captura_de_tela_2026.png` |
-| `Foto área produção.jpg` | `foto_area_producao.jpg` |
-| `test file (1).PNG` | `test_file_1.png` |
+### useSignedUrl.ts - Corrigir Logica de Extracao
+
+**Substituir linhas 18-67 com:**
+```tsx
+useEffect(() => {
+  if (!path) {
+    setSignedUrl(null);
+    return;
+  }
+
+  // For base64 data URLs, use directly (not uploaded yet)
+  if (path.startsWith('data:')) {
+    setSignedUrl(path);
+    return;
+  }
+
+  // Extract the file path from any URL format
+  let storagePath = path;
+  
+  // Handle signed URLs: extract path before ?token=
+  if (path.includes('/monitoring-photos/')) {
+    const match = path.match(/\/monitoring-photos\/([^?]+)/);
+    if (match) {
+      storagePath = match[1];
+    }
+  }
+  
+  // If it's already just a filename/path (no http), use it
+  if (!storagePath.startsWith('http')) {
+    // storagePath is ready
+  }
+
+  const fetchSignedUrl = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: urlError } = await supabase.storage
+        .from('monitoring-photos')
+        .createSignedUrl(storagePath, expiresIn);
+
+      if (urlError) {
+        console.error('Error creating signed URL:', urlError);
+        setError(urlError.message);
+        setSignedUrl(null);
+      } else if (data) {
+        setSignedUrl(data.signedUrl);
+      }
+    } catch (err) {
+      console.error('Error fetching signed URL:', err);
+      setError(err instanceof Error ? err.message : 'Failed to get signed URL');
+      setSignedUrl(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchSignedUrl();
+}, [path, expiresIn]);
+```
+
+---
+
+## Dados Existentes
+
+As URLs assinadas antigas ja salvas no banco continuarao funcionando porque a nova logica extrai o path de qualquer formato:
+
+| Formato no Banco | Path Extraido |
+|------------------|---------------|
+| `1770299217210-foto.png` | `1770299217210-foto.png` |
+| `https://.../monitoring-photos/1770299217210-foto.png?token=...` | `1770299217210-foto.png` |
+
+---
+
+## Resultado Esperado
+
+1. **Novos uploads**: Salvam apenas o path (ex: `1770299217210-foto.png`)
+2. **Exibicao**: Sempre regenera uma nova signed URL valida por 1 hora
+3. **Dados antigos**: Continuam funcionando com a extracao automatica do path
+4. **Performance**: Signed URLs sao cacheadas no estado do componente durante a sessao
