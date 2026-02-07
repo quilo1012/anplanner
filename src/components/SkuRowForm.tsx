@@ -8,6 +8,7 @@ interface SkuRowFormProps {
   onChange: (rows: SkuRow[]) => void;
   canReview?: boolean;
   errors?: Record<string, string>;
+  showTarget?: boolean; // When false, hides target field (default: true)
 }
 
 // Planner SKU Form - Now captures Target and Real Production per SKU
@@ -15,7 +16,8 @@ export function SkuRowForm({
   skuRows, 
   onChange, 
   canReview = false,
-  errors = {}
+  errors = {},
+  showTarget = true, // Default to true for backward compatibility
 }: SkuRowFormProps) {
   const addSkuRow = () => {
     onChange([...skuRows, createEmptySkuRow()]);
@@ -202,33 +204,35 @@ export function SkuRowForm({
                 )}
 
                 {/* Target and Real Production Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-border">
-                  {/* Target */}
-                  <div>
-                    <label className="label text-xs flex items-center gap-1">
-                      <Target size={12} className="text-primary" />
-                      Production Target
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={row.productionTarget || ''}
-                        onChange={e => updateSkuRow(row.id, 'productionTarget', parseInt(e.target.value) || 0)}
-                        placeholder="0"
-                        min="0"
-                        className="input-field text-sm pr-12"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                        units
-                      </span>
-                    </div>
-                    {row.productionTarget > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <Clock size={10} />
-                        {(row.productionTarget / 570).toFixed(2)} units/min
+                <div className={`grid grid-cols-1 ${showTarget ? 'md:grid-cols-2' : ''} gap-3 pt-3 border-t border-border`}>
+                  {/* Target - Only show when showTarget is true */}
+                  {showTarget && (
+                    <div>
+                      <label className="label text-xs flex items-center gap-1">
+                        <Target size={12} className="text-primary" />
+                        Production Target
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={row.productionTarget || ''}
+                          onChange={e => updateSkuRow(row.id, 'productionTarget', parseInt(e.target.value) || 0)}
+                          placeholder="0"
+                          min="0"
+                          className="input-field text-sm pr-12"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                          units
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      {row.productionTarget > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <Clock size={10} />
+                          {(row.productionTarget / 570).toFixed(2)} units/min
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Real Production */}
                   <div>
