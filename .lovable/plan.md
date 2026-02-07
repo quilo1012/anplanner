@@ -1,72 +1,103 @@
 
-# Plano: Corrigir Exibicao de Fotos do Monitoramento
+# Plano: Corrigir Formulario de Edicao - Target Unico e Salvamento de SKUs
 
-## Problema Identificado
+## Problema 1: Target Repetido por SKU
 
-Atraves da analise dos network logs e codigo, identifiquei a causa raiz:
+### Situacao Atual
+O campo "Production Target" aparece em cada SKU Row, obrigando o usuario a inserir o target para cada produto:
 
-### Upload funciona corretamente
-Os logs mostram que as imagens estao sendo salvas com sucesso:
+```text
+┌─ Product #1 ─────────────────┐
+│ SKU: ABC-123                 │
+│ Production Target: [7000   ] │  <- Target por SKU
+│ Real Production:   [6500   ] │
+└──────────────────────────────┘
+┌─ Product #2 ─────────────────┐
+│ SKU: DEF-456                 │
+│ Production Target: [3000   ] │  <- Target repetido
+│ Real Production:   [2800   ] │
+└──────────────────────────────┘
 ```
-monitoring_photo_url: "https://...supabase.co/storage/v1/object/sign/monitoring-photos/...?token=..."
-```
 
-### Problema: URLs Assinadas Expiram
+### Proposta
+O **Target** deve ser da **LINHA** (informado UMA vez), e cada SKU tem apenas sua producao real:
 
-1. **No upload**: O sistema salva uma URL assinada com validade de 1 hora no banco de dados
-2. **Ao exibir**: O hook `useSignedUrl` verifica se a URL ja tem `token=` e a usa diretamente
-3. **Resultado**: Apos 1 hora, a URL expira e a imagem nao carrega mais
+```text
+┌─ Line Production Target ─────┐
+│ Target:            [10000  ] │  <- Target unico da linha
+└──────────────────────────────┘
 
-**Codigo problematico em `useSignedUrl.ts` (linha 25):**
-```tsx
-if (path.startsWith('data:') || path.includes('token=')) {
-  setSignedUrl(path);  // USA URL EXPIRADA!
-  return;
-}
+┌─ Product #1 ─────────────────┐
+│ SKU: ABC-123                 │
+│ Real Production:   [6500   ] │  <- Apenas producao
+└──────────────────────────────┘
+┌─ Product #2 ─────────────────┐
+│ SKU: DEF-456                 │
+│ Real Production:   [2800   ] │  <- Apenas producao
+└──────────────────────────────┘
+
+Total Production: 9,300 units (93% of target)
 ```
 
 ---
 
-## Solucao
+## Problema 2: Novos SKUs Nao Salvam
 
-### 1. Armazenar APENAS o Path, nao a URL Assinada
+### Causa
+O codigo atual no `EditShiftDialog` utiliza `addShift()` para criar novos registros, mas esta passando os dados incorretamente ou falhando silenciosamente.
 
-Mudar o `ShiftContext.tsx` para salvar apenas o path do arquivo (ex: `1770299217210-foto.png`) ao inves da URL assinada completa.
+### Verificacao Necessaria
+- Garantir que todos os campos obrigatorios estao sendo passados
+- Adicionar logs para debug
+- Verificar se o `refreshShifts()` esta sendo chamado apos todos os inserts
 
-**De:**
-```tsx
-return signedUrlData.signedUrl;  // Salva URL assinada (expira)
+---
+
+## Alteracoes Detalhadas
+
+### 1. Criar Componente SimplificadoSkuRowForm
+
+Novo componente `SkuRowFormSimple.tsx` especifico para edicao no History, que mostra:
+- Target unico no topo (da linha)
+- SKUs apenas com producao real
+- Total de producao calculado automaticamente
+
+### 2. Modificar EditShiftDialog.tsx
+
+```text
+ANTES:
+- Target em cada SKU Row
+
+DEPOIS:
+┌────────────────────────────────────────┐
+│ Line Production Target: [______] units │  <- Campo unico
+└────────────────────────────────────────┘
+┌─ Products / SKUs ──────────────────────┐
+│ [+ Add SKU]                            │
+│                                        │
+│ Product #1: SKU-A                      │
+│ Real Production: [6500] units          │
+│                                        │
+│ Product #2: SKU-B                      │
+│ Real Production: [2800] units          │
+│                                        │
+│ ═══════════════════════════════════════│
+│ Total: 9,300 units | Performance: 93%  │
+└────────────────────────────────────────┘
 ```
 
-**Para:**
-```tsx
-return data.path;  // Salva apenas o path (permanente)
-```
+### 3. Corrigir Logica de Salvamento
 
-### 2. Corrigir o Hook `useSignedUrl`
+Problema identificado: o primeiro SKU recebe o target completo, os demais recebem target 0 (distribuido proporcionalmente ou total).
 
-Atualizar a logica para:
-- Extrair o path de URLs assinadas antigas
-- Sempre regenerar uma nova signed URL
+**Nova logica**:
+- Primeiro registro (update): recebe target = lineTarget, realProduction = soma de todos os SKUs
+- Registros adicionais (add): recebem target proporcional ou 0, cada um com seu realProduction
 
-**Logica corrigida:**
-```tsx
-// Extrair path de URLs assinadas ou publicas
-let storagePath = path;
-
-// Se a URL contem '/monitoring-photos/', extrair o path
-if (path.includes('/monitoring-photos/')) {
-  const match = path.match(/\/monitoring-photos\/([^?]+)/);
-  if (match) {
-    storagePath = match[1];
-  }
-}
-
-// Sempre regenerar signed URL (mesmo se tinha token=)
-const { data, error } = await supabase.storage
-  .from('monitoring-photos')
-  .createSignedUrl(storagePath, 3600);
-```
+**OU alternativa mais simples**:
+- Cada registro de shift guarda seu proprio SKU + producao real
+- O target da linha e armazenado no primeiro registro
+- Performance e calculada na agregacao (Dashboard/History)
 
 ---
 
@@ -74,112 +105,142 @@ const { data, error } = await supabase.storage
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/contexts/ShiftContext.tsx` | Salvar apenas `data.path` ao inves de `signedUrl` |
-| `src/hooks/useSignedUrl.ts` | Corrigir extracao de path e sempre regenerar URL |
+| `src/components/history/EditShiftDialog.tsx` | Adicionar campo de Target da linha separado, remover target do SkuRowForm, corrigir logica de salvamento |
+| `src/components/SkuRowForm.tsx` | Adicionar prop opcional `showTarget` para ocultar campo de target |
 
 ---
 
-## Detalhes Tecnicos
+## Codigo Proposto
 
-### ShiftContext.tsx - Salvar Path ao inves de URL
+### EditShiftDialog.tsx - Adicionar Target da Linha
 
-**Linha 200-211, mudar de:**
 ```tsx
-// Create signed URL (valid for 1 hour)
-const { data: signedUrlData, error: urlError } = await supabase.storage
-  .from('monitoring-photos')
-  .createSignedUrl(data.path, 3600);
+// Estado para target da linha (separado dos SKUs)
+const [lineTarget, setLineTarget] = useState(0);
 
-if (urlError || !signedUrlData) {
-  return data.path;
+// No useEffect ao carregar shift:
+setLineTarget(shift.productionTarget);
+
+// No form, antes dos SKU Rows:
+<div className="space-y-1">
+  <Label className="text-xs flex items-center gap-1">
+    <Target size={12} className="text-primary" />
+    Line Production Target
+  </Label>
+  <div className="relative">
+    <Input
+      type="number"
+      value={lineTarget || ''}
+      onChange={(e) => setLineTarget(parseInt(e.target.value) || 0)}
+      placeholder="Target for the line"
+      className="h-9 pr-12"
+    />
+    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+      units
+    </span>
+  </div>
+</div>
+
+// Mostrar totais calculados:
+const totalProduction = skuRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
+const performance = lineTarget > 0 ? (totalProduction / lineTarget) * 100 : 0;
+
+<div className="p-3 bg-muted rounded-lg">
+  <div className="flex justify-between text-sm">
+    <span>Total Production:</span>
+    <span className="font-bold">{totalProduction.toLocaleString()} units</span>
+  </div>
+  <div className="flex justify-between text-sm">
+    <span>Performance:</span>
+    <span className={performance >= 100 ? 'text-green-600' : 'text-yellow-600'}>
+      {performance.toFixed(1)}%
+    </span>
+  </div>
+</div>
+```
+
+### SkuRowForm.tsx - Adicionar prop para ocultar Target
+
+```tsx
+interface SkuRowFormProps {
+  skuRows: SkuRow[];
+  onChange: (rows: SkuRow[]) => void;
+  canReview?: boolean;
+  errors?: Record<string, string>;
+  showTarget?: boolean;  // NOVA PROP - default true para manter compatibilidade
 }
 
-return signedUrlData.signedUrl;
+// Dentro do componente:
+{showTarget !== false && (
+  <div>
+    <label className="label text-xs flex items-center gap-1">
+      <Target size={12} className="text-primary" />
+      Production Target
+    </label>
+    {/* ... campo de target ... */}
+  </div>
+)}
 ```
 
-**Para:**
+### EditShiftDialog - Corrigir Salvamento
+
 ```tsx
-// Return just the path - signed URL will be generated when displaying
-return data.path;
-```
-
-### useSignedUrl.ts - Corrigir Logica de Extracao
-
-**Substituir linhas 18-67 com:**
-```tsx
-useEffect(() => {
-  if (!path) {
-    setSignedUrl(null);
-    return;
-  }
-
-  // For base64 data URLs, use directly (not uploaded yet)
-  if (path.startsWith('data:')) {
-    setSignedUrl(path);
-    return;
-  }
-
-  // Extract the file path from any URL format
-  let storagePath = path;
+// Ao salvar, garantir await em todos os addShift e verificar resultado:
+const handleSubmit = async (e: React.FormEvent) => {
+  // ...validacao...
   
-  // Handle signed URLs: extract path before ?token=
-  if (path.includes('/monitoring-photos/')) {
-    const match = path.match(/\/monitoring-photos\/([^?]+)/);
-    if (match) {
-      storagePath = match[1];
+  // Primeiro registro: update com lineTarget e totalProduction
+  const totalProduction = validRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
+  
+  const result = await updateShift(shift.id, {
+    ...formData,
+    sku: firstRow.sku,
+    product: firstRow.product,
+    productionTarget: lineTarget,                    // Target da linha
+    realProduction: firstRow.realProduction,         // Producao deste SKU
+    // outros campos...
+  });
+  
+  if (!result.success) {
+    toast.error(`Failed to update: ${result.error}`);
+    return; // Para se falhar
+  }
+  
+  // Registros adicionais
+  let addedCount = 0;
+  for (let i = 1; i < validRows.length; i++) {
+    const row = validRows[i];
+    const addResult = await addShift({
+      ...formData,
+      sku: row.sku,
+      product: row.product,
+      productionTarget: 0,              // Target 0 para SKUs adicionais (agregado no primeiro)
+      realProduction: row.realProduction,
+    });
+    
+    if (addResult.success) {
+      addedCount++;
+    } else {
+      console.error('Failed to add SKU:', row.sku, addResult.error);
+      toast.error(`Failed to add ${row.sku}: ${addResult.error}`);
     }
   }
   
-  // If it's already just a filename/path (no http), use it
-  if (!storagePath.startsWith('http')) {
-    // storagePath is ready
+  if (addedCount > 0) {
+    toast.success(`Saved ${addedCount + 1} record(s)`);
   }
-
-  const fetchSignedUrl = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const { data, error: urlError } = await supabase.storage
-        .from('monitoring-photos')
-        .createSignedUrl(storagePath, expiresIn);
-
-      if (urlError) {
-        console.error('Error creating signed URL:', urlError);
-        setError(urlError.message);
-        setSignedUrl(null);
-      } else if (data) {
-        setSignedUrl(data.signedUrl);
-      }
-    } catch (err) {
-      console.error('Error fetching signed URL:', err);
-      setError(err instanceof Error ? err.message : 'Failed to get signed URL');
-      setSignedUrl(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  fetchSignedUrl();
-}, [path, expiresIn]);
+  
+  onOpenChange(false);
+  onSuccess?.();
+};
 ```
-
----
-
-## Dados Existentes
-
-As URLs assinadas antigas ja salvas no banco continuarao funcionando porque a nova logica extrai o path de qualquer formato:
-
-| Formato no Banco | Path Extraido |
-|------------------|---------------|
-| `1770299217210-foto.png` | `1770299217210-foto.png` |
-| `https://.../monitoring-photos/1770299217210-foto.png?token=...` | `1770299217210-foto.png` |
 
 ---
 
 ## Resultado Esperado
 
-1. **Novos uploads**: Salvam apenas o path (ex: `1770299217210-foto.png`)
-2. **Exibicao**: Sempre regenera uma nova signed URL valida por 1 hora
-3. **Dados antigos**: Continuam funcionando com a extracao automatica do path
-4. **Performance**: Signed URLs sao cacheadas no estado do componente durante a sessao
+1. **Target unico**: Usuario insere o target da linha uma vez so
+2. **SKUs com producao**: Cada SKU tem apenas seu campo de producao real
+3. **Totais calculados**: Performance e calculada automaticamente
+4. **Salvamento funciona**: Novos SKUs sao salvos corretamente como registros separados
+5. **Retrocompatibilidade**: O Planner original continua funcionando igual
