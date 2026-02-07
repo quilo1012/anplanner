@@ -1,234 +1,133 @@
 
-# Plano: Corrigir Formulario de Edicao - Target Unico e Salvamento de SKUs
+# Plano: Corrigir Salvamento de Produtos Manuais e Performance do History
 
-## Problema 1: Target Repetido por SKU
+## Problemas Identificados
 
-### Situacao Atual
-O campo "Production Target" aparece em cada SKU Row, obrigando o usuario a inserir o target para cada produto:
+### Problema 1: Produto Manual Não Salva no Catálogo
 
-```text
-┌─ Product #1 ─────────────────┐
-│ SKU: ABC-123                 │
-│ Production Target: [7000   ] │  <- Target por SKU
-│ Real Production:   [6500   ] │
-└──────────────────────────────┘
-┌─ Product #2 ─────────────────┐
-│ SKU: DEF-456                 │
-│ Production Target: [3000   ] │  <- Target repetido
-│ Real Production:   [2800   ] │
-└──────────────────────────────┘
-```
+**Causa Raiz:** O checkbox "Save to product catalog" só aparece quando `isNewProduct` está marcado E o SKU não foi encontrado (`!isFoundInDb`). Porém, o fluxo atual tem uma falha:
 
-### Proposta
-O **Target** deve ser da **LINHA** (informado UMA vez), e cada SKU tem apenas sua producao real:
+1. Usuário digita um SKU que não existe no banco
+2. `ProductSearch` define `isFoundInDb = false` via callback
+3. O checkbox "Save to product catalog" aparece
+4. **MAS**: Se o usuário NÃO marcar o checkbox manualmente, `isNewProduct` permanece `false`
+5. No `handleSubmit`, o código verifica `if (row.isNewProduct && ...)` - e como `isNewProduct` é `false`, o produto NÃO é salvo
 
-```text
-┌─ Line Production Target ─────┐
-│ Target:            [10000  ] │  <- Target unico da linha
-└──────────────────────────────┘
-
-┌─ Product #1 ─────────────────┐
-│ SKU: ABC-123                 │
-│ Real Production:   [6500   ] │  <- Apenas producao
-└──────────────────────────────┘
-┌─ Product #2 ─────────────────┐
-│ SKU: DEF-456                 │
-│ Real Production:   [2800   ] │  <- Apenas producao
-└──────────────────────────────┘
-
-Total Production: 9,300 units (93% of target)
-```
-
----
-
-## Problema 2: Novos SKUs Nao Salvam
-
-### Causa
-O codigo atual no `EditShiftDialog` utiliza `addShift()` para criar novos registros, mas esta passando os dados incorretamente ou falhando silenciosamente.
-
-### Verificacao Necessaria
-- Garantir que todos os campos obrigatorios estao sendo passados
-- Adicionar logs para debug
-- Verificar se o `refreshShifts()` esta sendo chamado apos todos os inserts
-
----
-
-## Alteracoes Detalhadas
-
-### 1. Criar Componente SimplificadoSkuRowForm
-
-Novo componente `SkuRowFormSimple.tsx` especifico para edicao no History, que mostra:
-- Target unico no topo (da linha)
-- SKUs apenas com producao real
-- Total de producao calculado automaticamente
-
-### 2. Modificar EditShiftDialog.tsx
-
-```text
-ANTES:
-- Target em cada SKU Row
-
-DEPOIS:
-┌────────────────────────────────────────┐
-│ Line Production Target: [______] units │  <- Campo unico
-└────────────────────────────────────────┘
-┌─ Products / SKUs ──────────────────────┐
-│ [+ Add SKU]                            │
-│                                        │
-│ Product #1: SKU-A                      │
-│ Real Production: [6500] units          │
-│                                        │
-│ Product #2: SKU-B                      │
-│ Real Production: [2800] units          │
-│                                        │
-│ ═══════════════════════════════════════│
-│ Total: 9,300 units | Performance: 93%  │
-└────────────────────────────────────────┘
-```
-
-### 3. Corrigir Logica de Salvamento
-
-Problema identificado: o primeiro SKU recebe o target completo, os demais recebem target 0 (distribuido proporcionalmente ou total).
-
-**Nova logica**:
-- Primeiro registro (update): recebe target = lineTarget, realProduction = soma de todos os SKUs
-- Registros adicionais (add): recebem target proporcional ou 0, cada um com seu realProduction
-
-**OU alternativa mais simples**:
-- Cada registro de shift guarda seu proprio SKU + producao real
-- O target da linha e armazenado no primeiro registro
-- Performance e calculada na agregacao (Dashboard/History)
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/history/EditShiftDialog.tsx` | Adicionar campo de Target da linha separado, remover target do SkuRowForm, corrigir logica de salvamento |
-| `src/components/SkuRowForm.tsx` | Adicionar prop opcional `showTarget` para ocultar campo de target |
-
----
-
-## Codigo Proposto
-
-### EditShiftDialog.tsx - Adicionar Target da Linha
-
+**Código atual no EditShiftDialog (linha 110-131):**
 ```tsx
-// Estado para target da linha (separado dos SKUs)
-const [lineTarget, setLineTarget] = useState(0);
-
-// No useEffect ao carregar shift:
-setLineTarget(shift.productionTarget);
-
-// No form, antes dos SKU Rows:
-<div className="space-y-1">
-  <Label className="text-xs flex items-center gap-1">
-    <Target size={12} className="text-primary" />
-    Line Production Target
-  </Label>
-  <div className="relative">
-    <Input
-      type="number"
-      value={lineTarget || ''}
-      onChange={(e) => setLineTarget(parseInt(e.target.value) || 0)}
-      placeholder="Target for the line"
-      className="h-9 pr-12"
-    />
-    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-      units
-    </span>
-  </div>
-</div>
-
-// Mostrar totais calculados:
-const totalProduction = skuRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
-const performance = lineTarget > 0 ? (totalProduction / lineTarget) * 100 : 0;
-
-<div className="p-3 bg-muted rounded-lg">
-  <div className="flex justify-between text-sm">
-    <span>Total Production:</span>
-    <span className="font-bold">{totalProduction.toLocaleString()} units</span>
-  </div>
-  <div className="flex justify-between text-sm">
-    <span>Performance:</span>
-    <span className={performance >= 100 ? 'text-green-600' : 'text-yellow-600'}>
-      {performance.toFixed(1)}%
-    </span>
-  </div>
-</div>
-```
-
-### SkuRowForm.tsx - Adicionar prop para ocultar Target
-
-```tsx
-interface SkuRowFormProps {
-  skuRows: SkuRow[];
-  onChange: (rows: SkuRow[]) => void;
-  canReview?: boolean;
-  errors?: Record<string, string>;
-  showTarget?: boolean;  // NOVA PROP - default true para manter compatibilidade
+// Save new products to catalog if flagged
+for (const row of skuRows) {
+  if (row.isNewProduct && row.sku.trim() && row.product.trim()) {
+    // ... salva no banco
+  }
 }
-
-// Dentro do componente:
-{showTarget !== false && (
-  <div>
-    <label className="label text-xs flex items-center gap-1">
-      <Target size={12} className="text-primary" />
-      Production Target
-    </label>
-    {/* ... campo de target ... */}
-  </div>
-)}
 ```
 
-### EditShiftDialog - Corrigir Salvamento
+O problema é que `isNewProduct` só é `true` se o usuário MARCAR o checkbox manualmente.
 
+---
+
+### Problema 2: Edição do History Demora Muito
+
+**Causa Raiz:** Múltiplas chamadas de `refreshShifts()` sequenciais. A cada operação (update, add), o contexto chama `refreshShifts()`, que:
+
+1. Faz SELECT em todas as shifts
+2. Faz SELECT em todos os downtimes
+3. Mapeia os dados
+
+Quando o usuário salva 3 SKUs:
+- `updateShift()` → `refreshShifts()` (busca tudo)
+- `addShift()` → `refreshShifts()` (busca tudo de novo)
+- `addShift()` → `refreshShifts()` (busca tudo de novo)
+
+São 6 queries no banco apenas para um salvamento.
+
+---
+
+## Solução Proposta
+
+### Correção 1: Auto-marcar checkbox quando SKU não encontrado
+
+Quando o usuário digita um SKU que não existe E preenche o nome do produto, automaticamente marcar `isNewProduct = true` para que o produto seja salvo no catálogo.
+
+**Mudança no SkuRowForm.tsx:**
 ```tsx
-// Ao salvar, garantir await em todos os addShift e verificar resultado:
+const handleFoundStatusChange = (rowId: string, found: boolean) => {
+  onChange(
+    skuRows.map(row => 
+      row.id === rowId 
+        ? { 
+            ...row, 
+            isFoundInDb: found, 
+            // AUTO-MARCAR: Se não encontrou e tem produto preenchido, marcar para salvar
+            isNewProduct: !found && row.product.trim().length > 0 ? true : row.isNewProduct
+          } 
+        : row
+    )
+  );
+};
+
+// Também atualizar quando o nome do produto mudar
+const updateSkuRow = (...) => {
+  onChange(
+    skuRows.map(row => {
+      if (row.id === id) {
+        const updated = { ...row, [field]: value };
+        // Se editou o nome do produto E não está no banco, marcar para salvar
+        if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
+          updated.isNewProduct = true;
+        }
+        return updated;
+      }
+      return row;
+    })
+  );
+};
+```
+
+### Correção 2: Otimizar salvamento com batch refresh
+
+Modificar o `ShiftContext` para:
+1. Remover `refreshShifts()` de dentro de `addShift()` e `updateShift()`
+2. Chamar `refreshShifts()` apenas UMA VEZ após todas as operações no `EditShiftDialog`
+
+**Mudança no ShiftContext.tsx:**
+```tsx
+const addShift = async (data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
+  // ... código existente ...
+  
+  // Só refresh se não foi pedido para pular
+  if (!skipRefresh) {
+    await refreshShifts();
+  }
+  return { success: true };
+};
+
+const updateShift = async (id: string, data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
+  // ... código existente ...
+  
+  if (!skipRefresh) {
+    await refreshShifts();
+  }
+  return { success: true };
+};
+```
+
+**Mudança no EditShiftDialog.tsx:**
+```tsx
 const handleSubmit = async (e: React.FormEvent) => {
-  // ...validacao...
+  // ... validação ...
   
-  // Primeiro registro: update com lineTarget e totalProduction
-  const totalProduction = validRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
+  // Primeiro registro: update SEM refresh
+  const result = await updateShift(shift.id, {...}, true); // skipRefresh = true
   
-  const result = await updateShift(shift.id, {
-    ...formData,
-    sku: firstRow.sku,
-    product: firstRow.product,
-    productionTarget: lineTarget,                    // Target da linha
-    realProduction: firstRow.realProduction,         // Producao deste SKU
-    // outros campos...
-  });
-  
-  if (!result.success) {
-    toast.error(`Failed to update: ${result.error}`);
-    return; // Para se falhar
-  }
-  
-  // Registros adicionais
-  let addedCount = 0;
+  // Registros adicionais: add SEM refresh
   for (let i = 1; i < validRows.length; i++) {
-    const row = validRows[i];
-    const addResult = await addShift({
-      ...formData,
-      sku: row.sku,
-      product: row.product,
-      productionTarget: 0,              // Target 0 para SKUs adicionais (agregado no primeiro)
-      realProduction: row.realProduction,
-    });
-    
-    if (addResult.success) {
-      addedCount++;
-    } else {
-      console.error('Failed to add SKU:', row.sku, addResult.error);
-      toast.error(`Failed to add ${row.sku}: ${addResult.error}`);
-    }
+    const addResult = await addShift({...}, true); // skipRefresh = true
   }
   
-  if (addedCount > 0) {
-    toast.success(`Saved ${addedCount + 1} record(s)`);
-  }
+  // ÚNICO refresh no final
+  await refreshShifts();
   
   onOpenChange(false);
   onSuccess?.();
@@ -237,10 +136,130 @@ const handleSubmit = async (e: React.FormEvent) => {
 
 ---
 
+## Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/SkuRowForm.tsx` | Auto-marcar `isNewProduct` quando SKU não encontrado e produto preenchido |
+| `src/contexts/ShiftContext.tsx` | Adicionar parâmetro `skipRefresh` nas funções add/update |
+| `src/components/history/EditShiftDialog.tsx` | Usar `skipRefresh=true` e fazer refresh único no final |
+
+---
+
+## Detalhes Técnicos
+
+### SkuRowForm.tsx - Auto-marcar para salvar
+
+```tsx
+// Linha 30-40: Modificar updateSkuRow
+const updateSkuRow = (
+  id: string, 
+  field: keyof SkuRow, 
+  value: string | number
+) => {
+  onChange(
+    skuRows.map(row => {
+      if (row.id === id) {
+        const updated = { ...row, [field]: value };
+        // Auto-mark for saving when product name is filled and SKU not in DB
+        if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
+          updated.isNewProduct = true;
+        }
+        return updated;
+      }
+      return row;
+    })
+  );
+};
+
+// Linha 52-60: Modificar handleFoundStatusChange
+const handleFoundStatusChange = (rowId: string, found: boolean) => {
+  onChange(
+    skuRows.map(row => 
+      row.id === rowId 
+        ? { 
+            ...row, 
+            isFoundInDb: found, 
+            // Auto-mark for catalog if not found and has product name
+            isNewProduct: !found && row.product.trim().length > 0 ? true : (found ? false : row.isNewProduct)
+          } 
+        : row
+    )
+  );
+};
+```
+
+### ShiftContext.tsx - Adicionar skipRefresh
+
+```tsx
+// Linha 209: Adicionar parâmetro
+const addShift = async (data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
+  // ... código existente até linha 268 ...
+  
+  // Linha 269: Condicional
+  if (!skipRefresh) {
+    await refreshShifts();
+  }
+  return { success: true };
+};
+
+// Linha 277: Adicionar parâmetro
+const updateShift = async (id: string, data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
+  // ... código existente até linha 340 ...
+  
+  // Linha 341: Condicional
+  if (!skipRefresh) {
+    await refreshShifts();
+  }
+  return { success: true };
+};
+
+// Linha 373: Atualizar interface
+interface ShiftContextType {
+  // ...
+  addShift: (data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
+  updateShift: (id: string, data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
+  // ...
+}
+```
+
+### EditShiftDialog.tsx - Usar skipRefresh e refresh único
+
+```tsx
+// Linha 137: Passar skipRefresh = true
+const result = await updateShift(shift.id, {
+  // ... dados ...
+}, true); // skipRefresh
+
+// Linha 170: Passar skipRefresh = true
+const addResult = await addShift({
+  // ... dados ...
+}, true); // skipRefresh
+
+// Após o loop (antes de onOpenChange):
+// Adicionar refresh manual
+await refreshShifts(); // Importar do contexto
+```
+
+---
+
 ## Resultado Esperado
 
-1. **Target unico**: Usuario insere o target da linha uma vez so
-2. **SKUs com producao**: Cada SKU tem apenas seu campo de producao real
-3. **Totais calculados**: Performance e calculada automaticamente
-4. **Salvamento funciona**: Novos SKUs sao salvos corretamente como registros separados
-5. **Retrocompatibilidade**: O Planner original continua funcionando igual
+1. **Produtos manuais salvam automaticamente**: Quando o usuário digita um SKU que não existe e preenche o nome do produto, o checkbox já vem marcado e o produto é salvo no catálogo
+
+2. **Edição rápida**: Ao invés de 6+ queries (2 por operação), teremos apenas 2 queries no final (shifts + downtimes), independente de quantos SKUs foram adicionados
+
+3. **Retrocompatibilidade**: O Planner original continua funcionando igual, pois `skipRefresh` tem valor default `false`
+
+---
+
+## Impacto na Performance
+
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Editar 1 SKU | 2 queries | 2 queries |
+| Editar + 1 SKU | 4 queries | 2 queries |
+| Editar + 3 SKUs | 8 queries | 2 queries |
+| Editar + 5 SKUs | 12 queries | 2 queries |
+
+Redução de até 83% no número de queries para cenários com múltiplos SKUs.
