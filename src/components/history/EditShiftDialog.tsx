@@ -6,11 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ShiftReport, ShiftType, SHIFT_TYPES, StructuredDowntime } from '@/types/shift';
+import { SkuRow } from '@/types/planner';
 import { useShifts } from '@/contexts/ShiftContext';
 import { PhotoUpload } from '@/components/PhotoUpload';
+import { SkuRowForm } from '@/components/SkuRowForm';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EditShiftDialogProps {
   shift: ShiftReport | null;
@@ -20,7 +23,7 @@ interface EditShiftDialogProps {
 }
 
 export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditShiftDialogProps) {
-  const { updateShift } = useShifts();
+  const { updateShift, addShift } = useShifts();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form state
@@ -28,13 +31,12 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
   const [shiftType, setShiftType] = useState<ShiftType>('DAY');
   const [productionLine, setProductionLine] = useState('');
   const [lineLeader, setLineLeader] = useState('');
-  const [product, setProduct] = useState('');
-  const [sku, setSku] = useState('');
-  const [productionTarget, setProductionTarget] = useState(0);
-  const [realProduction, setRealProduction] = useState(0);
   const [staffPlanned, setStaffPlanned] = useState(0);
   const [staffActual, setStaffActual] = useState(0);
   const [observations, setObservations] = useState('');
+  
+  // SKU Rows state - now supports multiple SKUs
+  const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
   
   // Photo and Downtime state
   const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
@@ -48,16 +50,22 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
       setShiftType(shift.shift);
       setProductionLine(shift.productionLine);
       setLineLeader(shift.lineLeader);
-      setProduct(shift.product);
-      setSku(shift.sku);
-      setProductionTarget(shift.productionTarget);
-      setRealProduction(shift.realProduction);
       setStaffPlanned(shift.staffPlanned);
       setStaffActual(shift.staffActual);
       setObservations(shift.observations);
       setMonitoringPhoto(shift.monitoringPhoto);
       setPhotoFilename(shift.photoFilename);
       setStructuredDowntimes(shift.structuredDowntimes || []);
+      
+      // Convert existing shift to SkuRow format
+      setSkuRows([{
+        id: shift.id,
+        sku: shift.sku,
+        product: shift.product,
+        productionTarget: shift.productionTarget,
+        realProduction: shift.realProduction,
+        isFoundInDb: true,
+      }]);
     }
   }, [shift]);
 
@@ -70,17 +78,50 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
     e.preventDefault();
     if (!shift) return;
 
+    // Validate at least one SKU
+    const validRows = skuRows.filter(row => row.sku.trim());
+    if (validRows.length === 0) {
+      toast.error('At least one SKU is required');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      // Save new products to catalog if flagged
+      for (const row of skuRows) {
+        if (row.isNewProduct && row.sku.trim() && row.product.trim()) {
+          const { data: existing } = await supabase
+            .from('products')
+            .select('product_code')
+            .eq('product_code', row.sku)
+            .maybeSingle();
+          
+          if (!existing) {
+            const { error } = await supabase.from('products').insert({
+              product_code: row.sku,
+              product_description: row.product,
+            });
+            
+            if (error) {
+              console.error('Error saving new product:', error);
+            } else {
+              toast.success(`Product ${row.sku} saved to catalog`);
+            }
+          }
+        }
+      }
+
+      // First row updates the original shift
+      const firstRow = validRows[0];
       const result = await updateShift(shift.id, {
         date,
         shift: shiftType,
         productionLine,
         lineLeader,
-        product,
-        sku,
-        productionTarget,
-        realProduction,
+        product: firstRow.product,
+        sku: firstRow.sku,
+        productionTarget: firstRow.productionTarget,
+        realProduction: firstRow.realProduction,
         observations,
         downtimes: shift.downtimes,
         structuredDowntimes,
@@ -95,7 +136,37 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
         return;
       }
 
-      toast.success('Shift updated successfully');
+      // Additional rows create new shifts
+      if (validRows.length > 1) {
+        for (let i = 1; i < validRows.length; i++) {
+          const row = validRows[i];
+          const addResult = await addShift({
+            date,
+            shift: shiftType,
+            productionLine,
+            lineLeader,
+            product: row.product,
+            sku: row.sku,
+            productionTarget: row.productionTarget,
+            realProduction: row.realProduction,
+            observations,
+            downtimes: [],
+            structuredDowntimes: [],
+            monitoringPhoto,
+            photoFilename,
+            staffPlanned,
+            staffActual,
+          });
+
+          if (!addResult.success) {
+            toast.error(`Failed to add SKU ${row.sku}: ${addResult.error}`);
+          }
+        }
+        toast.success(`Updated shift and added ${validRows.length - 1} new record(s)`);
+      } else {
+        toast.success('Shift updated successfully');
+      }
+
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -108,35 +179,39 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
 
   if (!shift) return null;
 
+  const hasMultipleRows = skuRows.length > 1;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Shift Record</DialogTitle>
           <DialogDescription>
-            Update the production record details including photo and downtime records.
+            Update the production record details. You can add multiple SKUs - additional SKUs will create new records.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          {/* Basic Info Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {/* Date */}
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+            <div className="space-y-1">
+              <Label htmlFor="date" className="text-xs">Date</Label>
               <Input
                 id="date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
+                className="h-9"
               />
             </div>
 
             {/* Shift */}
-            <div className="space-y-2">
-              <Label htmlFor="shift">Shift</Label>
+            <div className="space-y-1">
+              <Label htmlFor="shift" className="text-xs">Shift</Label>
               <Select value={shiftType} onValueChange={(v) => setShiftType(v as ShiftType)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Select shift" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,115 +223,89 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
             </div>
 
             {/* Production Line */}
-            <div className="space-y-2">
-              <Label htmlFor="line">Production Line</Label>
+            <div className="space-y-1">
+              <Label htmlFor="line" className="text-xs">Production Line</Label>
               <Input
                 id="line"
                 value={productionLine}
                 onChange={(e) => setProductionLine(e.target.value)}
                 placeholder="e.g., Line 1"
                 required
+                className="h-9"
               />
             </div>
 
             {/* Leader */}
-            <div className="space-y-2">
-              <Label htmlFor="leader">Leader / Supervisor</Label>
+            <div className="space-y-1">
+              <Label htmlFor="leader" className="text-xs">Leader / Supervisor</Label>
               <Input
                 id="leader"
                 value={lineLeader}
                 onChange={(e) => setLineLeader(e.target.value)}
                 placeholder="Leader name"
                 required
-              />
-            </div>
-
-            {/* SKU */}
-            <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                placeholder="Product SKU"
-              />
-            </div>
-
-            {/* Product Name */}
-            <div className="space-y-2">
-              <Label htmlFor="product">Product Name</Label>
-              <Input
-                id="product"
-                value={product}
-                onChange={(e) => setProduct(e.target.value)}
-                placeholder="Product name"
-              />
-            </div>
-
-            {/* Production Target */}
-            <div className="space-y-2">
-              <Label htmlFor="target">Planned Quantity</Label>
-              <Input
-                id="target"
-                type="number"
-                min={0}
-                value={productionTarget}
-                onChange={(e) => setProductionTarget(parseInt(e.target.value) || 0)}
-              />
-            </div>
-
-            {/* Real Production */}
-            <div className="space-y-2">
-              <Label htmlFor="actual">Actual Quantity</Label>
-              <Input
-                id="actual"
-                type="number"
-                min={0}
-                value={realProduction}
-                onChange={(e) => setRealProduction(parseInt(e.target.value) || 0)}
+                className="h-9"
               />
             </div>
 
             {/* Staff Planned */}
-            <div className="space-y-2">
-              <Label htmlFor="staffPlanned">Staff Planned</Label>
+            <div className="space-y-1">
+              <Label htmlFor="staffPlanned" className="text-xs">Staff Planned</Label>
               <Input
                 id="staffPlanned"
                 type="number"
                 min={0}
                 value={staffPlanned}
                 onChange={(e) => setStaffPlanned(parseInt(e.target.value) || 0)}
+                className="h-9"
               />
             </div>
 
             {/* Staff Actual */}
-            <div className="space-y-2">
-              <Label htmlFor="staffActual">Staff Actual</Label>
+            <div className="space-y-1">
+              <Label htmlFor="staffActual" className="text-xs">Staff Actual</Label>
               <Input
                 id="staffActual"
                 type="number"
                 min={0}
                 value={staffActual}
                 onChange={(e) => setStaffActual(parseInt(e.target.value) || 0)}
+                className="h-9"
               />
             </div>
           </div>
 
+          {/* SKU Rows Section */}
+          <div className="border-t pt-4">
+            {hasMultipleRows && (
+              <div className="flex items-center gap-2 mb-3 p-2 bg-warning/10 border border-warning/30 rounded-md text-sm">
+                <AlertTriangle size={16} className="text-warning" />
+                <span>Adding multiple SKUs will create {skuRows.length - 1} new shift record(s)</span>
+              </div>
+            )}
+            <SkuRowForm
+              skuRows={skuRows}
+              onChange={setSkuRows}
+              canReview={true}
+              errors={{}}
+            />
+          </div>
+
           {/* Observations */}
-          <div className="space-y-2">
-            <Label htmlFor="observations">Comments / Observations</Label>
+          <div className="space-y-1 border-t pt-4">
+            <Label htmlFor="observations" className="text-xs">Comments / Observations</Label>
             <Textarea
               id="observations"
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
               placeholder="Additional notes..."
-              rows={3}
+              rows={2}
             />
           </div>
 
           {/* Monitoring Photo Section */}
-          <div className="space-y-3 border-t pt-4">
-            <h4 className="font-semibold text-foreground">Monitoring Photo</h4>
+          <div className="space-y-2 border-t pt-4">
+            <h4 className="font-medium text-sm text-foreground">Monitoring Photo</h4>
             <PhotoUpload
               photo={monitoringPhoto}
               filename={photoFilename}
@@ -265,7 +314,7 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
           </div>
 
           {/* Downtime Section */}
-          <div className="space-y-3 border-t pt-4">
+          <div className="space-y-2 border-t pt-4">
             <StructuredDowntimeForm
               downtimes={structuredDowntimes}
               onChange={setStructuredDowntimes}
@@ -273,7 +322,7 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
             />
           </div>
 
-          <DialogFooter className="pt-4">
+          <DialogFooter className="pt-4 gap-2">
             <Button
               type="button"
               variant="outline"
@@ -291,7 +340,7 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Save Changes
+                  {hasMultipleRows ? `Save ${skuRows.length} Record(s)` : 'Save Changes'}
                 </>
               )}
             </Button>
