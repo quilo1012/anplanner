@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShiftReport, ShiftType, SHIFT_TYPES, StructuredDowntime } from '@/types/shift';
 import { SkuRow } from '@/types/planner';
 import { useShifts } from '@/contexts/ShiftContext';
+import { ShiftFormData } from '@/types/shift';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { SkuRowForm } from '@/components/SkuRowForm';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
@@ -23,7 +24,7 @@ interface EditShiftDialogProps {
 }
 
 export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditShiftDialogProps) {
-  const { updateShift, addShift } = useShifts();
+  const { updateShift, addShiftsBatch, refreshShifts } = useShifts();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form state
@@ -130,9 +131,8 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
         }
       }
 
-      // First row updates the original shift with the full line target
+      // First row updates the original shift with the full line target (skipRefresh = true for performance)
       const firstRow = validRows[0];
-      console.log('Updating first shift:', { id: shift.id, sku: firstRow.sku, lineTarget, realProduction: firstRow.realProduction });
       
       const result = await updateShift(shift.id, {
         date,
@@ -150,7 +150,7 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
         photoFilename,
         staffPlanned,
         staffActual,
-      });
+      }, true); // skipRefresh = true for batch performance
 
       if (result && !result.success) {
         toast.error(`Failed to update: ${result.error || 'Unknown error'}`);
@@ -158,50 +158,37 @@ export function EditShiftDialog({ shift, open, onOpenChange, onSuccess }: EditSh
         return;
       }
 
-      // Additional rows create new shifts with target = 0 (to avoid double-counting)
-      let addedCount = 0;
-      let failedCount = 0;
-      
+      // Additional rows create new shifts using batch insert (PERFORMANCE OPTIMIZED)
       if (validRows.length > 1) {
-        for (let i = 1; i < validRows.length; i++) {
-          const row = validRows[i];
-          console.log('Adding new shift:', { sku: row.sku, realProduction: row.realProduction });
-          
-          const addResult = await addShift({
-            date,
-            shift: shiftType,
-            productionLine,
-            lineLeader,
-            product: row.product,
-            sku: row.sku,
-            productionTarget: 0, // Target = 0 for additional SKUs (aggregated on first)
-            realProduction: row.realProduction,
-            observations: '', // Clean observations for additional records
-            downtimes: [],
-            structuredDowntimes: [],
-            monitoringPhoto: undefined,
-            photoFilename: undefined,
-            staffPlanned,
-            staffActual,
-          });
+        const additionalShifts: ShiftFormData[] = validRows.slice(1).map(row => ({
+          date,
+          shift: shiftType,
+          productionLine,
+          lineLeader,
+          product: row.product,
+          sku: row.sku,
+          productionTarget: 0, // Target = 0 for additional SKUs (aggregated on first)
+          realProduction: row.realProduction,
+          observations: '', // Clean observations for additional records
+          downtimes: [],
+          structuredDowntimes: [],
+          monitoringPhoto: undefined,
+          photoFilename: undefined,
+          staffPlanned,
+          staffActual,
+        }));
 
-          if (addResult.success) {
-            addedCount++;
-            console.log('Successfully added SKU:', row.sku);
-          } else {
-            failedCount++;
-            console.error('Failed to add SKU:', row.sku, addResult.error);
-            toast.error(`Failed to add SKU ${row.sku}: ${addResult.error}`);
-          }
-        }
+        // Use batch insert (single DB call, includes refresh at the end)
+        const batchResult = await addShiftsBatch(additionalShifts);
         
-        if (addedCount > 0) {
-          toast.success(`Updated shift and added ${addedCount} new record(s)`);
-        }
-        if (failedCount > 0) {
-          toast.warning(`${failedCount} record(s) failed to save`);
+        if (batchResult.success) {
+          toast.success(`Updated shift and added ${additionalShifts.length} new record(s)`);
+        } else {
+          toast.warning(`Primary shift updated, but additional SKUs failed: ${batchResult.error}`);
         }
       } else {
+        // Single row - manual refresh since we skipped it
+        await refreshShifts();
         toast.success('Shift updated successfully');
       }
 

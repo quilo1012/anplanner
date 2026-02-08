@@ -44,7 +44,7 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { addShift, updateShift, getShiftById } = useShifts();
+  const { addShift, addShiftsBatch, updateShift, getShiftById } = useShifts();
   const { user, hasRole } = useAuth();
   const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -211,34 +211,36 @@ export function Planner() {
           return;
         }
       } else {
-        // Save each SKU row as independent record
-        let isFirstShift = true;
-        for (const row of formState.skuRows) {
-          if (!row.sku.trim()) continue;
-          
-          const formData: ShiftFormData = {
-            date: formState.date,
-            shift: formState.shift,
-            productionLine: formState.productionLine,
-            lineLeader: formState.lineLeader,
-            product: row.product,
-            sku: row.sku,
-            productionTarget: row.productionTarget,
-            realProduction: row.realProduction,
-            observations: formState.observations,
-            downtimes: [],
-            monitoringPhoto: formState.monitoringPhoto,
-            photoFilename: formState.photoFilename,
-            staffPlanned: formState.staffPlanned,
-            staffActual: formState.staffActual,
-          };
-          
-          const result = await addShift(formData);
-          if (!result.success) {
-            toast.error(`Failed to save shift: ${result.error}`);
-            return;
-          }
-          isFirstShift = false;
+        // Batch save all SKU rows as independent records (PERFORMANCE OPTIMIZED)
+        const validRows = formState.skuRows.filter(row => row.sku.trim());
+        
+        if (validRows.length === 0) {
+          toast.error('At least one SKU is required');
+          return;
+        }
+        
+        const shiftsToCreate: ShiftFormData[] = validRows.map((row, index) => ({
+          date: formState.date,
+          shift: formState.shift,
+          productionLine: formState.productionLine,
+          lineLeader: formState.lineLeader,
+          product: row.product,
+          sku: row.sku,
+          productionTarget: row.productionTarget,
+          realProduction: row.realProduction,
+          observations: index === 0 ? formState.observations : '', // Only first gets observations
+          downtimes: [],
+          monitoringPhoto: index === 0 ? formState.monitoringPhoto : undefined, // Only first gets photo
+          photoFilename: index === 0 ? formState.photoFilename : undefined,
+          staffPlanned: formState.staffPlanned,
+          staffActual: formState.staffActual,
+        }));
+        
+        // Use batch insert for performance (single DB call for all rows)
+        const result = await addShiftsBatch(shiftsToCreate);
+        if (!result.success) {
+          toast.error(`Failed to save shifts: ${result.error}`);
+          return;
         }
       }
 

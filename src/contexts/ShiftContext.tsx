@@ -12,11 +12,16 @@ interface ShiftContextType {
   shifts: ShiftReport[];
   isLoading: boolean;
   error: string | null;
-  addShift: (data: ShiftFormData) => Promise<ShiftOperationResult>;
-  updateShift: (id: string, data: ShiftFormData) => Promise<ShiftOperationResult>;
-  deleteShift: (id: string) => Promise<ShiftOperationResult>;
+  addShift: (data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
+  addShiftsBatch: (shifts: ShiftFormData[]) => Promise<ShiftOperationResult>;
+  updateShift: (id: string, data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
+  deleteShift: (id: string, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
   getShiftById: (id: string) => ShiftReport | undefined;
   refreshShifts: () => Promise<void>;
+  // Optimistic update helpers
+  addShiftLocally: (shift: ShiftReport) => void;
+  updateShiftLocally: (id: string, data: Partial<ShiftReport>) => void;
+  removeShiftLocally: (id: string) => void;
 }
 
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
@@ -80,6 +85,17 @@ function mapDbToShift(row: any, downtimes: any[]): ShiftReport {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+// Timeout wrapper to prevent infinite hangs
+async function withTimeout<T>(
+  queryBuilder: PromiseLike<T>,
+  timeoutMs: number = 10000
+): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
+  );
+  return Promise.race([Promise.resolve(queryBuilder), timeout]);
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
@@ -149,6 +165,21 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   }, [authLoading, refreshShifts]);
 
+  // Optimistic update: add shift locally
+  const addShiftLocally = useCallback((shift: ShiftReport) => {
+    setShifts(prev => [shift, ...prev]);
+  }, []);
+
+  // Optimistic update: update shift locally
+  const updateShiftLocally = useCallback((id: string, data: Partial<ShiftReport>) => {
+    setShifts(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+  }, []);
+
+  // Optimistic update: remove shift locally
+  const removeShiftLocally = useCallback((id: string) => {
+    setShifts(prev => prev.filter(s => s.id !== id));
+  }, []);
+
   /**
    * Sanitizes filename for Supabase Storage compatibility.
    * Removes accents, spaces and special characters.
@@ -198,7 +229,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       // Return just the path - signed URL will be generated when displaying
-      // This ensures URLs never expire in the database
       return data.path;
     } catch (error) {
       console.error('Error processing photo:', error);
@@ -206,7 +236,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addShift = async (data: ShiftFormData): Promise<ShiftOperationResult> => {
+  const addShift = async (data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
 
     try {
@@ -218,28 +248,31 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         photoUrl = await uploadPhoto(data.monitoringPhoto, data.photoFilename);
       }
 
-      // Insert shift
-      const { data: newShift, error: shiftError } = await supabase
-        .from('shifts')
-        .insert({
-          date: data.date,
-          shift_type: mapShiftTypeToDb(data.shift),
-          production_line: data.productionLine,
-          line_leader: data.lineLeader,
-          product_name: data.product,
-          sku: data.sku || null,
-          planned_quantity: data.productionTarget,
-          real_production: data.realProduction,
-          performance: performance,
-          comments: data.observations || null,
-          is_archived: false,
-          monitoring_photo_url: photoUrl,
-          staff_planned: data.staffPlanned || 0,
-          staff_actual: data.staffActual || 0,
-          created_by: user.id,
-        })
-        .select()
-        .single();
+      // Insert shift with timeout protection
+      const { data: newShift, error: shiftError } = await withTimeout(
+        supabase
+          .from('shifts')
+          .insert({
+            date: data.date,
+            shift_type: mapShiftTypeToDb(data.shift),
+            production_line: data.productionLine,
+            line_leader: data.lineLeader,
+            product_name: data.product,
+            sku: data.sku || null,
+            planned_quantity: data.productionTarget,
+            real_production: data.realProduction,
+            performance: performance,
+            comments: data.observations || null,
+            is_archived: false,
+            monitoring_photo_url: photoUrl,
+            staff_planned: data.staffPlanned || 0,
+            staff_actual: data.staffActual || 0,
+            created_by: user.id,
+          })
+          .select()
+          .single(),
+        10000
+      );
 
       if (shiftError) {
         console.error('Error adding shift:', shiftError);
@@ -266,7 +299,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await refreshShifts();
+      // Only refresh if not skipped
+      if (!skipRefresh) {
+        await refreshShifts();
+      }
       return { success: true };
     } catch (error) {
       console.error('Error adding shift:', error);
@@ -274,7 +310,93 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateShift = async (id: string, data: ShiftFormData): Promise<ShiftOperationResult> => {
+  // Batch insert multiple shifts in a single operation
+  const addShiftsBatch = async (shiftsData: ShiftFormData[]): Promise<ShiftOperationResult> => {
+    if (!user) return { success: false, error: 'User not authenticated' };
+    if (shiftsData.length === 0) return { success: true };
+
+    try {
+      // Prepare all shift data (photos are handled separately if needed)
+      const shiftsToInsert = shiftsData.map(data => ({
+        date: data.date,
+        shift_type: mapShiftTypeToDb(data.shift),
+        production_line: data.productionLine,
+        line_leader: data.lineLeader,
+        product_name: data.product,
+        sku: data.sku || null,
+        planned_quantity: data.productionTarget,
+        real_production: data.realProduction,
+        performance: calculatePerformance(data.realProduction, data.productionTarget),
+        comments: data.observations || null,
+        is_archived: false,
+        monitoring_photo_url: null, // Photos not supported in batch mode
+        staff_planned: data.staffPlanned || 0,
+        staff_actual: data.staffActual || 0,
+        created_by: user.id,
+      }));
+
+      // Single batch insert with timeout
+      const { data: newShifts, error: batchError } = await withTimeout(
+        supabase
+          .from('shifts')
+          .insert(shiftsToInsert)
+          .select(),
+        15000
+      );
+
+      if (batchError) {
+        console.error('Error batch inserting shifts:', batchError);
+        return { success: false, error: batchError.message };
+      }
+
+      if (!newShifts || newShifts.length === 0) {
+        return { success: false, error: 'No shifts were inserted' };
+      }
+
+      // Batch insert all downtimes
+      const allDowntimes: Array<{
+        shift_id: string;
+        category: string;
+        reason: string;
+        duration: number;
+        comment: string | null;
+      }> = [];
+
+      shiftsData.forEach((shiftData, idx) => {
+        if (shiftData.structuredDowntimes && shiftData.structuredDowntimes.length > 0 && newShifts[idx]) {
+          shiftData.structuredDowntimes.forEach(d => {
+            allDowntimes.push({
+              shift_id: newShifts[idx].id,
+              category: d.category,
+              reason: d.reason,
+              duration: d.duration,
+              comment: d.comment || null,
+            });
+          });
+        }
+      });
+
+      if (allDowntimes.length > 0) {
+        const { error: downtimeError } = await supabase
+          .from('structured_downtimes')
+          .insert(allDowntimes);
+
+        if (downtimeError) {
+          console.error('Error batch inserting downtimes:', downtimeError);
+          // Non-critical, shifts were saved
+        }
+      }
+
+      // Single refresh at the end
+      await refreshShifts();
+      return { success: true };
+    } catch (error) {
+      console.error('Error in batch shift insert:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  };
+
+  const updateShift = async (id: string, data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
 
     try {
@@ -289,25 +411,28 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Update shift
-      const { error: shiftError } = await supabase
-        .from('shifts')
-        .update({
-          date: data.date,
-          shift_type: mapShiftTypeToDb(data.shift),
-          production_line: data.productionLine,
-          line_leader: data.lineLeader,
-          product_name: data.product,
-          sku: data.sku || null,
-          planned_quantity: data.productionTarget,
-          real_production: data.realProduction,
-          performance: performance,
-          comments: data.observations || null,
-          staff_planned: data.staffPlanned || 0,
-          staff_actual: data.staffActual || 0,
-          ...(photoUrl && { monitoring_photo_url: photoUrl }),
-        })
-        .eq('id', id);
+      // Update shift with timeout
+      const { error: shiftError } = await withTimeout(
+        supabase
+          .from('shifts')
+          .update({
+            date: data.date,
+            shift_type: mapShiftTypeToDb(data.shift),
+            production_line: data.productionLine,
+            line_leader: data.lineLeader,
+            product_name: data.product,
+            sku: data.sku || null,
+            planned_quantity: data.productionTarget,
+            real_production: data.realProduction,
+            performance: performance,
+            comments: data.observations || null,
+            staff_planned: data.staffPlanned || 0,
+            staff_actual: data.staffActual || 0,
+            ...(photoUrl && { monitoring_photo_url: photoUrl }),
+          })
+          .eq('id', id),
+        10000
+      );
 
       if (shiftError) {
         console.error('Error updating shift:', shiftError);
@@ -338,7 +463,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await refreshShifts();
+      // Only refresh if not skipped
+      if (!skipRefresh) {
+        await refreshShifts();
+      }
       return { success: true };
     } catch (error) {
       console.error('Error updating shift:', error);
@@ -346,19 +474,25 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteShift = async (id: string): Promise<ShiftOperationResult> => {
+  const deleteShift = async (id: string, skipRefresh = false): Promise<ShiftOperationResult> => {
     try {
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('id', id);
+      const { error } = await withTimeout(
+        supabase
+          .from('shifts')
+          .delete()
+          .eq('id', id),
+        10000
+      );
 
       if (error) {
         console.error('Error deleting shift:', error);
         return { success: false, error: error.message };
       }
 
-      await refreshShifts();
+      // Only refresh if not skipped
+      if (!skipRefresh) {
+        await refreshShifts();
+      }
       return { success: true };
     } catch (error) {
       console.error('Error deleting shift:', error);
@@ -371,7 +505,20 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ShiftContext.Provider value={{ shifts, isLoading, error, addShift, updateShift, deleteShift, getShiftById, refreshShifts }}>
+    <ShiftContext.Provider value={{ 
+      shifts, 
+      isLoading, 
+      error, 
+      addShift, 
+      addShiftsBatch,
+      updateShift, 
+      deleteShift, 
+      getShiftById, 
+      refreshShifts,
+      addShiftLocally,
+      updateShiftLocally,
+      removeShiftLocally,
+    }}>
       {children}
     </ShiftContext.Provider>
   );
