@@ -33,9 +33,17 @@ export function SkuRowForm({
     value: string | number
   ) => {
     onChange(
-      skuRows.map(row => 
-        row.id === id ? { ...row, [field]: value } : row
-      )
+      skuRows.map(row => {
+        if (row.id === id) {
+          const updated = { ...row, [field]: value };
+          // Auto-mark for saving when product name is filled and SKU not in DB
+          if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
+            updated.isNewProduct = true;
+          }
+          return updated;
+        }
+        return row;
+      })
     );
   };
 
@@ -51,11 +59,17 @@ export function SkuRowForm({
 
   const handleFoundStatusChange = (rowId: string, found: boolean) => {
     onChange(
-      skuRows.map(row => 
-        row.id === rowId 
-          ? { ...row, isFoundInDb: found, isNewProduct: !found ? row.isNewProduct : false } 
-          : row
-      )
+      skuRows.map(row => {
+        if (row.id === rowId) {
+          return { 
+            ...row, 
+            isFoundInDb: found, 
+            // Auto-mark for catalog if not found AND has product name
+            isNewProduct: !found && row.product.trim().length > 0 ? true : (found ? false : row.isNewProduct)
+          };
+        }
+        return row;
+      })
     );
   };
 
