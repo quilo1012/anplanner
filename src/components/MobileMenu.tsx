@@ -12,6 +12,7 @@ export function MobileMenu() {
     { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
+    { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
   ];
   

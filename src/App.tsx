@@ -31,6 +31,7 @@ const App = () => (
               <Route path="planner" element={<Planner />} />
               <Route path="downtime" element={<Downtime />} />
               <Route path="history" element={<History />} />
+              <Route path="weekly-report" element={<WeeklyReport />} />
               <Route
                 path="admin"
                 element={
