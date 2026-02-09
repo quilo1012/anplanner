@@ -41,13 +41,15 @@ export function Dashboard() {
 
   const filteredSessions = useMemo(() => {
     return sessions.filter(s => {
+      // Operator filter: only show sessions where lineLeader matches user name
+      if (isOperator && user?.name && s.lineLeader.toLowerCase() !== user.name.toLowerCase()) return false;
       const matchesDate = s.date === selectedDate;
       const matchesShift = s.shift === selectedShift;
       const matchesLine = !selectedLine || s.productionLine === selectedLine;
       const matchesLeader = !selectedLeader || s.lineLeader === selectedLeader;
       return matchesDate && matchesShift && matchesLine && matchesLeader;
     });
-  }, [sessions, selectedDate, selectedShift, selectedLine, selectedLeader]);
+  }, [sessions, selectedDate, selectedShift, selectedLine, selectedLeader, isOperator, user?.name]);
 
   const stats = useMemo(() => {
     const totalSessions = filteredSessions.length;
