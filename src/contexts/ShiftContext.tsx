@@ -139,7 +139,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // Fetch all downtimes
       const { data: downtimesData, error: downtimesError } = await supabase
         .from('structured_downtimes')
-        .select('*');
+        .select('id, shift_id, category, reason, duration, comment, created_at');
 
       if (downtimesError) {
         console.error('Error fetching downtimes:', downtimesError);
