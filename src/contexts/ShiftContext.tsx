@@ -40,11 +40,16 @@ function mapShiftTypeToDb(shift: ShiftType): string {
   return shift.toLowerCase();
 }
 
-async function withTimeout<T>(queryBuilder: PromiseLike<T>, timeoutMs: number = 10000): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
-  );
-  return Promise.race([Promise.resolve(queryBuilder), timeout]);
+async function withTimeout<T>(promise: PromiseLike<T>, ms: number = 15000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Operation timed out')), ms);
+  });
+  try {
+    return await Promise.race([Promise.resolve(promise), timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
