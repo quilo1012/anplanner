@@ -13,7 +13,8 @@ import { naturalLineSort } from '@/utils/naturalLineSort';
 
 export function History() {
   const { sessions, refreshSessions } = useShifts();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
+  const isOperator = user?.role === 'operator';
   const printRef = useRef<HTMLDivElement>(null);
   
   const [filterFromDate, setFilterFromDate] = useState('');
