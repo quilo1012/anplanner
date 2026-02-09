@@ -33,7 +33,7 @@ interface DowntimeEntry {
 }
 
 export function Downtime() {
-  const { shifts, updateShift, refreshShifts } = useShifts();
+  const { shifts, saveDowntimesBatch } = useShifts();
   const { hasRole } = useAuth();
   
   // Filters
