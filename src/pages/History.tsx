@@ -337,7 +337,7 @@ export function History() {
           <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewPhoto(null)}>
             <div className="relative max-w-3xl max-h-[90vh]" onClick={e => e.stopPropagation()}>
               <button onClick={() => setPreviewPhoto(null)} className="absolute -top-10 right-0 text-white hover:text-gray-300"><X size={24} /></button>
-              <SecureImage filePath={previewPhoto} alt="Monitoring photo" className="max-h-[85vh] object-contain rounded-lg" />
+              <SecureImage src={previewPhoto} alt="Monitoring photo" className="max-h-[85vh] object-contain rounded-lg" />
             </div>
           </div>
         )}
