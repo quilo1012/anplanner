@@ -67,6 +67,95 @@ export type Database = {
           },
         ]
       }
+      production_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_name: string | null
+          quantity_actual: number | null
+          quantity_target: number | null
+          session_id: string
+          sku: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_name?: string | null
+          quantity_actual?: number | null
+          quantity_target?: number | null
+          session_id: string
+          sku: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_name?: string | null
+          quantity_actual?: number | null
+          quantity_target?: number | null
+          session_id?: string
+          sku?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "production_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_sessions: {
+        Row: {
+          comments: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          is_archived: boolean
+          line_leader: string
+          monitoring_photo_url: string | null
+          planned_quantity: number | null
+          production_line: string
+          shift_type: string
+          staff_actual: number | null
+          staff_planned: number | null
+          updated_at: string
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          date: string
+          id?: string
+          is_archived?: boolean
+          line_leader: string
+          monitoring_photo_url?: string | null
+          planned_quantity?: number | null
+          production_line: string
+          shift_type: string
+          staff_actual?: number | null
+          staff_planned?: number | null
+          updated_at?: string
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          is_archived?: boolean
+          line_leader?: string
+          monitoring_photo_url?: string | null
+          planned_quantity?: number | null
+          production_line?: string
+          shift_type?: string
+          staff_actual?: number | null
+          staff_planned?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string
@@ -112,69 +201,6 @@ export type Database = {
         }
         Relationships: []
       }
-      shifts: {
-        Row: {
-          comments: string | null
-          created_at: string
-          created_by: string | null
-          date: string
-          id: string
-          is_archived: boolean
-          line_leader: string
-          monitoring_photo_url: string | null
-          performance: number
-          planned_quantity: number
-          product_name: string
-          production_line: string
-          real_production: number
-          shift_type: string
-          sku: string | null
-          staff_actual: number | null
-          staff_planned: number | null
-          updated_at: string
-        }
-        Insert: {
-          comments?: string | null
-          created_at?: string
-          created_by?: string | null
-          date: string
-          id?: string
-          is_archived?: boolean
-          line_leader: string
-          monitoring_photo_url?: string | null
-          performance?: number
-          planned_quantity?: number
-          product_name: string
-          production_line: string
-          real_production?: number
-          shift_type: string
-          sku?: string | null
-          staff_actual?: number | null
-          staff_planned?: number | null
-          updated_at?: string
-        }
-        Update: {
-          comments?: string | null
-          created_at?: string
-          created_by?: string | null
-          date?: string
-          id?: string
-          is_archived?: boolean
-          line_leader?: string
-          monitoring_photo_url?: string | null
-          performance?: number
-          planned_quantity?: number
-          product_name?: string
-          production_line?: string
-          real_production?: number
-          shift_type?: string
-          sku?: string | null
-          staff_actual?: number | null
-          staff_planned?: number | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       structured_downtimes: {
         Row: {
           category: string
@@ -183,7 +209,7 @@ export type Database = {
           duration: number
           id: string
           reason: string
-          shift_id: string
+          session_id: string
         }
         Insert: {
           category: string
@@ -192,7 +218,7 @@ export type Database = {
           duration?: number
           id?: string
           reason: string
-          shift_id: string
+          session_id: string
         }
         Update: {
           category?: string
@@ -201,14 +227,14 @@ export type Database = {
           duration?: number
           id?: string
           reason?: string
-          shift_id?: string
+          session_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "structured_downtimes_shift_id_fkey"
-            columns: ["shift_id"]
+            foreignKeyName: "structured_downtimes_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
-            referencedRelation: "shifts"
+            referencedRelation: "production_sessions"
             referencedColumns: ["id"]
           },
         ]
