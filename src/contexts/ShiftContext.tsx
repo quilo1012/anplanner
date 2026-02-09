@@ -40,11 +40,16 @@ function mapShiftTypeToDb(shift: ShiftType): string {
   return shift.toLowerCase();
 }
 
-async function withTimeout<T>(queryBuilder: PromiseLike<T>, timeoutMs: number = 10000): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
-  );
-  return Promise.race([Promise.resolve(queryBuilder), timeout]);
+async function withTimeout<T>(promise: PromiseLike<T>, ms: number = 15000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Operation timed out')), ms);
+  });
+  try {
+    return await Promise.race([Promise.resolve(promise), timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
@@ -66,19 +71,22 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Parallel fetch: sessions, items, downtimes
-      const [sessionsRes, itemsRes, downtimesRes] = await Promise.all([
-        supabase
-          .from('production_sessions')
-          .select('*')
-          .order('date', { ascending: false }),
-        supabase
-          .from('production_items')
-          .select('*'),
-        supabase
-          .from('structured_downtimes')
-          .select('*'),
-      ]);
+      // Parallel fetch with 15s timeout
+      const [sessionsRes, itemsRes, downtimesRes] = await withTimeout(
+        Promise.all([
+          supabase
+            .from('production_sessions')
+            .select('*')
+            .order('date', { ascending: false }),
+          supabase
+            .from('production_items')
+            .select('*'),
+          supabase
+            .from('structured_downtimes')
+            .select('*'),
+        ]),
+        15000
+      );
 
       if (sessionsRes.error) {
         console.error('Error fetching sessions:', sessionsRes.error);
@@ -288,8 +296,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         await supabase.from('structured_downtimes').insert(downtimesToInsert);
       }
 
-      await refreshSessions();
       timer.end();
+      refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true, sessionId };
     } catch (error) {
       console.error('Error saving session:', error);
@@ -394,8 +402,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await refreshSessions();
       timer.end();
+      refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true };
     } catch (error) {
       console.error('Error updating session:', error);
@@ -414,7 +422,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         console.error('Error deleting session:', error);
         return { success: false, error: error.message };
       }
-      await refreshSessions();
+      refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true };
     } catch (error) {
       console.error('Error deleting session:', error);
