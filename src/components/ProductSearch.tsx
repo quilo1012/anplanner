@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Package, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useProductCache } from '@/hooks/useProductCache';
+import { createPerfTimer } from '@/utils/performanceLogger';
 
 interface Product {
   product_code: string;
@@ -11,7 +13,7 @@ interface Product {
 interface ProductSearchProps {
   value: string;
   onChange: (sku: string, product?: { sku: string; name: string }) => void;
-  onFoundStatusChange?: (found: boolean) => void;  // Callback when SKU found status changes
+  onFoundStatusChange?: (found: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -26,6 +28,16 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   const [hasSearched, setHasSearched] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Use product cache for O(1) lookups
+  const { searchProducts, hasProduct, getProduct, isLoaded: cacheLoaded, loadProducts } = useProductCache();
+
+  // Load cache on mount if not loaded
+  useEffect(() => {
+    if (!cacheLoaded) {
+      loadProducts();
+    }
+  }, [cacheLoaded, loadProducts]);
 
   // Sync external value
   useEffect(() => {
@@ -45,9 +57,9 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Search products
+  // Search products - cache first, fallback to DB
   useEffect(() => {
-    const searchProducts = async () => {
+    const searchProductsHandler = async () => {
       if (query.length < 2) {
         setResults([]);
         setSkuNotFound(false);
@@ -55,9 +67,66 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         return;
       }
 
+      const timer = createPerfTimer('ProductSearch');
       setIsLoading(true);
       setHasSearched(true);
+      
       try {
+        // CACHE FIRST: Try local cache (O(1) lookup)
+        if (cacheLoaded) {
+          const cachedResults = searchProducts(query);
+          
+          if (cachedResults.length > 0) {
+            // Map to component format
+            const formattedResults = cachedResults.map(p => ({
+              product_code: p.sku,
+              product_description: p.name,
+            }));
+            
+            setResults(formattedResults);
+            
+            // Check for exact match
+            const exactMatch = cachedResults.find(
+              p => p.sku.toLowerCase() === query.toLowerCase()
+            );
+            const isFound = !!exactMatch;
+            setSkuNotFound(!isFound);
+            onFoundStatusChange?.(isFound);
+            
+            if (exactMatch && !selectedProduct) {
+              setSelectedProduct({
+                product_code: exactMatch.sku,
+                product_description: exactMatch.name,
+              });
+              onChange(exactMatch.sku, { 
+                sku: exactMatch.sku, 
+                name: exactMatch.name,
+              });
+            }
+            
+            timer.end();
+            setIsLoading(false);
+            return;
+          }
+          
+          // Cache miss but cache loaded - check if exact SKU exists
+          if (hasProduct(query)) {
+            const product = getProduct(query);
+            if (product) {
+              setResults([{
+                product_code: product.sku,
+                product_description: product.name,
+              }]);
+              setSkuNotFound(false);
+              onFoundStatusChange?.(true);
+              timer.end();
+              setIsLoading(false);
+              return;
+            }
+          }
+        }
+
+        // FALLBACK: Query database for new/unknown SKUs
         const { data, error } = await supabase
           .from('products')
           .select('product_code, product_description')
@@ -67,6 +136,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
 
         if (error) {
           console.error('Error searching products:', error);
+          timer.end();
           return;
         }
 
@@ -77,17 +147,17 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         const isFound = !!exactMatch;
         setSkuNotFound(!isFound && query.length >= 2);
         
-        // Notify parent of found status
         onFoundStatusChange?.(isFound);
         
         if (exactMatch && !selectedProduct) {
-          // Auto-select if exact match
           setSelectedProduct(exactMatch);
           onChange(exactMatch.product_code, { 
             sku: exactMatch.product_code, 
-            name: exactMatch.product_description 
+            name: exactMatch.product_description,
           });
         }
+        
+        timer.end();
       } catch (error) {
         console.error('Error searching products:', error);
       } finally {
@@ -95,9 +165,10 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
       }
     };
 
-    const debounce = setTimeout(searchProducts, 500);
+    // Reduced debounce from 500ms to 300ms since cache is fast
+    const debounce = setTimeout(searchProductsHandler, 300);
     return () => clearTimeout(debounce);
-  }, [query]);
+  }, [query, cacheLoaded, searchProducts, hasProduct, getProduct]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -105,7 +176,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     setIsOpen(true);
     setSelectedProduct(null);
     setSkuNotFound(false);
-    onFoundStatusChange?.(false);  // Reset found status on change
+    onFoundStatusChange?.(false);
     onChange(newValue);
   };
 
@@ -114,10 +185,10 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     setSelectedProduct(product);
     setSkuNotFound(false);
     setIsOpen(false);
-    onFoundStatusChange?.(true);  // Found in DB
+    onFoundStatusChange?.(true);
     onChange(product.product_code, { 
       sku: product.product_code, 
-      name: product.product_description 
+      name: product.product_description,
     });
   };
 

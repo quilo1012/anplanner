@@ -21,15 +21,15 @@
 
 | Requisito | Status | Prioridade |
 |-----------|--------|------------|
-| Cache de produtos (SKU Search) | ❌ Falta | CRÍTICO |
-| Cache de lookups fixos (Lines, Leaders, Categories) | ❌ Falta | CRÍTICO |
-| Index no SKU da products | ❌ Falta | ALTA |
-| Index no SKU da shifts | ❌ Falta | ALTA |
-| Index no line_leader | ❌ Falta | MÉDIA |
-| Downtime batch operations | ⚠️ Parcial | ALTA |
+| Cache de produtos (SKU Search) | ✅ Implementado | useProductCache.ts |
+| Cache de lookups fixos (Lines, Leaders, Categories) | ✅ Implementado | useLookupCache.ts |
+| Index no SKU da products | ✅ Criado | idx_products_sku (UNIQUE) |
+| Index no SKU da shifts | ✅ Criado | idx_shifts_sku |
+| Index no line_leader | ✅ Criado | idx_shifts_line_leader |
+| Downtime batch operations | ✅ Implementado | saveDowntimesBatch() |
 | Lazy loading por linha no Planner | ❌ Falta | MÉDIA |
 | Dashboard com dados pré-agregados | ❌ Falta | BAIXA |
-| Logs de observabilidade | ❌ Falta | BAIXA |
+| Logs de observabilidade | ✅ Implementado | performanceLogger.ts |
 
 ---
 

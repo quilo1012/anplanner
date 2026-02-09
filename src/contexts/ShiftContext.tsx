@@ -16,6 +16,7 @@ interface ShiftContextType {
   addShiftsBatch: (shifts: ShiftFormData[]) => Promise<ShiftOperationResult>;
   updateShift: (id: string, data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
   deleteShift: (id: string, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
+  saveDowntimesBatch: (shiftId: string, downtimes: StructuredDowntime[]) => Promise<ShiftOperationResult>;
   getShiftById: (id: string) => ShiftReport | undefined;
   refreshShifts: () => Promise<void>;
   // Optimistic update helpers
@@ -504,6 +505,66 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     return shifts.find(shift => shift.id === id);
   };
 
+  /**
+   * Batch save downtimes for a shift - NO refresh, optimistic local update only.
+   * Designed for < 500ms save time as per industrial requirements.
+   */
+  const saveDowntimesBatch = async (
+    shiftId: string,
+    downtimes: StructuredDowntime[]
+  ): Promise<ShiftOperationResult> => {
+    try {
+      // Delete existing downtimes for this shift
+      const { error: deleteError } = await withTimeout(
+        supabase
+          .from('structured_downtimes')
+          .delete()
+          .eq('shift_id', shiftId),
+        5000
+      );
+
+      if (deleteError) {
+        console.error('Error deleting old downtimes:', deleteError);
+        return { success: false, error: deleteError.message };
+      }
+
+      // Insert new downtimes in batch
+      if (downtimes.length > 0) {
+        const downtimesToInsert = downtimes.map(d => ({
+          shift_id: shiftId,
+          category: d.category,
+          reason: d.reason,
+          duration: d.duration,
+          comment: d.comment || null,
+        }));
+
+        const { error: insertError } = await withTimeout(
+          supabase
+            .from('structured_downtimes')
+            .insert(downtimesToInsert),
+          5000
+        );
+
+        if (insertError) {
+          console.error('Error inserting downtimes:', insertError);
+          return { success: false, error: insertError.message };
+        }
+      }
+
+      // Optimistic local update - NO refreshShifts() call
+      const totalDowntime = downtimes.reduce((sum, d) => sum + d.duration, 0);
+      updateShiftLocally(shiftId, {
+        structuredDowntimes: downtimes,
+        totalDowntime,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving downtimes batch:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  };
+
   return (
     <ShiftContext.Provider value={{ 
       shifts, 
@@ -512,7 +573,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       addShift, 
       addShiftsBatch,
       updateShift, 
-      deleteShift, 
+      deleteShift,
+      saveDowntimesBatch,
       getShiftById, 
       refreshShifts,
       addShiftLocally,
