@@ -1,9 +1,11 @@
 import { ProductionSession, ShiftType } from '@/types/production';
+import { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from '@/types/downtime';
 
 interface PrintReportProps {
   sessions: ProductionSession[];
   date: string;
   shift: ShiftType;
+  dateRange?: string;
 }
 
 export function PrintReport({ sessions, date, shift }: PrintReportProps) {

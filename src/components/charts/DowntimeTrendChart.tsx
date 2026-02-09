@@ -15,7 +15,7 @@ export function DowntimeTrendChart({ sessions }: DowntimeTrendChartProps) {
       const shiftKey = s.shift.toLowerCase() as 'day' | 'night';
       byDate[s.date][shiftKey] += s.totalDowntime;
     });
-    return Object.entries(byDate).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime()).slice(-7)
+    return Object.entries(byDate).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
       .map(([date, data]) => ({ date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), day: data.day || 0, night: data.night || 0 }));
   }, [sessions]);
 
