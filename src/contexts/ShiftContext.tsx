@@ -126,7 +126,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // Fetch shifts
       const { data: shiftsData, error: shiftsError } = await supabase
         .from('shifts')
-        .select('*')
+        .select('id, date, shift_type, production_line, line_leader, product_name, sku, planned_quantity, real_production, performance, comments, is_archived, monitoring_photo_url, staff_planned, staff_actual, created_by, created_at, updated_at')
         .order('date', { ascending: false });
 
       if (shiftsError) {
