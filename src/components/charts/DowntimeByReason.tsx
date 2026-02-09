@@ -17,12 +17,14 @@ function getReasonLabel(category: string, reasonCode: string): string {
   return found ? found.label : reasonCode;
 }
 
-export function DowntimeByReason({ sessions }: DowntimeByReasonProps) {
+export function DowntimeByReason({ sessions, filterCategory, filterReason }: DowntimeByReasonProps) {
   const data = useMemo(() => {
     const reasonTotals: Record<string, { label: string; minutes: number }> = {};
     sessions.forEach(s => {
       if (s.structuredDowntimes) {
         s.structuredDowntimes.forEach(dt => {
+          if (filterCategory && dt.category !== filterCategory) return;
+          if (filterReason && dt.reason !== filterReason) return;
           const key = `${dt.category}:${dt.reason}`;
           const label = getReasonLabel(dt.category, dt.reason);
           if (!reasonTotals[key]) reasonTotals[key] = { label, minutes: 0 };

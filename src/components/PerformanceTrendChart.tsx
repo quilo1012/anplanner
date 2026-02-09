@@ -14,7 +14,7 @@ export function PerformanceTrendChart({ sessions }: PerformanceTrendChartProps) 
       const shiftKey = s.shift.toLowerCase() as 'day' | 'night';
       if (byDate[s.date][shiftKey]) byDate[s.date][shiftKey].push(s.performance);
     });
-    return Object.entries(byDate).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime()).slice(-7)
+    return Object.entries(byDate).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
       .map(([date, data]) => {
         const calcAvg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null;
         return { date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), day: calcAvg(data.day), night: calcAvg(data.night) };

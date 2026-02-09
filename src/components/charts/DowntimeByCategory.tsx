@@ -15,12 +15,13 @@ const CATEGORY_COLORS: Record<string, string> = {
   staff: 'hsl(var(--industrial-green))', other: 'hsl(var(--muted-foreground))',
 };
 
-export function DowntimeByCategory({ sessions }: DowntimeByCategoryProps) {
+export function DowntimeByCategory({ sessions, filterCategory }: DowntimeByCategoryProps) {
   const data = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
     sessions.forEach(s => {
       if (s.structuredDowntimes) {
         s.structuredDowntimes.forEach(dt => {
+          if (filterCategory && dt.category !== filterCategory) return;
           categoryTotals[dt.category] = (categoryTotals[dt.category] || 0) + dt.duration;
         });
       }

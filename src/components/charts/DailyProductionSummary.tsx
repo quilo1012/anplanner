@@ -13,7 +13,7 @@ export function DailyProductionSummary({ sessions }: DailyProductionSummaryProps
     return Object.entries(byDate)
       .map(([date, total]) => ({ date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), rawDate: date, total }))
       .sort((a, b) => new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime())
-      .slice(-14);
+      ;
   }, [sessions]);
 
   if (chartData.length === 0) return <div className="h-64 flex items-center justify-center text-muted-foreground">No production data for selected filters</div>;
