@@ -25,6 +25,8 @@ const LINE_COLORS = [
 
 export function Dashboard() {
   const { sessions, isLoading } = useShifts();
+  const { user } = useAuth();
+  const isOperator = user?.role === 'operator';
   const [selectedShift, setSelectedShift] = useState<ShiftType>('DAY');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedLine, setSelectedLine] = useState<string>('');
