@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
 import { PerformanceTrendChart } from '@/components/PerformanceTrendChart';
