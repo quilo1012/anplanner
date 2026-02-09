@@ -1,46 +1,91 @@
 
-# Fix: History Edit Freezing on Save
+
+# Fix: updateSession Timing Out on Save
 
 ## Root Cause
 
-The `updateSession` function in `ShiftContext.tsx` has **multiple database operations without timeouts or error handling**. When inserting production items or downtimes, if any request stalls (network delay, RLS issue), the entire save hangs indefinitely because:
+Two issues cause the save to freeze:
 
-1. **Lines 337-352** (items delete + insert): No `withTimeout`, no error handling -- if the request stalls, it blocks forever
-2. **Lines 356-367** (downtimes delete + insert): Same problem -- no timeout, no error catching
-3. Only the session update itself (line 313) has `withTimeout`
+1. **`withTimeout` leaks timers**: The `setTimeout` is never cleared when the Supabase query resolves successfully. With 6 sequential `withTimeout` calls in `updateSession`, old timers accumulate and can cause unexpected rejections.
 
-Additionally, the `EditShiftDialog` has a secondary issue:
-- **Line 50-72**: Misuses `useState(() => {...})` as a side-effect runner (should be initialization only)
-- This is fragile and can cause stale form state on re-opens
+2. **`refreshSessions()` has no timeout or error protection**: After all 6 DB operations complete successfully, `await refreshSessions()` runs 3 unbounded queries (sessions, items, downtimes) with zero timeout. If any query hangs, `updateSession` never returns, and the save button stays stuck on "Saving..." forever.
 
-## Fix Summary
+## Fix
 
-### 1. `src/contexts/ShiftContext.tsx` -- Add timeouts and error handling to ALL operations in `updateSession`
+### 1. Fix `withTimeout` to clear timer on success
 
-Wrap every database call in `withTimeout` and add error checks:
+Replace the current implementation with one that properly cleans up:
 
 ```text
-updateSession(id, data):
-  1. Upload photo if needed (already OK)
-  2. UPDATE session         -> withTimeout + error check (already done)
-  3. DELETE old items       -> ADD withTimeout + error check
-  4. INSERT new items       -> ADD withTimeout + error check
-  5. DELETE old downtimes   -> ADD withTimeout + error check
-  6. INSERT new downtimes   -> ADD withTimeout + error check
-  7. refreshSessions()
+Before: Promise.race([query, timeout])  -- timer leaks
+After:  Promise.race([query, timeout])  -- clearTimeout on resolve
 ```
 
-Each step returns early with `{ success: false, error }` if it fails, ensuring the `finally` block runs and `isSubmitting` resets.
+### 2. Make `refreshSessions` non-blocking after save
 
-### 2. `src/components/history/EditShiftDialog.tsx` -- Fix state initialization
+Instead of `await refreshSessions()` (which can hang indefinitely), do an **optimistic local state update** for `updateSession` and fire `refreshSessions()` in background without blocking the result:
 
-- Remove the misused `useState(() => {...})` block (lines 50-72)
-- Keep only the render-time sync pattern (lines 74-93) which correctly detects session changes via `prevSessionId`
-- This prevents stale state and potential issues on dialog re-open
+```text
+Before:
+  await refreshSessions();  // blocks forever if slow
+  return { success: true };
+
+After:
+  // Optimistic: update local state immediately
+  setSessions(prev => prev.map(s => s.id === id ? updatedSession : s));
+  // Background refresh (non-blocking)
+  refreshSessions().catch(console.error);
+  return { success: true };
+```
+
+### 3. Add timeout to `refreshSessions` itself
+
+Wrap the 3 parallel queries inside `refreshSessions` with a 15-second timeout so it can never hang indefinitely.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/contexts/ShiftContext.tsx` | Wrap items/downtimes operations in `withTimeout`, add error handling for each step |
-| `src/components/history/EditShiftDialog.tsx` | Remove misused `useState` side-effect block |
+| `src/contexts/ShiftContext.tsx` | Fix `withTimeout` to clear timer; make `refreshSessions` non-blocking after mutations; add timeout to `refreshSessions` queries |
+
+## Technical Details
+
+### Fixed `withTimeout`
+
+```typescript
+async function withTimeout<T>(promise: PromiseLike<T>, ms = 15000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Operation timed out')), ms);
+  });
+  try {
+    return await Promise.race([Promise.resolve(promise), timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+```
+
+### Non-blocking refresh pattern
+
+Applied to `updateSession`, `saveSession`, and `deleteSession`:
+
+```typescript
+// Instead of: await refreshSessions();
+refreshSessions().catch(err => console.error('Background refresh failed:', err));
+return { success: true };
+```
+
+### Timeout on refreshSessions
+
+```typescript
+const refreshSessions = useCallback(async () => {
+  // ... existing checks ...
+  const [sessionsRes, itemsRes, downtimesRes] = await Promise.race([
+    Promise.all([...3 queries...]),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Refresh timed out')), 15000))
+  ]);
+  // ...
+}, [...]);
+```
+
