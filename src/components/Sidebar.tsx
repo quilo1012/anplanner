@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Factory, Clock } from 'lucide-react';
+import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Factory, Clock, FileBarChart } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 
 export function Sidebar() {
