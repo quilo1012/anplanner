@@ -6,6 +6,8 @@ import { DOWNTIME_REASONS_BY_CATEGORY } from '@/types/downtime';
 
 interface DowntimeByReasonProps {
   sessions: ProductionSession[];
+  filterCategory?: string;
+  filterReason?: string;
 }
 
 function getReasonLabel(category: string, reasonCode: string): string {
