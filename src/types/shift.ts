@@ -78,4 +78,3 @@ export const DOWNTIME_REASONS: DowntimeReason[] = [
 export const SHIFT_TYPES: ShiftType[] = ['DAY', 'NIGHT'];
 
 export type { StructuredDowntime, DowntimeCategory };
-export { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY };
