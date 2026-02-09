@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
 import { PerformanceTrendChart } from '@/components/PerformanceTrendChart';
@@ -24,6 +25,8 @@ const LINE_COLORS = [
 
 export function Dashboard() {
   const { sessions, isLoading } = useShifts();
+  const { user } = useAuth();
+  const isOperator = user?.role === 'operator';
   const [selectedShift, setSelectedShift] = useState<ShiftType>('DAY');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedLine, setSelectedLine] = useState<string>('');
@@ -38,13 +41,15 @@ export function Dashboard() {
 
   const filteredSessions = useMemo(() => {
     return sessions.filter(s => {
+      // Operator filter: only show sessions where lineLeader matches user name
+      if (isOperator && user?.name && s.lineLeader.toLowerCase() !== user.name.toLowerCase()) return false;
       const matchesDate = s.date === selectedDate;
       const matchesShift = s.shift === selectedShift;
       const matchesLine = !selectedLine || s.productionLine === selectedLine;
       const matchesLeader = !selectedLeader || s.lineLeader === selectedLeader;
       return matchesDate && matchesShift && matchesLine && matchesLeader;
     });
-  }, [sessions, selectedDate, selectedShift, selectedLine, selectedLeader]);
+  }, [sessions, selectedDate, selectedShift, selectedLine, selectedLeader, isOperator, user?.name]);
 
   const stats = useMemo(() => {
     const totalSessions = filteredSessions.length;
