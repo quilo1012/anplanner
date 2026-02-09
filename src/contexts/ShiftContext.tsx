@@ -334,8 +334,15 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       // Replace items
-      await supabase.from('production_items').delete().eq('session_id', id);
-      
+      const { error: deleteItemsError } = await withTimeout(
+        supabase.from('production_items').delete().eq('session_id', id),
+        10000
+      );
+      if (deleteItemsError) {
+        console.error('Error deleting old items:', deleteItemsError);
+        return { success: false, error: deleteItemsError.message };
+      }
+
       if (data.items.length > 0) {
         const itemsToInsert = data.items
           .filter(i => i.sku.trim())
@@ -348,13 +355,27 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           }));
 
         if (itemsToInsert.length > 0) {
-          await supabase.from('production_items').insert(itemsToInsert);
+          const { error: insertItemsError } = await withTimeout(
+            supabase.from('production_items').insert(itemsToInsert),
+            10000
+          );
+          if (insertItemsError) {
+            console.error('Error inserting items:', insertItemsError);
+            return { success: false, error: insertItemsError.message };
+          }
         }
       }
 
       // Replace downtimes
-      await supabase.from('structured_downtimes').delete().eq('session_id', id);
-      
+      const { error: deleteDowntimesError } = await withTimeout(
+        supabase.from('structured_downtimes').delete().eq('session_id', id),
+        10000
+      );
+      if (deleteDowntimesError) {
+        console.error('Error deleting old downtimes:', deleteDowntimesError);
+        return { success: false, error: deleteDowntimesError.message };
+      }
+
       if (data.structuredDowntimes && data.structuredDowntimes.length > 0) {
         const downtimesToInsert = data.structuredDowntimes.map(d => ({
           session_id: id,
@@ -363,7 +384,14 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           duration: d.duration,
           comment: d.comment || null,
         }));
-        await supabase.from('structured_downtimes').insert(downtimesToInsert);
+        const { error: insertDowntimesError } = await withTimeout(
+          supabase.from('structured_downtimes').insert(downtimesToInsert),
+          10000
+        );
+        if (insertDowntimesError) {
+          console.error('Error inserting downtimes:', insertDowntimesError);
+          return { success: false, error: insertDowntimesError.message };
+        }
       }
 
       await refreshSessions();
