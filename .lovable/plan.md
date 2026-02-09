@@ -1,104 +1,111 @@
 
 
-# Dashboard Professional Upgrade
+# Weekly Production Report
 
-## Resumo das Melhorias
+## Overview
 
-### 1. Filtro por Intervalo de Datas (Data Inicio / Data Fim)
+A new **read-only** Weekly Production Report page accessible from the sidebar navigation. It displays a professional table summarizing production performance per line, per day, per shift for a selected calendar week, with week-to-date totals and print support.
 
-Substituir o campo de data unica por dois campos: **Data Inicio** e **Data Fim**. Isto permite analisar periodos completos (ex: semana passada, mes inteiro).
+## New Route and Navigation
 
-- Adicionar estado `startDate` e `endDate` em vez do actual `selectedDate`
-- Botoes de preset rapido: "Hoje", "7 Dias", "30 Dias", "Mes Atual"
-- Todos os graficos e tabelas passam a filtrar pelo intervalo completo
-- Os trend charts (Performance 7d, Downtime 7d) passam a usar o intervalo seleccionado em vez de hardcoded 7 dias
+- Add `/weekly-report` route in `App.tsx`
+- Add "Weekly Report" nav item in `Sidebar.tsx` (icon: `FileBarChart`) -- visible to all roles
 
-### 2. Filtros Detalhados de Downtime
+## Backend: Edge Function
 
-Adicionar filtros especificos para downtime dentro da seccao de graficos:
+Create a new edge function `weekly-report` that performs all calculations server-side using SQL aggregation. This ensures sub-second response times and avoids frontend per-cell calculations.
 
-- Dropdown de **Categoria de Downtime** (Maintenance, Quality, Staff, etc.)
-- Dropdown de **Razao de Downtime** (dinamico baseado na categoria seleccionada)
-- Os graficos DowntimeByCategory e DowntimeByReason actualizam com os filtros
-- Novo card de **Downtime History** mostrando uma tabela com todas as entradas de downtime do periodo filtrado (linha, data, categoria, razao, duracao)
+**Endpoint**: `GET /weekly-report?line=Line 1&week_start=2026-02-02&shift=ALL`
 
-### 3. Daily Summary Imprimivel
+**SQL Logic**:
+- Query `production_sessions` joined with `production_items` and `structured_downtimes`
+- `GROUP BY` production_line, date, shift_type
+- Return pre-aggregated rows: `{ date, shift, planned_qty, actual_qty, performance, downtime_minutes }`
+- Performance: `CASE WHEN planned > 0 THEN ROUND((actual::numeric / planned) * 100, 1) ELSE NULL END`
+- Downtime: `SUM(duration)` from structured_downtimes
 
-Melhorar o DailySummaryTable para ser imprimivel:
+**Access Control**: The edge function checks the user's JWT. If role is `operator`, it filters by `line_leader = user.name`. Supervisors/admins see all.
 
-- Adicionar botao "Print" dedicado junto ao titulo do Daily Summary
-- Gerar uma versao print-friendly com cabecalho (logo, periodo, filtros activos)
-- Incluir totais e medias no rodape da tabela
-- Remover o limite de 20 linhas - mostrar todos os dados do periodo
-
-### 4. Layout Mais Profissional
-
-Melhorias visuais para dar um aspecto mais limpo e corporativo:
-
-- **Barra de filtros**: Reorganizar em duas linhas - datas/presets na primeira, filtros de linha/leader na segunda
-- **Section headers**: Adicionar divisores visuais entre seccoes (Line Cards, Charts, Summary) com titulos claros
-- **Print styles**: Melhorar CSS de impressao para que TODOS os graficos e tabelas aparecam correctamente quando se imprime
-- **Spacing consistente**: Uniformizar gaps e paddings entre cards e seccoes
-- **Summary bar**: Barra fixa no topo com KPIs principais (Total Production, Avg Performance, Total Downtime, OEE) com design mais limpo
-
-## Ficheiros a Alterar
-
-| Ficheiro | Alteracao |
-|----------|-----------|
-| `src/pages/Dashboard.tsx` | Filtro de intervalo de datas; presets de data; filtros de downtime; reorganizacao do layout; section headers |
-| `src/components/charts/DailySummaryTable.tsx` | Remover limite de 20 linhas; adicionar totais; botao print dedicado; print styles |
-| `src/components/charts/DowntimeByCategory.tsx` | Aceitar filtro de categoria opcional |
-| `src/components/charts/DowntimeByReason.tsx` | Aceitar filtro de categoria/razao opcional |
-| `src/components/charts/DowntimeTrendChart.tsx` | Usar intervalo de datas em vez de hardcoded 7 dias |
-| `src/components/charts/PerformanceTrendChart.tsx` (titulo apenas) | Usar intervalo de datas em vez de hardcoded 7 dias |
-| `src/components/charts/DailyProductionSummary.tsx` | Usar intervalo de datas completo |
-| `src/components/PrintReport.tsx` | Adicionar seccao de downtime detalhado; suportar intervalo de datas |
-
-## Detalhes Tecnicos
-
-### Filtro de intervalo de datas
-
-```typescript
-// Substituir selectedDate por:
-const [startDate, setStartDate] = useState<string>(today);
-const [endDate, setEndDate] = useState<string>(today);
-
-// Presets
-const setPreset = (preset: string) => {
-  const now = new Date();
-  switch (preset) {
-    case 'today': setStartDate(today); setEndDate(today); break;
-    case '7d': setStartDate(sub7days); setEndDate(today); break;
-    case '30d': setStartDate(sub30days); setEndDate(today); break;
-  }
-};
-
-// Filtro passa a ser:
-const matchesDate = s.date >= startDate && s.date <= endDate;
-```
-
-### Downtime History Table (novo componente inline)
-
-Tabela dentro do Dashboard que lista TODAS as entradas de downtime do periodo:
-
-| Data | Turno | Linha | Categoria | Razao | Duracao |
-|------|-------|-------|-----------|-------|---------|
-| Extraido de `session.structuredDowntimes` para todas as sessoes filtradas |
-
-### DailySummaryTable melhorado
-
-- Linha de totais no rodape (Total Planned, Total Actual, Total Downtime, Avg Performance)
-- Sem limite de 20 linhas quando em modo de impressao
-- Botao print que abre `window.print()` com CSS especifico para a tabela
-
-### Print Styles globais
-
-```css
-@media print {
-  .dashboard-section { page-break-inside: avoid; }
-  .no-print { display: none !important; }
-  .print-only { display: block !important; }
-  .recharts-responsive-container { height: 200px !important; }
+**Response Shape**:
+```text
+{
+  line: "Line 1",
+  week_start: "2026-02-02",
+  days: [
+    { date: "2026-02-02", day_name: "Mon", shift: "DAY", planned: 5000, actual: 4800, performance: 96.0, downtime_minutes: 45 },
+    { date: "2026-02-02", day_name: "Mon", shift: "NIGHT", planned: 4000, actual: 3900, performance: 97.5, downtime_minutes: 20 },
+    ...
+  ],
+  totals: { planned: 35000, actual: 33500, performance: 95.7, downtime_minutes: 280 }
 }
 ```
+
+## Frontend: New Page `src/pages/WeeklyReport.tsx`
+
+### Filter Bar
+- **Production Line** dropdown (required) -- operators see only their line
+- **Week Selector**: calendar-based week picker (Mon-Sun), showing "Week 6: 02 Feb - 08 Feb 2026"
+- **Shift**: DAY / NIGHT / ALL (default: ALL)
+- Navigation arrows to move between weeks quickly
+
+### Report Table
+
+```text
++--------+-------+---------+--------+-------------+----------+
+|  Day   | Shift | Planned | Actual | Performance | Downtime |
++--------+-------+---------+--------+-------------+----------+
+| Mon 02 | DAY   |   5,000 |  4,800 |      96.0%  |  0:45    |
+| Mon 02 | NIGHT |   4,000 |  3,900 |      97.5%  |  0:20    |
+| Tue 03 | DAY   |   5,000 |  5,100 |     102.0%  |  0:10    |
+| ...    |       |         |        |             |          |
++--------+-------+---------+--------+-------------+----------+
+| WEEK TOTAL     |  35,000 | 33,500 |      95.7%  |  4:40    |
++--------+-------+---------+--------+-------------+----------+
+```
+
+### Visual Rules
+- Performance >= 100%: green background
+- Performance 90-99%: yellow/amber background
+- Performance < 90%: red background
+- No plan (null): gray dash "--"
+- Downtime always displayed in HH:MM format
+- Zero downtime shown as "0:00" (never hidden)
+
+### Empty States
+- "No data for this week" message when no sessions exist
+- Never shows errors or blocks other pages
+
+### Print Button
+- "Print Weekly Report" button (top right)
+- Opens print-optimized view: black and white, A4, table only, no charts
+- Header with: company name, line, week, shift filter, generation timestamp
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `supabase/functions/weekly-report/index.ts` | CREATE - Edge function with SQL aggregation |
+| `src/pages/WeeklyReport.tsx` | CREATE - Full page component with filters, table, print |
+| `src/App.tsx` | MODIFY - Add `/weekly-report` route |
+| `src/components/Sidebar.tsx` | MODIFY - Add nav item |
+| `src/components/MobileMenu.tsx` | MODIFY - Add nav item |
+
+## Access Control
+
+- **Operators**: Line dropdown is pre-filtered to show only lines where they are the leader. The edge function also enforces this server-side.
+- **Supervisors/Admins**: Can select any line, print reports.
+
+## Performance
+
+- All aggregation happens in the edge function SQL query (single query with JOINs and GROUP BY)
+- Frontend receives max ~14 rows per week (7 days x 2 shifts)
+- No dependency on ShiftContext -- uses its own fetch via the edge function
+- Does not trigger planner or dashboard refreshes
+
+## Data Safety
+
+- Missing data shows empty cells or dashes
+- Division by zero prevented in SQL with `CASE WHEN planned > 0`
+- Edge function returns empty array for weeks with no data
+- Errors caught and displayed as toast, never crash the page
 
