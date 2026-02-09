@@ -1,206 +1,300 @@
 
-# Dynamic Downtime Categories & Reasons
+# Production Session Architecture Refactor
 
-## Overview
+## Problem
 
-Currently, downtime categories and reasons are hardcoded in `src/types/downtime.ts`. This plan creates database tables for them, loads them into the existing cache layer, and adds "Add new..." options to the dropdowns in the `StructuredDowntimeForm`.
+Currently, each SKU saved from the Planner creates a **separate `shifts` row**. If you plan 3 SKUs on Line 1 / DAY / Feb 9, the system creates 3 independent records. This breaks:
 
----
+- **Dashboard**: Performance is calculated per-SKU instead of per-line, inflating or deflating averages
+- **Downtime**: Linked to individual SKU records instead of the production session
+- **History**: Shows 3 separate entries instead of 1 grouped session
+- **KPIs**: All aggregations are incorrect because the unit of measurement is wrong
 
-## Phase 1: Database Tables
+## Solution
 
-Create two new tables with case-insensitive uniqueness:
+Introduce a normalized data model:
 
-```sql
-CREATE TABLE downtime_categories (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  label text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT uq_downtime_category_name UNIQUE (name)
-);
-
-CREATE TABLE downtime_reasons (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  category_name text NOT NULL REFERENCES downtime_categories(name),
-  name text NOT NULL,
-  label text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT uq_downtime_reason_per_category UNIQUE (category_name, name)
-);
+```text
+production_sessions (1 per line + date + shift)
+  |-- id, line, date, shift, leader, staff, target, comments, photo
+  |-- UNIQUE(production_line, date, shift_type)
+  |
+  +-- production_items (N per session)
+       |-- sku, product_name, quantity_target, quantity_actual
+  |
+  +-- structured_downtimes (N per session)
+       |-- category, reason, duration, comment
+       |-- FK changes from shift_id -> session_id
 ```
 
-- Add a `citext` extension OR use `lower()` unique index for case-insensitive uniqueness
-- Seed with all existing hardcoded values from `DOWNTIME_CATEGORIES` and `DOWNTIME_REASONS_BY_CATEGORY`
-- RLS: SELECT open to authenticated users, INSERT/UPDATE for supervisors and admins
+---
+
+## Phase 1: Database Migration
+
+### New Tables
+
+**`production_sessions`** -- replaces `shifts` as the parent entity:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| production_line | text NOT NULL | |
+| date | date NOT NULL | |
+| shift_type | text NOT NULL | DAY/NIGHT |
+| line_leader | text NOT NULL | |
+| staff_planned | int DEFAULT 0 | |
+| staff_actual | int DEFAULT 0 | |
+| planned_quantity | int DEFAULT 0 | Line-level target |
+| comments | text | |
+| monitoring_photo_url | text | |
+| created_by | uuid | |
+| created_at / updated_at | timestamptz | |
+| UNIQUE | (production_line, date, shift_type) | Enforces 1 session per line/shift |
+
+**`production_items`** -- child records for each SKU:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| session_id | uuid FK -> production_sessions | |
+| sku | text NOT NULL | |
+| product_name | text | |
+| quantity_target | int DEFAULT 0 | Per-SKU target |
+| quantity_actual | int DEFAULT 0 | Per-SKU actual |
+| created_at | timestamptz | |
+
+### Data Migration
+
+Migrate existing `shifts` data:
+1. Group existing shifts by (production_line, date, shift_type)
+2. For each group, create 1 `production_session` with aggregated data
+3. Create 1 `production_item` per original shift row
+4. Re-link `structured_downtimes` from `shift_id` to the new `session_id`
+
+### Downtime FK Change
+
+- Add `session_id` column to `structured_downtimes`
+- Populate from migrated data
+- Drop old `shift_id` column
+
+### RLS Policies
+
+Same pattern as current `shifts`:
+- SELECT: authenticated users
+- INSERT/UPDATE/DELETE: supervisors and admins
+
+### Indexes
+
+```sql
+CREATE UNIQUE INDEX idx_sessions_unique ON production_sessions(production_line, date, shift_type);
+CREATE INDEX idx_items_session ON production_items(session_id);
+CREATE INDEX idx_items_sku ON production_items(sku);
+CREATE INDEX idx_downtimes_session ON structured_downtimes(session_id);
+```
 
 ---
 
-## Phase 2: Extend `useLookupCache`
+## Phase 2: Type Definitions
 
-**File:** `src/hooks/useLookupCache.ts`
+### New Types (replace ShiftReport/ShiftFormData)
 
-Currently returns static `DOWNTIME_CATEGORIES` and `DOWNTIME_REASONS_BY_CATEGORY`. Change to:
+```typescript
+// src/types/production.ts
 
-1. On `loadLookups()`, also fetch from `downtime_categories` and `downtime_reasons` tables
-2. Store in singleton globals alongside lines/leaders
-3. Add helper functions:
-   - `addCategory(name, label)` -- upserts to DB + updates cache instantly
-   - `addReason(categoryName, name, label)` -- upserts to DB + updates cache instantly
-4. Return dynamic categories/reasons instead of static constants
+interface ProductionItem {
+  id: string;
+  sku: string;
+  productName: string;
+  quantityTarget: number;
+  quantityActual: number;
+}
 
----
+interface ProductionSession {
+  id: string;
+  productionLine: string;
+  date: string;
+  shift: 'DAY' | 'NIGHT';
+  lineLeader: string;
+  staffPlanned: number;
+  staffActual: number;
+  plannedQuantity: number;  // Line-level target
+  comments: string;
+  monitoringPhoto?: string;
+  items: ProductionItem[];       // Multiple SKUs
+  downtimes: StructuredDowntime[];
+  // Computed
+  totalProduction: number;       // sum of items.quantityActual
+  totalDowntime: number;         // sum of downtimes.duration
+  performance: number;           // totalProduction / plannedQuantity * 100
+  createdAt: string;
+  updatedAt: string;
+}
+```
 
-## Phase 3: Update `StructuredDowntimeForm`
+### Keep backward-compatible exports
 
-**File:** `src/components/StructuredDowntimeForm.tsx`
-
-Replace static `DOWNTIME_CATEGORIES` and `DOWNTIME_REASONS_BY_CATEGORY` with data from `useLookupCache`.
-
-For both Category and Reason dropdowns:
-
-1. Add a special last option: `"__new__"` labeled "+ Add new..."
-2. When selected, show a text input field inline (replacing the dropdown temporarily)
-3. On blur/enter:
-   - Validate non-empty
-   - Set the downtime entry's category/reason to the new value
-   - Mark that a new category/reason needs to be persisted
-4. On form save (parent `onChange`), the new values are just strings in the downtime data
-
-The actual database insert happens in `saveDowntimesBatch` or `addShiftsBatch` -- before inserting downtimes, check if any category/reason values don't exist in cache and upsert them.
-
-**Alternative (simpler):** Insert new category/reason immediately when the user confirms the text input (on blur/enter), using the `addCategory`/`addReason` from `useLookupCache`. This is simpler and ensures the value exists before save. If the user cancels the downtime entry, the category/reason still exists but that's harmless.
-
-Chosen approach: **Insert on confirm** (simpler, no orphan risk since categories/reasons are reusable lookup data).
-
----
-
-## Phase 4: Update `src/types/downtime.ts`
-
-- Keep `DowntimeCategory` as `string` type (no longer a union of hardcoded values)
-- Remove hardcoded `DOWNTIME_CATEGORIES` and `DOWNTIME_REASONS_BY_CATEGORY` constants (or keep as fallback defaults)
-- Keep `StructuredDowntime` interface (category becomes `string` instead of union type)
+`ShiftReport` becomes an alias for `ProductionSession` during transition, or we update all imports.
 
 ---
 
-## Files to Create/Modify
+## Phase 3: Context Rewrite (ShiftContext -> ProductionContext)
+
+### Key Changes
+
+| Current | New |
+|---------|-----|
+| `shifts: ShiftReport[]` | `sessions: ProductionSession[]` |
+| `addShift(data)` | `saveSession(data)` -- upserts session + items |
+| `addShiftsBatch(shifts[])` | `saveSession(data)` -- single session, multiple items |
+| `updateShift(id, data)` | `updateSession(id, data)` |
+| `deleteShift(id)` | `deleteSession(id)` |
+| `saveDowntimesBatch(shiftId, ...)` | `saveDowntimesBatch(sessionId, ...)` |
+
+### Save Logic (Critical)
+
+```text
+saveSession(data):
+  1. Check if session exists: WHERE production_line = X AND date = Y AND shift_type = Z
+  2. If exists -> UPDATE session fields
+  3. If not exists -> INSERT new session
+  4. Delete old production_items for this session
+  5. Batch INSERT all production_items
+  6. Return session_id
+```
+
+This ensures:
+- 1 or 10 SKUs = exactly 2 queries (1 upsert session + 1 batch items)
+- Response time stays under 1 second
+
+### Data Fetching
+
+```text
+refreshSessions():
+  1. SELECT from production_sessions (explicit columns)
+  2. SELECT from production_items (all, join in memory by session_id)
+  3. SELECT from structured_downtimes (all, join in memory by session_id)
+  4. Assemble ProductionSession[] in memory
+```
+
+---
+
+## Phase 4: Frontend Updates
+
+### Planner (src/pages/Planner.tsx)
+
+- Save button calls `saveSession()` instead of `addShiftsBatch()`
+- All SKU rows go into 1 session
+- No more "creating N independent records" pattern
+
+### Dashboard (src/pages/Dashboard.tsx)
+
+- Consumes `sessions[]` instead of `shifts[]`
+- `lineStats` groups naturally by session (1 session = 1 line card)
+- Performance is `session.performance` (already correct)
+- Downtime is per-session
+
+### History (src/pages/History.tsx)
+
+- Each row = 1 production session
+- Expanded view shows list of SKU items within the session
+- Edit opens the session with all its items
+
+### Downtime (src/pages/Downtime.tsx)
+
+- Extracts downtimes from sessions (not individual SKUs)
+- Each downtime links to a session (line+date+shift) not an SKU
+
+### EditShiftDialog -> EditSessionDialog
+
+- Loads full session with all items
+- No more "additional rows create new records" hack
+- Save updates the session + replaces items
+
+### Chart Components
+
+All chart components receive `ProductionSession[]` instead of `ShiftReport[]`:
+- `PerformanceByLine`: Already groups by line -- now 1:1 with sessions
+- `PerformanceBySKU`: Iterates `session.items` instead of individual shifts
+- `DowntimeByCategory/Reason`: Uses `session.downtimes`
+- `DailySummaryTable`: Groups by session naturally
+- `LeaderPerformanceBoard`: Groups by leader across sessions
+- `PrintReport`: Iterates sessions and their items
+
+### Export CSV
+
+Updated to flatten sessions -> rows (1 row per item within session context).
+
+---
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `supabase/migrations/XXXX_production_sessions.sql` | New tables + data migration + FK change |
+| `src/types/production.ts` | New type definitions |
+
+## Files to Modify (Major)
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/` | New migration: create tables, seed data, RLS, indexes |
-| `src/types/downtime.ts` | Relax `DowntimeCategory` to `string`, keep hardcoded as fallback seeds |
-| `src/hooks/useLookupCache.ts` | Fetch categories/reasons from DB, add `addCategory`/`addReason` functions |
-| `src/components/StructuredDowntimeForm.tsx` | Use dynamic data from cache, add "+ Add new..." option with inline text input |
-| `src/types/shift.ts` | Update `DowntimeCategory` re-export to match new string type |
+| `src/contexts/ShiftContext.tsx` | Complete rewrite -> ProductionContext |
+| `src/pages/Planner.tsx` | Save logic |
+| `src/pages/Dashboard.tsx` | Consume sessions |
+| `src/pages/History.tsx` | Display sessions with items |
+| `src/pages/Downtime.tsx` | Link to sessions |
+| `src/components/history/EditShiftDialog.tsx` | Edit full session |
+| `src/components/dashboard/LineStatusCard.tsx` | Accept session data |
+| `src/components/dashboard/OEEPanel.tsx` | Minor type changes |
+
+## Files to Modify (Minor - type imports)
+
+| File | Change |
+|------|--------|
+| `src/components/PrintReport.tsx` | Use ProductionSession |
+| `src/utils/exportCsv.ts` | Flatten sessions for export |
+| `src/components/charts/PerformanceBySKU.tsx` | Iterate session.items |
+| `src/components/charts/PerformanceByLine.tsx` | 1 session = 1 line |
+| `src/components/charts/PerformanceByLeader.tsx` | Group by session.leader |
+| `src/components/charts/DowntimeByCategory.tsx` | session.downtimes |
+| `src/components/charts/DowntimeByReason.tsx` | session.downtimes |
+| `src/components/charts/DowntimeTrendChart.tsx` | session-based |
+| `src/components/charts/DailyProductionSummary.tsx` | session-based |
+| `src/components/charts/DailySummaryTable.tsx` | Already groups -- simplify |
+| `src/components/charts/LeaderPerformanceBoard.tsx` | session-based |
+| `src/components/PerformanceTrendChart.tsx` | session-based |
+| `src/types/shift.ts` | Keep as compatibility layer or remove |
 
 ---
 
-## UX Flow
+## Data Safety
 
-```text
-User clicks Category dropdown
-  |-- Sees all existing categories
-  |-- Last option: "+ Add new..."
-  |
-  Selects "+ Add new..."
-  |-- Dropdown replaced by text input
-  |-- User types "Utilities"
-  |-- Presses Enter or clicks away
-  |     |-- toast: "New category created"
-  |     |-- Category set to "utilities"
-  |     |-- Cache updated instantly
-  |     |-- Dropdown shows new category selected
-  |
-  Same flow for Reason dropdown
-```
+Current database has only **11 shifts** and **15 downtimes**. The migration will:
+1. Create new tables
+2. Migrate all existing data
+3. Re-link downtimes
+4. The old `shifts` table will be dropped after successful migration
 
 ---
 
-## Performance Rules
+## Performance Impact
 
-- `addCategory` / `addReason`: single upsert query, no refresh, no planner reload
-- Cache update is synchronous (Map update), no re-render cascade
-- Total time for creating new category + reason < 500ms
-- If record already exists (upsert), reuse silently -- no error, no toast
+| Operation | Before | After |
+|-----------|--------|-------|
+| Save 5 SKUs on 1 line | 5 INSERT (shifts) | 1 UPSERT (session) + 1 batch INSERT (items) |
+| Load dashboard for 1 day | N rows per line | 1 session per line |
+| Downtime per line | Ambiguous (which SKU?) | Clear (1 session) |
+| Calculate line performance | Aggregate N shifts | Read 1 session.performance |
 
 ---
 
-## Technical Details
+## Implementation Order
 
-### Migration SQL (key parts)
-
-```sql
--- Enable citext for case-insensitive matching
-CREATE EXTENSION IF NOT EXISTS citext;
-
--- Categories
-CREATE TABLE downtime_categories (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name citext NOT NULL UNIQUE,
-  label text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
--- Reasons
-CREATE TABLE downtime_reasons (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  category_name citext NOT NULL REFERENCES downtime_categories(name),
-  name citext NOT NULL,
-  label text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (category_name, name)
-);
-
--- Indexes
-CREATE INDEX idx_downtime_reasons_category ON downtime_reasons(category_name);
-
--- RLS
-ALTER TABLE downtime_categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE downtime_reasons ENABLE ROW LEVEL SECURITY;
-
--- SELECT for all authenticated
-CREATE POLICY "Authenticated can view categories" ON downtime_categories FOR SELECT USING (auth.uid() IS NOT NULL);
-CREATE POLICY "Authenticated can view reasons" ON downtime_reasons FOR SELECT USING (auth.uid() IS NOT NULL);
-
--- INSERT for supervisors/admins
-CREATE POLICY "Supervisors can insert categories" ON downtime_categories FOR INSERT
-  WITH CHECK (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'supervisor'));
-CREATE POLICY "Supervisors can insert reasons" ON downtime_reasons FOR INSERT
-  WITH CHECK (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'supervisor'));
-
--- Seed existing data
-INSERT INTO downtime_categories (name, label) VALUES
-  ('maintenance', 'Maintenance Issues'),
-  ('quality', 'Quality Issues'),
-  ('health_safety', 'Health & Safety'),
-  ('warehouse', 'Warehouse'),
-  ('staff', 'Staff'),
-  ('other', 'Other');
-
-INSERT INTO downtime_reasons (category_name, name, label) VALUES
-  ('maintenance', 'cleaning', 'Cleaning'),
-  ('maintenance', 'line_prep', 'Line Prep'),
-  -- ... all existing reasons seeded
-```
-
-### Cache addCategory example
-
-```typescript
-const addCategory = async (name: string, label: string): Promise<boolean> => {
-  const normalized = name.toLowerCase().replace(/\s+/g, '_');
-  // Check cache first
-  if (globalCategories.find(c => c.value === normalized)) return true;
-  
-  // Upsert to DB
-  const { error } = await supabase
-    .from('downtime_categories')
-    .upsert({ name: normalized, label }, { onConflict: 'name' });
-  
-  if (error) return false;
-  
-  // Update cache instantly
-  globalCategories = [...globalCategories, { value: normalized, label }].sort((a,b) => a.label.localeCompare(b.label));
-  // ... trigger state update
-  return true;
-};
-```
+1. Database migration (new tables, migrate data, indexes, RLS)
+2. New type definitions
+3. ProductionContext (data layer)
+4. Planner (save logic)
+5. Dashboard + charts (display)
+6. History + EditDialog (CRUD)
+7. Downtime page
+8. Export/Print utilities
+9. Remove old `shifts` table references
