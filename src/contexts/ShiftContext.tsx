@@ -422,7 +422,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         console.error('Error deleting session:', error);
         return { success: false, error: error.message };
       }
-      await refreshSessions();
+      refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true };
     } catch (error) {
       console.error('Error deleting session:', error);
