@@ -6,6 +6,7 @@ import { DOWNTIME_CATEGORIES, DowntimeCategory } from '@/types/downtime';
 
 interface DowntimeByCategoryProps {
   sessions: ProductionSession[];
+  filterCategory?: string;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
