@@ -10,6 +10,7 @@ import { Downtime } from '@/pages/Downtime';
 import { History } from '@/pages/History';
 import { Login } from '@/pages/Login';
 import { Admin } from '@/pages/Admin';
+import { WeeklyReport } from '@/pages/WeeklyReport';
 
 const App = () => (
   <ErrorBoundary>
