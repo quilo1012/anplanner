@@ -6,7 +6,8 @@ import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
 import { SecureImage } from '@/components/SecureImage';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftType, SHIFT_TYPES, ShiftReport, DOWNTIME_CATEGORIES } from '@/types/shift';
+import { ShiftType, SHIFT_TYPES, ShiftReport } from '@/types/shift';
+import { DOWNTIME_CATEGORIES } from '@/types/downtime';
 import { exportToCsv, formatDate } from '@/utils/exportCsv';
 import { Edit, Trash2, Download, X, Image, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search } from 'lucide-react';
 

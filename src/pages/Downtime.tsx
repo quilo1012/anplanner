@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftType, SHIFT_TYPES, StructuredDowntime, DOWNTIME_CATEGORIES, DOWNTIME_REASONS } from '@/types/shift';
+import { ShiftType, SHIFT_TYPES, StructuredDowntime } from '@/types/shift';
+import { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from '@/types/downtime';
 import { formatDate } from '@/utils/exportCsv';
 import { 
   Plus, Edit, Trash2, Filter, X, Calendar, Factory, Users, 
