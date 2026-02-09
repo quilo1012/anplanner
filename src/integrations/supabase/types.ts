@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      downtime_categories: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      downtime_reasons: {
+        Row: {
+          category_name: string
+          created_at: string
+          id: string
+          label: string
+          name: string
+        }
+        Insert: {
+          category_name: string
+          created_at?: string
+          id?: string
+          label: string
+          name: string
+        }
+        Update: {
+          category_name?: string
+          created_at?: string
+          id?: string
+          label?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "downtime_reasons_category_name_fkey"
+            columns: ["category_name"]
+            isOneToOne: false
+            referencedRelation: "downtime_categories"
+            referencedColumns: ["name"]
+          },
+        ]
+      }
       products: {
         Row: {
           created_at: string

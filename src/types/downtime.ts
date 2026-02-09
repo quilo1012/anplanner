@@ -1,11 +1,17 @@
-export type DowntimeCategory = 'maintenance' | 'quality' | 'health_safety' | 'warehouse' | 'staff' | 'other';
+export type DowntimeCategory = string;
 
 export interface DowntimeReason {
   value: string;
   label: string;
 }
 
-export const DOWNTIME_CATEGORIES: { value: DowntimeCategory; label: string }[] = [
+export interface DowntimeCategoryItem {
+  value: string;
+  label: string;
+}
+
+// Fallback defaults (used if DB fetch fails)
+export const DOWNTIME_CATEGORIES_FALLBACK: DowntimeCategoryItem[] = [
   { value: 'maintenance', label: 'Maintenance Issues' },
   { value: 'quality', label: 'Quality Issues' },
   { value: 'health_safety', label: 'Health & Safety' },
@@ -14,7 +20,7 @@ export const DOWNTIME_CATEGORIES: { value: DowntimeCategory; label: string }[] =
   { value: 'other', label: 'Other' },
 ];
 
-export const DOWNTIME_REASONS_BY_CATEGORY: Record<DowntimeCategory, DowntimeReason[]> = {
+export const DOWNTIME_REASONS_FALLBACK: Record<string, DowntimeReason[]> = {
   maintenance: [
     { value: 'cleaning', label: 'Cleaning' },
     { value: 'line_prep', label: 'Line Prep' },
@@ -58,6 +64,10 @@ export const DOWNTIME_REASONS_BY_CATEGORY: Record<DowntimeCategory, DowntimeReas
     { value: 'other', label: 'Other (specify in comment)' },
   ],
 };
+
+// Keep backward-compatible exports
+export const DOWNTIME_CATEGORIES = DOWNTIME_CATEGORIES_FALLBACK;
+export const DOWNTIME_REASONS_BY_CATEGORY = DOWNTIME_REASONS_FALLBACK;
 
 export interface StructuredDowntime {
   id: string;
