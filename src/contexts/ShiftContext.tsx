@@ -2,6 +2,7 @@ import { createContext, useContext, ReactNode, useState, useEffect, useCallback 
 import { supabase } from '@/integrations/supabase/client';
 import { ShiftReport, ShiftFormData, StructuredDowntime, ShiftType } from '@/types/shift';
 import { useAuth } from './AuthContext';
+import { createPerfTimer } from '@/utils/performanceLogger';
 
 interface ShiftOperationResult {
   success: boolean;
