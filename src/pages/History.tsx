@@ -52,6 +52,8 @@ export function History() {
 
   const filteredSessions = useMemo(() => {
     return sessions.filter(session => {
+      // Operator filter: only show sessions where lineLeader matches user name
+      if (isOperator && user?.name && session.lineLeader.toLowerCase() !== user.name.toLowerCase()) return false;
       if (filterFromDate && session.date < filterFromDate) return false;
       if (filterToDate && session.date > filterToDate) return false;
       if (filterShift && session.shift !== filterShift) return false;
@@ -68,8 +70,8 @@ export function History() {
         if (!matchesSearch) return false;
       }
       return true;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [sessions, filterFromDate, filterToDate, filterShift, filterLine, filterLeader, filterSku, searchQuery]);
+    }).sort((a, b) => naturalLineSort(a.productionLine, b.productionLine));
+  }, [sessions, filterFromDate, filterToDate, filterShift, filterLine, filterLeader, filterSku, searchQuery, isOperator, user?.name]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
