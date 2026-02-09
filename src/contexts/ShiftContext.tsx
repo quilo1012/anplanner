@@ -521,6 +521,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     shiftId: string,
     downtimes: StructuredDowntime[]
   ): Promise<ShiftOperationResult> => {
+    const timer = createPerfTimer('saveDowntimesBatch');
     try {
       // Delete existing downtimes for this shift
       const { error: deleteError } = await withTimeout(
