@@ -1,4 +1,4 @@
-import { StructuredDowntime, DowntimeCategory, DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from './downtime';
+import { StructuredDowntime, DowntimeCategory } from './downtime';
 
 export type ShiftType = 'DAY' | 'NIGHT';
 
