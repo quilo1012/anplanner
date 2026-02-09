@@ -2,6 +2,7 @@ import { createContext, useContext, ReactNode, useState, useEffect, useCallback 
 import { supabase } from '@/integrations/supabase/client';
 import { ShiftReport, ShiftFormData, StructuredDowntime, ShiftType } from '@/types/shift';
 import { useAuth } from './AuthContext';
+import { createPerfTimer } from '@/utils/performanceLogger';
 
 interface ShiftOperationResult {
   success: boolean;
@@ -125,7 +126,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // Fetch shifts
       const { data: shiftsData, error: shiftsError } = await supabase
         .from('shifts')
-        .select('*')
+        .select('id, date, shift_type, production_line, line_leader, product_name, sku, planned_quantity, real_production, performance, comments, is_archived, monitoring_photo_url, staff_planned, staff_actual, created_by, created_at, updated_at')
         .order('date', { ascending: false });
 
       if (shiftsError) {
@@ -138,7 +139,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // Fetch all downtimes
       const { data: downtimesData, error: downtimesError } = await supabase
         .from('structured_downtimes')
-        .select('*');
+        .select('id, shift_id, category, reason, duration, comment, created_at');
 
       if (downtimesError) {
         console.error('Error fetching downtimes:', downtimesError);
@@ -239,6 +240,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
   const addShift = async (data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
+    const timer = createPerfTimer('addShift');
 
     try {
       const performance = calculatePerformance(data.realProduction, data.productionTarget);
@@ -304,9 +306,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       if (!skipRefresh) {
         await refreshShifts();
       }
+      timer.end();
       return { success: true };
     } catch (error) {
       console.error('Error adding shift:', error);
+      timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
@@ -315,6 +319,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const addShiftsBatch = async (shiftsData: ShiftFormData[]): Promise<ShiftOperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
     if (shiftsData.length === 0) return { success: true };
+    const timer = createPerfTimer(`addShiftsBatch(${shiftsData.length})`);
 
     try {
       // Prepare all shift data (photos are handled separately if needed)
@@ -390,15 +395,18 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       // Single refresh at the end
       await refreshShifts();
+      timer.end();
       return { success: true };
     } catch (error) {
       console.error('Error in batch shift insert:', error);
+      timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
   const updateShift = async (id: string, data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
+    const timer = createPerfTimer('updateShift');
 
     try {
       const performance = calculatePerformance(data.realProduction, data.productionTarget);
@@ -468,9 +476,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       if (!skipRefresh) {
         await refreshShifts();
       }
+      timer.end();
       return { success: true };
     } catch (error) {
       console.error('Error updating shift:', error);
+      timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
@@ -513,6 +523,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     shiftId: string,
     downtimes: StructuredDowntime[]
   ): Promise<ShiftOperationResult> => {
+    const timer = createPerfTimer('saveDowntimesBatch');
     try {
       // Delete existing downtimes for this shift
       const { error: deleteError } = await withTimeout(
@@ -558,9 +569,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         totalDowntime,
       });
 
+      timer.end();
       return { success: true };
     } catch (error) {
       console.error('Error saving downtimes batch:', error);
+      timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
