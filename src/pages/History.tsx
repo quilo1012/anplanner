@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
 import { Edit, Trash2, Download, X, Image, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
+import { naturalLineSort } from '@/utils/naturalLineSort';
 
 export function History() {
   const { sessions, refreshSessions } = useShifts();
