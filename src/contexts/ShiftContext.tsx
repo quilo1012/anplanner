@@ -402,8 +402,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await refreshSessions();
       timer.end();
+      refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true };
     } catch (error) {
       console.error('Error updating session:', error);
