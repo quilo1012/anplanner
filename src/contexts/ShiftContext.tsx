@@ -1,99 +1,46 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ShiftReport, ShiftFormData, StructuredDowntime, ShiftType } from '@/types/shift';
+import { ProductionSession, ProductionItem, ProductionSessionFormData, ShiftType } from '@/types/production';
+import { StructuredDowntime } from '@/types/downtime';
 import { useAuth } from './AuthContext';
 import { createPerfTimer } from '@/utils/performanceLogger';
 
-interface ShiftOperationResult {
+interface OperationResult {
   success: boolean;
   error?: string;
 }
 
 interface ShiftContextType {
-  shifts: ShiftReport[];
+  sessions: ProductionSession[];
   isLoading: boolean;
   error: string | null;
-  addShift: (data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
-  addShiftsBatch: (shifts: ShiftFormData[]) => Promise<ShiftOperationResult>;
-  updateShift: (id: string, data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
-  deleteShift: (id: string, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
-  saveDowntimesBatch: (shiftId: string, downtimes: StructuredDowntime[]) => Promise<ShiftOperationResult>;
-  getShiftById: (id: string) => ShiftReport | undefined;
+  saveSession: (data: ProductionSessionFormData) => Promise<OperationResult & { sessionId?: string }>;
+  updateSession: (id: string, data: ProductionSessionFormData) => Promise<OperationResult>;
+  deleteSession: (id: string) => Promise<OperationResult>;
+  saveDowntimesBatch: (sessionId: string, downtimes: StructuredDowntime[]) => Promise<OperationResult>;
+  getSessionById: (id: string) => ProductionSession | undefined;
+  refreshSessions: () => Promise<void>;
+  // Keep old names for compatibility during transition
+  shifts: ProductionSession[];
   refreshShifts: () => Promise<void>;
-  // Optimistic update helpers
-  addShiftLocally: (shift: ShiftReport) => void;
-  updateShiftLocally: (id: string, data: Partial<ShiftReport>) => void;
-  removeShiftLocally: (id: string) => void;
 }
 
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
 
-function calculatePerformance(real: number, target: number): number {
-  if (target <= 0) return 0;
-  return (real / target) * 100;
-}
-
-function calculateTotalDowntime(structuredDowntimes?: StructuredDowntime[]): number {
-  return structuredDowntimes?.reduce((total, d) => total + d.duration, 0) || 0;
-}
-
-// Map database shift_type to ShiftType (DAY/NIGHT)
 function mapDbShiftType(dbType: string): ShiftType {
   const upper = dbType?.toUpperCase();
   if (upper === 'DAY') return 'DAY';
   if (upper === 'NIGHT') return 'NIGHT';
-  // Legacy mapping from A/B/C
   if (upper === 'A' || upper === 'B') return 'DAY';
   if (upper === 'C') return 'NIGHT';
   return 'DAY';
 }
 
-// Map ShiftType to database shift_type
 function mapShiftTypeToDb(shift: ShiftType): string {
   return shift.toLowerCase();
 }
 
-// Map database row to ShiftReport
-function mapDbToShift(row: any, downtimes: any[]): ShiftReport {
-  const shiftDowntimes = downtimes.filter(d => d.shift_id === row.id);
-  const structuredDowntimes: StructuredDowntime[] = shiftDowntimes.map(d => ({
-    id: d.id,
-    category: d.category,
-    reason: d.reason,
-    duration: d.duration,
-    comment: d.comment || undefined,
-  }));
-
-  return {
-    id: row.id,
-    date: row.date,
-    shift: mapDbShiftType(row.shift_type),
-    productionLine: row.production_line,
-    lineLeader: row.line_leader,
-    product: row.product_name,
-    sku: row.sku || '',
-    productionTarget: row.planned_quantity,
-    realProduction: row.real_production,
-    performance: Number(row.performance),
-    observations: row.comments || '',
-    downtimes: [], // Legacy field, kept empty
-    structuredDowntimes,
-    totalDowntime: calculateTotalDowntime(structuredDowntimes),
-    monitoringPhoto: row.monitoring_photo_url || undefined,
-    photoFilename: row.monitoring_photo_url ? row.monitoring_photo_url.split('/').pop() : undefined,
-    staffPlanned: row.staff_planned || 0,
-    staffActual: row.staff_actual || 0,
-    isArchived: row.is_archived,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-// Timeout wrapper to prevent infinite hangs
-async function withTimeout<T>(
-  queryBuilder: PromiseLike<T>,
-  timeoutMs: number = 10000
-): Promise<T> {
+async function withTimeout<T>(queryBuilder: PromiseLike<T>, timeoutMs: number = 10000): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
   );
@@ -101,19 +48,15 @@ async function withTimeout<T>(
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
-  const [shifts, setShifts] = useState<ShiftReport[]>([]);
+  const [sessions, setSessions] = useState<ProductionSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const refreshShifts = useCallback(async () => {
-    // Don't fetch if auth is still loading or user not authenticated
-    if (authLoading) {
-      return;
-    }
-
+  const refreshSessions = useCallback(async () => {
+    if (authLoading) return;
     if (!isAuthenticated) {
-      setShifts([]);
+      setSessions([]);
       setIsLoading(false);
       setError(null);
       return;
@@ -123,89 +66,115 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Fetch shifts
-      const { data: shiftsData, error: shiftsError } = await supabase
-        .from('shifts')
-        .select('id, date, shift_type, production_line, line_leader, product_name, sku, planned_quantity, real_production, performance, comments, is_archived, monitoring_photo_url, staff_planned, staff_actual, created_by, created_at, updated_at')
-        .order('date', { ascending: false });
+      // Parallel fetch: sessions, items, downtimes
+      const [sessionsRes, itemsRes, downtimesRes] = await Promise.all([
+        supabase
+          .from('production_sessions')
+          .select('*')
+          .order('date', { ascending: false }),
+        supabase
+          .from('production_items')
+          .select('*'),
+        supabase
+          .from('structured_downtimes')
+          .select('*'),
+      ]);
 
-      if (shiftsError) {
-        console.error('Error fetching shifts:', shiftsError);
-        setError('Failed to load shifts. Please try again.');
-        setShifts([]);
+      if (sessionsRes.error) {
+        console.error('Error fetching sessions:', sessionsRes.error);
+        setError('Failed to load production data.');
+        setSessions([]);
         return;
       }
 
-      // Fetch all downtimes
-      const { data: downtimesData, error: downtimesError } = await supabase
-        .from('structured_downtimes')
-        .select('id, shift_id, category, reason, duration, comment, created_at');
+      const itemsData = itemsRes.data || [];
+      const downtimesData = downtimesRes.data || [];
 
-      if (downtimesError) {
-        console.error('Error fetching downtimes:', downtimesError);
-        // Non-critical - continue with shifts
-      }
+      // Group items and downtimes by session_id
+      const itemsBySession: Record<string, ProductionItem[]> = {};
+      itemsData.forEach((item: any) => {
+        if (!itemsBySession[item.session_id]) itemsBySession[item.session_id] = [];
+        itemsBySession[item.session_id].push({
+          id: item.id,
+          sku: item.sku,
+          productName: item.product_name || '',
+          quantityTarget: item.quantity_target || 0,
+          quantityActual: item.quantity_actual || 0,
+        });
+      });
 
-      const mappedShifts = (shiftsData || []).map(row => 
-        mapDbToShift(row, downtimesData || [])
-      );
+      const downtimesBySession: Record<string, StructuredDowntime[]> = {};
+      downtimesData.forEach((dt: any) => {
+        if (!downtimesBySession[dt.session_id]) downtimesBySession[dt.session_id] = [];
+        downtimesBySession[dt.session_id].push({
+          id: dt.id,
+          category: dt.category,
+          reason: dt.reason,
+          duration: dt.duration,
+          comment: dt.comment || undefined,
+        });
+      });
 
-      setShifts(mappedShifts);
+      const mapped: ProductionSession[] = (sessionsRes.data || []).map((row: any) => {
+        const items = itemsBySession[row.id] || [];
+        const downtimes = downtimesBySession[row.id] || [];
+        const totalProduction = items.reduce((sum, i) => sum + i.quantityActual, 0);
+        const totalDowntime = downtimes.reduce((sum, d) => sum + d.duration, 0);
+        const plannedQty = row.planned_quantity || 0;
+
+        return {
+          id: row.id,
+          productionLine: row.production_line,
+          date: row.date,
+          shift: mapDbShiftType(row.shift_type),
+          lineLeader: row.line_leader,
+          staffPlanned: row.staff_planned || 0,
+          staffActual: row.staff_actual || 0,
+          plannedQuantity: plannedQty,
+          comments: row.comments || '',
+          monitoringPhoto: row.monitoring_photo_url || undefined,
+          photoFilename: row.monitoring_photo_url ? row.monitoring_photo_url.split('/').pop() : undefined,
+          items,
+          structuredDowntimes: downtimes,
+          totalProduction,
+          totalDowntime,
+          performance: plannedQty > 0 ? (totalProduction / plannedQty) * 100 : 0,
+          isArchived: row.is_archived,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        };
+      });
+
+      setSessions(mapped);
     } catch (err) {
-      console.error('Error refreshing shifts:', err);
-      setError('An unexpected error occurred. Please reload the page.');
-      setShifts([]);
+      console.error('Error refreshing sessions:', err);
+      setError('An unexpected error occurred.');
+      setSessions([]);
     } finally {
       setIsLoading(false);
     }
   }, [isAuthenticated, authLoading]);
 
-  // Load shifts only when auth is resolved and user is authenticated
   useEffect(() => {
     if (!authLoading) {
-      refreshShifts();
+      refreshSessions();
     }
-  }, [authLoading, refreshShifts]);
+  }, [authLoading, refreshSessions]);
 
-  // Optimistic update: add shift locally
-  const addShiftLocally = useCallback((shift: ShiftReport) => {
-    setShifts(prev => [shift, ...prev]);
-  }, []);
-
-  // Optimistic update: update shift locally
-  const updateShiftLocally = useCallback((id: string, data: Partial<ShiftReport>) => {
-    setShifts(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-  }, []);
-
-  // Optimistic update: remove shift locally
-  const removeShiftLocally = useCallback((id: string) => {
-    setShifts(prev => prev.filter(s => s.id !== id));
-  }, []);
-
-  /**
-   * Sanitizes filename for Supabase Storage compatibility.
-   * Removes accents, spaces and special characters.
-   */
   const sanitizeFilename = (filename: string): string => {
     const lastDot = filename.lastIndexOf('.');
     const name = lastDot > 0 ? filename.slice(0, lastDot) : filename;
     const ext = lastDot > 0 ? filename.slice(lastDot) : '';
-    
     const safeName = name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-zA-Z0-9._-]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '')
-      .toLowerCase()
-      .slice(0, 100);
-    
+      .replace(/_+/g, '_').replace(/^_|_$/g, '')
+      .toLowerCase().slice(0, 100);
     return safeName + ext.toLowerCase();
   };
 
   const uploadPhoto = async (base64Photo: string, filename: string): Promise<string | null> => {
     try {
-      // Convert base64 to blob
       const base64Data = base64Photo.split(',')[1];
       const byteCharacters = atob(base64Data);
       const byteNumbers = new Array(byteCharacters.length);
@@ -214,335 +183,231 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
       const safeName = sanitizeFilename(filename);
       const filePath = `${Date.now()}-${safeName}`;
 
       const { data, error } = await supabase.storage
         .from('monitoring-photos')
-        .upload(filePath, blob, {
-          contentType: 'image/jpeg',
-          upsert: false,
-        });
+        .upload(filePath, blob, { contentType: 'image/jpeg', upsert: false });
 
-      if (error) {
-        console.error('Error uploading photo:', error);
-        return null;
-      }
-
-      // Return just the path - signed URL will be generated when displaying
+      if (error) { console.error('Error uploading photo:', error); return null; }
       return data.path;
-    } catch (error) {
-      console.error('Error processing photo:', error);
-      return null;
-    }
+    } catch (error) { console.error('Error processing photo:', error); return null; }
   };
 
-  const addShift = async (data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
+  /**
+   * Save a production session: upserts session + replaces items.
+   * This is the CORRECT way: 1 session per line/date/shift, N items.
+   */
+  const saveSession = async (data: ProductionSessionFormData): Promise<OperationResult & { sessionId?: string }> => {
     if (!user) return { success: false, error: 'User not authenticated' };
-    const timer = createPerfTimer('addShift');
+    const timer = createPerfTimer('saveSession');
 
     try {
-      const performance = calculatePerformance(data.realProduction, data.productionTarget);
-
-      // Upload photo if exists
+      // Upload photo if base64
       let photoUrl: string | null = null;
-      if (data.monitoringPhoto && data.photoFilename) {
-        photoUrl = await uploadPhoto(data.monitoringPhoto, data.photoFilename);
+      if (data.monitoringPhoto && data.monitoringPhoto.startsWith('data:')) {
+        photoUrl = await uploadPhoto(data.monitoringPhoto, data.photoFilename || 'photo.jpg');
+      } else if (data.monitoringPhoto) {
+        photoUrl = data.monitoringPhoto; // Already a path
       }
 
-      // Insert shift with timeout protection
-      const { data: newShift, error: shiftError } = await withTimeout(
+      const totalProduction = data.items.reduce((sum, i) => sum + i.quantityActual, 0);
+      const performance = data.plannedQuantity > 0 ? (totalProduction / data.plannedQuantity) * 100 : 0;
+
+      // Step 1: Upsert session
+      const sessionData = {
+        production_line: data.productionLine,
+        date: data.date,
+        shift_type: mapShiftTypeToDb(data.shift),
+        line_leader: data.lineLeader,
+        staff_planned: data.staffPlanned || 0,
+        staff_actual: data.staffActual || 0,
+        planned_quantity: data.plannedQuantity,
+        comments: data.comments || null,
+        monitoring_photo_url: photoUrl,
+        created_by: user.id,
+      };
+
+      const { data: upsertedSession, error: sessionError } = await withTimeout(
         supabase
-          .from('shifts')
-          .insert({
-            date: data.date,
-            shift_type: mapShiftTypeToDb(data.shift),
-            production_line: data.productionLine,
-            line_leader: data.lineLeader,
-            product_name: data.product,
-            sku: data.sku || null,
-            planned_quantity: data.productionTarget,
-            real_production: data.realProduction,
-            performance: performance,
-            comments: data.observations || null,
-            is_archived: false,
-            monitoring_photo_url: photoUrl,
-            staff_planned: data.staffPlanned || 0,
-            staff_actual: data.staffActual || 0,
-            created_by: user.id,
-          })
-          .select()
+          .from('production_sessions')
+          .upsert(sessionData, { onConflict: 'production_line,date,shift_type' })
+          .select('id')
           .single(),
         10000
       );
 
-      if (shiftError) {
-        console.error('Error adding shift:', shiftError);
-        return { success: false, error: shiftError.message };
+      if (sessionError) {
+        console.error('Error upserting session:', sessionError);
+        return { success: false, error: sessionError.message };
       }
 
-      // Insert structured downtimes
+      const sessionId = upsertedSession.id;
+
+      // Step 2: Delete existing items for this session
+      await supabase.from('production_items').delete().eq('session_id', sessionId);
+
+      // Step 3: Batch insert new items
+      if (data.items.length > 0) {
+        const itemsToInsert = data.items
+          .filter(i => i.sku.trim())
+          .map(i => ({
+            session_id: sessionId,
+            sku: i.sku,
+            product_name: i.productName || '',
+            quantity_target: i.quantityTarget || 0,
+            quantity_actual: i.quantityActual || 0,
+          }));
+
+        if (itemsToInsert.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('production_items')
+            .insert(itemsToInsert);
+
+          if (itemsError) {
+            console.error('Error inserting items:', itemsError);
+            return { success: false, error: itemsError.message };
+          }
+        }
+      }
+
+      // Step 4: Save downtimes if provided
       if (data.structuredDowntimes && data.structuredDowntimes.length > 0) {
+        // Delete existing downtimes
+        await supabase.from('structured_downtimes').delete().eq('session_id', sessionId);
+        
         const downtimesToInsert = data.structuredDowntimes.map(d => ({
-          shift_id: newShift.id,
+          session_id: sessionId,
           category: d.category,
           reason: d.reason,
           duration: d.duration,
           comment: d.comment || null,
         }));
 
-        const { error: downtimeError } = await supabase
-          .from('structured_downtimes')
-          .insert(downtimesToInsert);
-
-        if (downtimeError) {
-          console.error('Error adding downtimes:', downtimeError);
-          // Non-critical, shift was saved
-        }
+        await supabase.from('structured_downtimes').insert(downtimesToInsert);
       }
 
-      // Only refresh if not skipped
-      if (!skipRefresh) {
-        await refreshShifts();
-      }
+      await refreshSessions();
       timer.end();
-      return { success: true };
+      return { success: true, sessionId };
     } catch (error) {
-      console.error('Error adding shift:', error);
+      console.error('Error saving session:', error);
       timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
-  // Batch insert multiple shifts in a single operation
-  const addShiftsBatch = async (shiftsData: ShiftFormData[]): Promise<ShiftOperationResult> => {
+  const updateSession = async (id: string, data: ProductionSessionFormData): Promise<OperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
-    if (shiftsData.length === 0) return { success: true };
-    const timer = createPerfTimer(`addShiftsBatch(${shiftsData.length})`);
+    const timer = createPerfTimer('updateSession');
 
     try {
-      // Prepare all shift data (photos are handled separately if needed)
-      const shiftsToInsert = shiftsData.map(data => ({
-        date: data.date,
-        shift_type: mapShiftTypeToDb(data.shift),
-        production_line: data.productionLine,
-        line_leader: data.lineLeader,
-        product_name: data.product,
-        sku: data.sku || null,
-        planned_quantity: data.productionTarget,
-        real_production: data.realProduction,
-        performance: calculatePerformance(data.realProduction, data.productionTarget),
-        comments: data.observations || null,
-        is_archived: false,
-        monitoring_photo_url: null, // Photos not supported in batch mode
-        staff_planned: data.staffPlanned || 0,
-        staff_actual: data.staffActual || 0,
-        created_by: user.id,
-      }));
-
-      // Single batch insert with timeout
-      const { data: newShifts, error: batchError } = await withTimeout(
-        supabase
-          .from('shifts')
-          .insert(shiftsToInsert)
-          .select(),
-        15000
-      );
-
-      if (batchError) {
-        console.error('Error batch inserting shifts:', batchError);
-        return { success: false, error: batchError.message };
-      }
-
-      if (!newShifts || newShifts.length === 0) {
-        return { success: false, error: 'No shifts were inserted' };
-      }
-
-      // Batch insert all downtimes
-      const allDowntimes: Array<{
-        shift_id: string;
-        category: string;
-        reason: string;
-        duration: number;
-        comment: string | null;
-      }> = [];
-
-      shiftsData.forEach((shiftData, idx) => {
-        if (shiftData.structuredDowntimes && shiftData.structuredDowntimes.length > 0 && newShifts[idx]) {
-          shiftData.structuredDowntimes.forEach(d => {
-            allDowntimes.push({
-              shift_id: newShifts[idx].id,
-              category: d.category,
-              reason: d.reason,
-              duration: d.duration,
-              comment: d.comment || null,
-            });
-          });
-        }
-      });
-
-      if (allDowntimes.length > 0) {
-        const { error: downtimeError } = await supabase
-          .from('structured_downtimes')
-          .insert(allDowntimes);
-
-        if (downtimeError) {
-          console.error('Error batch inserting downtimes:', downtimeError);
-          // Non-critical, shifts were saved
-        }
-      }
-
-      // Single refresh at the end
-      await refreshShifts();
-      timer.end();
-      return { success: true };
-    } catch (error) {
-      console.error('Error in batch shift insert:', error);
-      timer.end();
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  };
-
-  const updateShift = async (id: string, data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
-    if (!user) return { success: false, error: 'User not authenticated' };
-    const timer = createPerfTimer('updateShift');
-
-    try {
-      const performance = calculatePerformance(data.realProduction, data.productionTarget);
-
-      // Upload new photo if exists and is base64
       let photoUrl: string | undefined = undefined;
       if (data.monitoringPhoto && data.monitoringPhoto.startsWith('data:')) {
-        const uploadedUrl = await uploadPhoto(data.monitoringPhoto, data.photoFilename || 'photo.jpg');
-        if (uploadedUrl) {
-          photoUrl = uploadedUrl;
-        }
+        const uploaded = await uploadPhoto(data.monitoringPhoto, data.photoFilename || 'photo.jpg');
+        if (uploaded) photoUrl = uploaded;
       }
 
-      // Update shift with timeout
-      const { error: shiftError } = await withTimeout(
+      // Update session
+      const { error: sessionError } = await withTimeout(
         supabase
-          .from('shifts')
+          .from('production_sessions')
           .update({
+            production_line: data.productionLine,
             date: data.date,
             shift_type: mapShiftTypeToDb(data.shift),
-            production_line: data.productionLine,
             line_leader: data.lineLeader,
-            product_name: data.product,
-            sku: data.sku || null,
-            planned_quantity: data.productionTarget,
-            real_production: data.realProduction,
-            performance: performance,
-            comments: data.observations || null,
             staff_planned: data.staffPlanned || 0,
             staff_actual: data.staffActual || 0,
+            planned_quantity: data.plannedQuantity,
+            comments: data.comments || null,
             ...(photoUrl && { monitoring_photo_url: photoUrl }),
           })
           .eq('id', id),
         10000
       );
 
-      if (shiftError) {
-        console.error('Error updating shift:', shiftError);
-        return { success: false, error: shiftError.message };
+      if (sessionError) {
+        console.error('Error updating session:', sessionError);
+        return { success: false, error: sessionError.message };
       }
 
-      // Delete existing downtimes and insert new ones
-      await supabase
-        .from('structured_downtimes')
-        .delete()
-        .eq('shift_id', id);
+      // Replace items
+      await supabase.from('production_items').delete().eq('session_id', id);
+      
+      if (data.items.length > 0) {
+        const itemsToInsert = data.items
+          .filter(i => i.sku.trim())
+          .map(i => ({
+            session_id: id,
+            sku: i.sku,
+            product_name: i.productName || '',
+            quantity_target: i.quantityTarget || 0,
+            quantity_actual: i.quantityActual || 0,
+          }));
 
+        if (itemsToInsert.length > 0) {
+          await supabase.from('production_items').insert(itemsToInsert);
+        }
+      }
+
+      // Replace downtimes
+      await supabase.from('structured_downtimes').delete().eq('session_id', id);
+      
       if (data.structuredDowntimes && data.structuredDowntimes.length > 0) {
         const downtimesToInsert = data.structuredDowntimes.map(d => ({
-          shift_id: id,
+          session_id: id,
           category: d.category,
           reason: d.reason,
           duration: d.duration,
           comment: d.comment || null,
         }));
-
-        const { error: downtimeError } = await supabase
-          .from('structured_downtimes')
-          .insert(downtimesToInsert);
-
-        if (downtimeError) {
-          console.error('Error updating downtimes:', downtimeError);
-        }
+        await supabase.from('structured_downtimes').insert(downtimesToInsert);
       }
 
-      // Only refresh if not skipped
-      if (!skipRefresh) {
-        await refreshShifts();
-      }
+      await refreshSessions();
       timer.end();
       return { success: true };
     } catch (error) {
-      console.error('Error updating shift:', error);
+      console.error('Error updating session:', error);
       timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
-  const deleteShift = async (id: string, skipRefresh = false): Promise<ShiftOperationResult> => {
+  const deleteSession = async (id: string): Promise<OperationResult> => {
     try {
       const { error } = await withTimeout(
-        supabase
-          .from('shifts')
-          .delete()
-          .eq('id', id),
+        supabase.from('production_sessions').delete().eq('id', id),
         10000
       );
-
       if (error) {
-        console.error('Error deleting shift:', error);
+        console.error('Error deleting session:', error);
         return { success: false, error: error.message };
       }
-
-      // Only refresh if not skipped
-      if (!skipRefresh) {
-        await refreshShifts();
-      }
+      await refreshSessions();
       return { success: true };
     } catch (error) {
-      console.error('Error deleting shift:', error);
+      console.error('Error deleting session:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
-  const getShiftById = (id: string) => {
-    return shifts.find(shift => shift.id === id);
-  };
-
-  /**
-   * Batch save downtimes for a shift - NO refresh, optimistic local update only.
-   * Designed for < 500ms save time as per industrial requirements.
-   */
   const saveDowntimesBatch = async (
-    shiftId: string,
+    sessionId: string,
     downtimes: StructuredDowntime[]
-  ): Promise<ShiftOperationResult> => {
+  ): Promise<OperationResult> => {
     const timer = createPerfTimer('saveDowntimesBatch');
     try {
-      // Delete existing downtimes for this shift
-      const { error: deleteError } = await withTimeout(
-        supabase
-          .from('structured_downtimes')
-          .delete()
-          .eq('shift_id', shiftId),
+      await withTimeout(
+        supabase.from('structured_downtimes').delete().eq('session_id', sessionId),
         5000
       );
 
-      if (deleteError) {
-        console.error('Error deleting old downtimes:', deleteError);
-        return { success: false, error: deleteError.message };
-      }
-
-      // Insert new downtimes in batch
       if (downtimes.length > 0) {
-        const downtimesToInsert = downtimes.map(d => ({
-          shift_id: shiftId,
+        const toInsert = downtimes.map(d => ({
+          session_id: sessionId,
           category: d.category,
           reason: d.reason,
           duration: d.duration,
@@ -550,9 +415,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }));
 
         const { error: insertError } = await withTimeout(
-          supabase
-            .from('structured_downtimes')
-            .insert(downtimesToInsert),
+          supabase.from('structured_downtimes').insert(toInsert),
           5000
         );
 
@@ -562,12 +425,13 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Optimistic local update - NO refreshShifts() call
+      // Optimistic local update
       const totalDowntime = downtimes.reduce((sum, d) => sum + d.duration, 0);
-      updateShiftLocally(shiftId, {
-        structuredDowntimes: downtimes,
-        totalDowntime,
-      });
+      setSessions(prev => prev.map(s => 
+        s.id === sessionId 
+          ? { ...s, structuredDowntimes: downtimes, totalDowntime }
+          : s
+      ));
 
       timer.end();
       return { success: true };
@@ -578,21 +442,22 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const getSessionById = (id: string) => sessions.find(s => s.id === id);
+
   return (
-    <ShiftContext.Provider value={{ 
-      shifts, 
-      isLoading, 
-      error, 
-      addShift, 
-      addShiftsBatch,
-      updateShift, 
-      deleteShift,
+    <ShiftContext.Provider value={{
+      sessions,
+      isLoading,
+      error,
+      saveSession,
+      updateSession,
+      deleteSession,
       saveDowntimesBatch,
-      getShiftById, 
-      refreshShifts,
-      addShiftLocally,
-      updateShiftLocally,
-      removeShiftLocally,
+      getSessionById,
+      refreshSessions,
+      // Backward compat aliases
+      shifts: sessions,
+      refreshShifts: refreshSessions,
     }}>
       {children}
     </ShiftContext.Provider>

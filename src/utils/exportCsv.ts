@@ -1,58 +1,48 @@
-import { ShiftReport, DOWNTIME_REASON_LABELS } from '@/types/shift';
+import { ProductionSession } from '@/types/production';
 
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export function exportToCsv(shifts: ShiftReport[], filename: string): void {
+export function exportSessionsToCsv(sessions: ProductionSession[], filename: string): void {
   const headers = [
-    'Date',
-    'Shift',
-    'Production Line',
-    'Line Leader',
-    'Product',
-    'SKU',
-    'Planned Quantity',
-    'Actual Production',
-    'Performance (%)',
-    'Total Downtime (min)',
-    'Downtime Details',
-    'Comments',
-    'Photo Filename',
+    'Date', 'Shift', 'Production Line', 'Line Leader',
+    'SKU', 'Product', 'SKU Target', 'SKU Actual',
+    'Line Target', 'Line Actual', 'Performance (%)',
+    'Total Downtime (min)', 'Comments',
   ];
 
-  const rows = shifts.map(shift => {
-    const downtimeDetails = shift.downtimes
-      .map(d => `${DOWNTIME_REASON_LABELS[d.reason]}: ${d.duration}min${d.notes ? ` (${d.notes})` : ''}`)
-      .join('; ');
-
-    return [
-      shift.date,
-      shift.shift,
-      shift.productionLine,
-      shift.lineLeader,
-      shift.product || '',
-      shift.sku || '',
-      shift.productionTarget.toString(),
-      shift.realProduction.toString(),
-      shift.performance.toFixed(1),
-      shift.totalDowntime.toString(),
-      downtimeDetails,
-      shift.observations || '',
-      shift.photoFilename || '',
-    ];
+  const rows: string[][] = [];
+  sessions.forEach(session => {
+    if (session.items.length === 0) {
+      rows.push([
+        session.date, session.shift, session.productionLine, session.lineLeader,
+        '', '', '0', '0',
+        session.plannedQuantity.toString(), session.totalProduction.toString(),
+        session.performance.toFixed(1), session.totalDowntime.toString(),
+        session.comments || '',
+      ]);
+    } else {
+      session.items.forEach((item, idx) => {
+        rows.push([
+          idx === 0 ? session.date : '', idx === 0 ? session.shift : '',
+          idx === 0 ? session.productionLine : '', idx === 0 ? session.lineLeader : '',
+          item.sku, item.productName,
+          item.quantityTarget.toString(), item.quantityActual.toString(),
+          idx === 0 ? session.plannedQuantity.toString() : '',
+          idx === 0 ? session.totalProduction.toString() : '',
+          idx === 0 ? session.performance.toFixed(1) : '',
+          idx === 0 ? session.totalDowntime.toString() : '',
+          idx === 0 ? (session.comments || '') : '',
+        ]);
+      });
+    }
   });
 
   const csvContent = [
     headers.join(','),
-    ...rows.map(row =>
-      row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')
-    ),
+    ...rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')),
   ].join('\n');
 
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -64,4 +54,9 @@ export function exportToCsv(shifts: ShiftReport[], filename: string): void {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+// Keep old export for backward compat
+export function exportToCsv(shifts: any[], filename: string): void {
+  exportSessionsToCsv(shifts, filename);
 }

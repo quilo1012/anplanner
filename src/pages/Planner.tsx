@@ -7,7 +7,7 @@ import { ExcelUpload } from '@/components/ExcelUpload';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShiftFormData, ShiftType, SHIFT_TYPES } from '@/types/shift';
+import { ShiftType, SHIFT_TYPES } from '@/types/production';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,7 +44,7 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { addShift, addShiftsBatch, updateShift, getShiftById } = useShifts();
+  const { saveSession, updateSession, getSessionById } = useShifts();
   const { user, hasRole } = useAuth();
   const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -55,32 +55,35 @@ export function Planner() {
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
 
-  // Load existing shift data for editing
+  // Load existing session data for editing
   useEffect(() => {
     if (editId) {
-      const shift = getShiftById(editId);
-      if (shift) {
+      const session = getSessionById(editId);
+      if (session) {
         setFormState({
-          date: shift.date,
-          shift: shift.shift,
-          productionLine: shift.productionLine,
-          lineLeader: shift.lineLeader,
-          skuRows: [{
-            id: editId,
-            sku: shift.sku,
-            product: shift.product,
-            productionTarget: shift.productionTarget || 0,
-            realProduction: shift.realProduction || 0,
-          }],
-          observations: shift.observations,
-          monitoringPhoto: shift.monitoringPhoto,
-          photoFilename: shift.photoFilename,
-          staffPlanned: shift.staffPlanned || 0,
-          staffActual: shift.staffActual || 0,
+          date: session.date,
+          shift: session.shift,
+          productionLine: session.productionLine,
+          lineLeader: session.lineLeader,
+          skuRows: session.items.length > 0 
+            ? session.items.map(item => ({
+                id: item.id,
+                sku: item.sku,
+                product: item.productName,
+                productionTarget: item.quantityTarget,
+                realProduction: item.quantityActual,
+                isFoundInDb: true,
+              }))
+            : [createEmptySkuRow()],
+          observations: session.comments,
+          monitoringPhoto: session.monitoringPhoto,
+          photoFilename: session.photoFilename,
+          staffPlanned: session.staffPlanned || 0,
+          staffActual: session.staffActual || 0,
         });
       }
     }
-  }, [editId, getShiftById]);
+  }, [editId, getSessionById]);
 
   const handleFieldChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -100,17 +103,24 @@ export function Planner() {
   };
 
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
-    setFormState(prev => ({ 
-      ...prev, 
-      monitoringPhoto: photo,
-      photoFilename: filename,
-    }));
+    setFormState(prev => ({ ...prev, monitoringPhoto: photo, photoFilename: filename }));
   };
 
-  const handleExcelImport = async (entries: ShiftFormData[]) => {
+  const handleExcelImport = async (entries: any[]) => {
+    // Excel import creates individual sessions per entry
     let hasError = false;
     for (const entry of entries) {
-      const result = await addShift(entry);
+      const result = await saveSession({
+        date: entry.date,
+        shift: entry.shift,
+        productionLine: entry.productionLine,
+        lineLeader: entry.lineLeader,
+        plannedQuantity: entry.productionTarget || 0,
+        items: [{ sku: entry.sku, productName: entry.product, quantityTarget: entry.productionTarget || 0, quantityActual: entry.realProduction || 0 }],
+        comments: entry.observations || '',
+        staffPlanned: entry.staffPlanned || 0,
+        staffActual: entry.staffActual || 0,
+      });
       if (!result.success) {
         toast.error(`Failed to import: ${result.error}`);
         hasError = true;
@@ -126,44 +136,29 @@ export function Planner() {
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-
-    if (!formState.date) {
-      newErrors.date = 'Date is required';
-    }
-    if (!formState.productionLine.trim()) {
-      newErrors.productionLine = 'Production Line is required';
-    }
-    if (!formState.lineLeader.trim()) {
-      newErrors.lineLeader = 'Line Leader is required';
-    }
-
-    // Validate SKU rows - only SKU is required (no quantity in planner)
+    if (!formState.date) newErrors.date = 'Date is required';
+    if (!formState.productionLine.trim()) newErrors.productionLine = 'Production Line is required';
+    if (!formState.lineLeader.trim()) newErrors.lineLeader = 'Line Leader is required';
     if (formState.skuRows.length === 0) {
       newErrors.skuRows = 'At least one product is required';
     } else {
       formState.skuRows.forEach(row => {
-        if (!row.sku.trim()) {
-          newErrors[`sku_${row.id}`] = 'SKU is required';
-        }
+        if (!row.sku.trim()) newErrors[`sku_${row.id}`] = 'SKU is required';
       });
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validate()) return;
-
     setIsSubmitting(true);
 
     try {
       // Save new products to catalog if flagged
       for (const row of formState.skuRows) {
         if (row.isNewProduct && row.sku.trim() && row.product.trim()) {
-          // Check if already exists
           const { data: existing } = await supabase
             .from('products')
             .select('product_code')
@@ -175,7 +170,6 @@ export function Planner() {
               product_code: row.sku,
               product_description: row.product,
             });
-            
             if (error) {
               console.error('Error saving new product:', error);
               toast.error(`Failed to save product ${row.sku} to catalog`);
@@ -186,68 +180,50 @@ export function Planner() {
         }
       }
 
-      // If editing, update single shift
-      if (editId && formState.skuRows.length === 1) {
-        const row = formState.skuRows[0];
-        const formData: ShiftFormData = {
-          date: formState.date,
-          shift: formState.shift,
-          productionLine: formState.productionLine,
-          lineLeader: formState.lineLeader,
-          product: row.product,
-          sku: row.sku,
-          productionTarget: row.productionTarget,
-          realProduction: row.realProduction,
-          observations: formState.observations,
-          downtimes: [],
-          monitoringPhoto: formState.monitoringPhoto,
-          photoFilename: formState.photoFilename,
-          staffPlanned: formState.staffPlanned,
-          staffActual: formState.staffActual,
-        };
-        const result = await updateShift(editId, formData);
-        if (!result.success) {
-          toast.error(`Failed to update shift: ${result.error}`);
-          return;
-        }
-      } else {
-        // Batch save all SKU rows as independent records (PERFORMANCE OPTIMIZED)
-        const validRows = formState.skuRows.filter(row => row.sku.trim());
-        
-        if (validRows.length === 0) {
-          toast.error('At least one SKU is required');
-          return;
-        }
-        
-        const shiftsToCreate: ShiftFormData[] = validRows.map((row, index) => ({
-          date: formState.date,
-          shift: formState.shift,
-          productionLine: formState.productionLine,
-          lineLeader: formState.lineLeader,
-          product: row.product,
-          sku: row.sku,
-          productionTarget: row.productionTarget,
-          realProduction: row.realProduction,
-          observations: index === 0 ? formState.observations : '', // Only first gets observations
-          downtimes: [],
-          monitoringPhoto: index === 0 ? formState.monitoringPhoto : undefined, // Only first gets photo
-          photoFilename: index === 0 ? formState.photoFilename : undefined,
-          staffPlanned: formState.staffPlanned,
-          staffActual: formState.staffActual,
-        }));
-        
-        // Use batch insert for performance (single DB call for all rows)
-        const result = await addShiftsBatch(shiftsToCreate);
-        if (!result.success) {
-          toast.error(`Failed to save shifts: ${result.error}`);
-          return;
-        }
+      const validRows = formState.skuRows.filter(row => row.sku.trim());
+      if (validRows.length === 0) {
+        toast.error('At least one SKU is required');
+        return;
       }
 
-      toast.success(editId ? 'Shift updated successfully!' : 'Shift saved successfully!');
+      // Calculate total planned quantity from all SKU targets
+      const totalPlanned = validRows.reduce((sum, row) => sum + (row.productionTarget || 0), 0);
+
+      const sessionData = {
+        date: formState.date,
+        shift: formState.shift,
+        productionLine: formState.productionLine,
+        lineLeader: formState.lineLeader,
+        plannedQuantity: totalPlanned,
+        items: validRows.map(row => ({
+          sku: row.sku,
+          productName: row.product,
+          quantityTarget: row.productionTarget || 0,
+          quantityActual: row.realProduction || 0,
+        })),
+        comments: formState.observations,
+        monitoringPhoto: formState.monitoringPhoto,
+        photoFilename: formState.photoFilename,
+        staffPlanned: formState.staffPlanned,
+        staffActual: formState.staffActual,
+      };
+
+      let result;
+      if (editId) {
+        result = await updateSession(editId, sessionData);
+      } else {
+        result = await saveSession(sessionData);
+      }
+
+      if (!result.success) {
+        toast.error(`Failed to save: ${result.error}`);
+        return;
+      }
+
+      toast.success(editId ? 'Session updated successfully!' : 'Production session saved!');
       navigate('/history');
     } catch (error) {
-      console.error('Error saving shift:', error);
+      console.error('Error saving session:', error);
       toast.error('An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
@@ -262,27 +238,19 @@ export function Planner() {
   return (
     <>
       <Header
-        title={editId ? 'Edit Shift' : 'New Shift Report'}
+        title={editId ? 'Edit Production Session' : 'New Production Session'}
         subtitle={isOperator ? 'Enter planned production data' : 'Record and review production data'}
       />
 
       <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Action Buttons */}
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setShowProductUpload(true)}
-                className="btn-secondary"
-              >
+              <button type="button" onClick={() => setShowProductUpload(true)} className="btn-secondary">
                 <Package size={18} />
                 <span className="hidden sm:inline">Import Products</span>
               </button>
-              <button
-                onClick={() => setShowExcelUpload(true)}
-                className="btn-secondary"
-              >
+              <button onClick={() => setShowExcelUpload(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import Plan</span>
               </button>
@@ -299,216 +267,109 @@ export function Planner() {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label htmlFor="date" className="label">
-                    Date <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={formState.date}
-                    onChange={handleFieldChange}
-                    className={`input-field ${errors.date ? 'border-destructive' : ''}`}
-                  />
-                  {errors.date && (
-                    <p className="text-sm text-destructive mt-1">{errors.date}</p>
-                  )}
+                  <label htmlFor="date" className="label">Date <span className="text-destructive">*</span></label>
+                  <input type="date" id="date" name="date" value={formState.date} onChange={handleFieldChange}
+                    className={`input-field ${errors.date ? 'border-destructive' : ''}`} />
+                  {errors.date && <p className="text-sm text-destructive mt-1">{errors.date}</p>}
                 </div>
-
                 <div>
                   <label htmlFor="shift" className="label">Shift</label>
-                  <select
-                    id="shift"
-                    name="shift"
-                    value={formState.shift}
-                    onChange={handleFieldChange}
-                    className="select-field"
-                  >
-                    {SHIFT_TYPES.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
+                  <select id="shift" name="shift" value={formState.shift} onChange={handleFieldChange} className="select-field">
+                    {SHIFT_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-
                 <div>
-                  <label htmlFor="productionLine" className="label">
-                    Production Line <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="productionLine"
-                    name="productionLine"
-                    value={formState.productionLine}
-                    onChange={handleFieldChange}
-                    placeholder="e.g., Line 1"
-                    className={`input-field ${errors.productionLine ? 'border-destructive' : ''}`}
-                    maxLength={50}
-                  />
-                  {errors.productionLine && (
-                    <p className="text-sm text-destructive mt-1">{errors.productionLine}</p>
-                  )}
+                  <label htmlFor="productionLine" className="label">Production Line <span className="text-destructive">*</span></label>
+                  <input type="text" id="productionLine" name="productionLine" value={formState.productionLine}
+                    onChange={handleFieldChange} placeholder="e.g., Line 1"
+                    className={`input-field ${errors.productionLine ? 'border-destructive' : ''}`} maxLength={50} />
+                  {errors.productionLine && <p className="text-sm text-destructive mt-1">{errors.productionLine}</p>}
                 </div>
-
                 <div>
-                  <label htmlFor="lineLeader" className="label">
-                    Line Leader <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="lineLeader"
-                    name="lineLeader"
-                    value={formState.lineLeader}
-                    onChange={handleFieldChange}
-                    placeholder="Leader name"
-                    className={`input-field ${errors.lineLeader ? 'border-destructive' : ''}`}
-                    maxLength={100}
-                  />
-                  {errors.lineLeader && (
-                    <p className="text-sm text-destructive mt-1">{errors.lineLeader}</p>
-                  )}
+                  <label htmlFor="lineLeader" className="label">Line Leader <span className="text-destructive">*</span></label>
+                  <input type="text" id="lineLeader" name="lineLeader" value={formState.lineLeader}
+                    onChange={handleFieldChange} placeholder="Leader name"
+                    className={`input-field ${errors.lineLeader ? 'border-destructive' : ''}`} maxLength={100} />
+                  {errors.lineLeader && <p className="text-sm text-destructive mt-1">{errors.lineLeader}</p>}
                 </div>
               </div>
             </div>
 
-            {/* SKU Rows Section - Like Downtime Form */}
+            {/* SKU Rows */}
             <div className="card p-4 sm:p-6">
-              <SkuRowForm
-                skuRows={formState.skuRows}
-                onChange={handleSkuRowsChange}
-                canReview={canReview}
-                errors={errors}
-              />
-              {errors.skuRows && (
-                <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>
-              )}
+              <SkuRowForm skuRows={formState.skuRows} onChange={handleSkuRowsChange} canReview={canReview} errors={errors} />
+              {errors.skuRows && <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>}
             </div>
 
-            {/* Staffing Section - Supervisor Only */}
+            {/* Staffing */}
             {canReview && (
               <div className="card p-4 sm:p-6">
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
                   <Users size={20} className="text-primary" />
                   Staffing
                 </h3>
-                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="staffPlanned" className="label">Staff Planned</label>
-                    <input
-                      type="number"
-                      id="staffPlanned"
-                      name="staffPlanned"
-                      value={formState.staffPlanned || ''}
-                      onChange={handleFieldChange}
-                      min="0"
-                      placeholder="0"
-                      className="input-field"
-                    />
+                    <input type="number" id="staffPlanned" name="staffPlanned" value={formState.staffPlanned || ''}
+                      onChange={handleFieldChange} min="0" placeholder="0" className="input-field" />
                   </div>
-
                   <div>
                     <label htmlFor="staffActual" className="label">Staff Actual</label>
-                    <input
-                      type="number"
-                      id="staffActual"
-                      name="staffActual"
-                      value={formState.staffActual || ''}
-                      onChange={handleFieldChange}
-                      min="0"
-                      placeholder="0"
-                      className="input-field"
-                    />
+                    <input type="number" id="staffActual" name="staffActual" value={formState.staffActual || ''}
+                      onChange={handleFieldChange} min="0" placeholder="0" className="input-field" />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Supervisor Review Section */}
+            {/* Review Section */}
             <div className={`card p-4 sm:p-6 border-l-4 ${canReview ? 'border-l-primary' : 'border-l-muted'}`}>
               <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-lg">
                 <ClipboardCheck size={20} className={canReview ? 'text-primary' : 'text-muted-foreground'} />
                 Production Review
                 {!canReview && (
                   <span className="ml-auto flex items-center gap-1 text-sm font-normal text-muted-foreground">
-                    <Lock size={14} />
-                    Supervisor access required
+                    <Lock size={14} />Supervisor access required
                   </span>
                 )}
               </h3>
-              
               <div className={`${!canReview ? 'opacity-50 pointer-events-none' : ''}`}>
-                {/* Observations */}
                 <div className="mb-6">
                   <label htmlFor="observations" className="label">Comments / Observations</label>
-                  <textarea
-                    id="observations"
-                    name="observations"
-                    value={formState.observations}
-                    onChange={handleFieldChange}
-                    rows={3}
-                    placeholder="Additional notes about the shift..."
-                    className="input-field resize-none"
-                    maxLength={500}
-                    disabled={!canReview}
-                  />
+                  <textarea id="observations" name="observations" value={formState.observations}
+                    onChange={handleFieldChange} rows={3} placeholder="Additional notes about the shift..."
+                    className="input-field resize-none" maxLength={500} disabled={!canReview} />
                 </div>
-
-                {/* Photo Upload */}
                 <div className="p-4 bg-muted rounded-lg">
-                  <PhotoUpload
-                    photo={formState.monitoringPhoto}
-                    filename={formState.photoFilename}
-                    onChange={handlePhotoChange}
-                  />
+                  <PhotoUpload photo={formState.monitoringPhoto} filename={formState.photoFilename} onChange={handlePhotoChange} />
                 </div>
               </div>
             </div>
 
-            {/* Form Actions */}
+            {/* Actions */}
             <div className="flex flex-wrap gap-3 justify-end">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="btn-secondary"
-                disabled={isSubmitting}
-              >
-                <RotateCcw size={18} />
-                Reset
+              <button type="button" onClick={handleReset} className="btn-secondary" disabled={isSubmitting}>
+                <RotateCcw size={18} /> Reset
               </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={isSubmitting}
-              >
+              <button type="submit" className="btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Saving...
-                  </>
+                  <><span className="animate-spin">⏳</span> Saving...</>
                 ) : (
-                  <>
-                    <Save size={18} />
-                    {editId ? 'Update Shift' : `Save ${formState.skuRows.length} Product(s)`}
-                  </>
+                  <><Save size={18} /> {editId ? 'Update Session' : 'Save Session'}</>
                 )}
               </button>
             </div>
           </form>
+
+          {showExcelUpload && (
+            <ExcelUpload onImport={handleExcelImport} onClose={() => setShowExcelUpload(false)} />
+          )}
+          {showProductUpload && (
+            <ProductCsvUpload onClose={() => setShowProductUpload(false)} />
+          )}
         </div>
       </div>
-
-      {/* Excel Upload Modal */}
-      {showExcelUpload && (
-        <ExcelUpload
-          onImport={handleExcelImport}
-          onClose={() => setShowExcelUpload(false)}
-        />
-      )}
-
-      {/* Product CSV Upload Modal */}
-      {showProductUpload && (
-        <ProductCsvUpload onClose={() => setShowProductUpload(false)} />
-      )}
     </>
   );
 }
