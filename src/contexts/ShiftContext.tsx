@@ -306,9 +306,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       if (!skipRefresh) {
         await refreshShifts();
       }
+      timer.end();
       return { success: true };
     } catch (error) {
       console.error('Error adding shift:', error);
+      timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
