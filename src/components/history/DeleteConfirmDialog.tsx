@@ -8,7 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ShiftReport } from '@/types/shift';
+import { ProductionSession } from '@/types/production';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useState } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
@@ -16,34 +16,35 @@ import { toast } from 'sonner';
 import { formatDate } from '@/utils/exportCsv';
 
 interface DeleteConfirmDialogProps {
-  shift: ShiftReport | null;
+  session: ProductionSession | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
-export function DeleteConfirmDialog({ shift, open, onOpenChange, onSuccess }: DeleteConfirmDialogProps) {
-  const { deleteShift } = useShifts();
+export function DeleteConfirmDialog({ session, open, onOpenChange, onSuccess }: DeleteConfirmDialogProps) {
+  const { deleteSession } = useShifts();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!shift) return;
+    if (!session) return;
 
     setIsDeleting(true);
     try {
-      await deleteShift(shift.id);
-      toast.success('Shift record deleted successfully');
+      const result = await deleteSession(session.id);
+      if (!result.success) throw new Error(result.error);
+      toast.success('Production session deleted successfully');
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      console.error('Error deleting shift:', error);
-      toast.error('Failed to delete shift record');
+      console.error('Error deleting session:', error);
+      toast.error('Failed to delete production session');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  if (!shift) return null;
+  if (!session) return null;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
