@@ -204,7 +204,7 @@ export function Dashboard() {
                   colorClass={line.colorClass}
                   realProduction={line.realProduction}
                   productionTarget={line.productionTarget}
-                  skuCount={line.skuCount}
+                  
                 />
               ))
             ) : (

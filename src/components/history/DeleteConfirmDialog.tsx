@@ -61,11 +61,11 @@ export function DeleteConfirmDialog({ session, open, onOpenChange, onSuccess }: 
               </p>
               
               <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
-                <p><strong>Date:</strong> {formatDate(shift.date)}</p>
-                <p><strong>Shift:</strong> {shift.shift}</p>
-                <p><strong>Line:</strong> {shift.productionLine}</p>
-                <p><strong>Leader:</strong> {shift.lineLeader}</p>
-                {shift.sku && <p><strong>SKU:</strong> {shift.sku}</p>}
+                <p><strong>Date:</strong> {formatDate(session.date)}</p>
+                <p><strong>Shift:</strong> {session.shift}</p>
+                <p><strong>Line:</strong> {session.productionLine}</p>
+                <p><strong>Leader:</strong> {session.lineLeader}</p>
+                {session.items.length > 0 && <p><strong>SKUs:</strong> {session.items.map(i => i.sku).join(', ')}</p>}
               </div>
 
               <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-lg text-sm text-destructive">
