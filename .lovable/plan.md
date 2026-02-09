@@ -1,91 +1,62 @@
 
 
-# Fix: updateSession Timing Out on Save
+# Plano: Filtro por Operador + Ordenacao por Linha
 
-## Root Cause
+## O que muda
 
-Two issues cause the save to freeze:
+### 1. Operadores so veem as suas linhas no History
 
-1. **`withTimeout` leaks timers**: The `setTimeout` is never cleared when the Supabase query resolves successfully. With 6 sequential `withTimeout` calls in `updateSession`, old timers accumulate and can cause unexpected rejections.
+Quando o utilizador logado tem o role "operator", o History filtra automaticamente as sessoes onde o campo **Line Leader** corresponde ao **nome do utilizador**. Supervisores e Admins continuam a ver tudo.
 
-2. **`refreshSessions()` has no timeout or error protection**: After all 6 DB operations complete successfully, `await refreshSessions()` runs 3 unbounded queries (sessions, items, downtimes) with zero timeout. If any query hangs, `updateSession` never returns, and the save button stays stuck on "Saving..." forever.
+**Implementacao** (`src/pages/History.tsx`):
+- Importar `useAuth` para obter `user.name` e `user.role`
+- No `filteredSessions`, adicionar uma condicao: se `user.role === 'operator'`, so incluir sessoes onde `session.lineLeader` corresponde ao `user.name` (comparacao case-insensitive com `.toLowerCase()`)
+- Esconder o filtro de "Leader" no dropdown para operadores (ja esta filtrado automaticamente)
 
-## Fix
+### 2. Ordenacao por sequencia de linha de producao
 
-### 1. Fix `withTimeout` to clear timer on success
+Alterar a ordenacao das sessoes no History de "data mais recente" para **sequencia natural de linha** (Line 1, Line 2, Line 3... Filler Line 1, etc.).
 
-Replace the current implementation with one that properly cleans up:
+**Implementacao** (`src/pages/History.tsx`):
+- Substituir o `.sort()` actual (linha 69) por uma funcao que ordena por nome de linha usando ordenacao natural (extrai numeros do nome da linha para comparar numericamente em vez de alfabeticamente)
+- Exemplo: "Line 1" < "Line 2" < "Line 10" < "Filler Line 1"
+
+### 3. Dashboard tambem respeita o filtro do operador
+
+O Dashboard aplica a mesma logica: operadores so veem os cards das linhas onde sao Leader.
+
+**Implementacao** (`src/pages/Dashboard.tsx`):
+- Adicionar filtro no `filteredSessions` para operadores, identico ao History
+
+## Detalhes Tecnicos
+
+### Ficheiros a alterar
+
+| Ficheiro | Alteracao |
+|----------|-----------|
+| `src/pages/History.tsx` | Filtro automatico por `lineLeader` para operadores; ordenacao por sequencia de linha |
+| `src/pages/Dashboard.tsx` | Filtro automatico por `lineLeader` para operadores |
+
+### Funcao de ordenacao natural por linha
 
 ```text
-Before: Promise.race([query, timeout])  -- timer leaks
-After:  Promise.race([query, timeout])  -- clearTimeout on resolve
+naturalLineSort("Line 1", "Line 2")   -> Line 1 primeiro
+naturalLineSort("Line 2", "Line 10")  -> Line 2 primeiro
+naturalLineSort("Line 5", "Filler Line 1") -> Line 5 primeiro
 ```
 
-### 2. Make `refreshSessions` non-blocking after save
+Extrai o prefixo (Line, Filler Line) e o numero, ordena primeiro por prefixo e depois numericamente.
 
-Instead of `await refreshSessions()` (which can hang indefinitely), do an **optimistic local state update** for `updateSession` and fire `refreshSessions()` in background without blocking the result:
+### Logica de filtro do operador
 
 ```text
-Before:
-  await refreshSessions();  // blocks forever if slow
-  return { success: true };
-
-After:
-  // Optimistic: update local state immediately
-  setSessions(prev => prev.map(s => s.id === id ? updatedSession : s));
-  // Background refresh (non-blocking)
-  refreshSessions().catch(console.error);
-  return { success: true };
-```
-
-### 3. Add timeout to `refreshSessions` itself
-
-Wrap the 3 parallel queries inside `refreshSessions` with a 15-second timeout so it can never hang indefinitely.
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/contexts/ShiftContext.tsx` | Fix `withTimeout` to clear timer; make `refreshSessions` non-blocking after mutations; add timeout to `refreshSessions` queries |
-
-## Technical Details
-
-### Fixed `withTimeout`
-
-```typescript
-async function withTimeout<T>(promise: PromiseLike<T>, ms = 15000): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('Operation timed out')), ms);
-  });
-  try {
-    return await Promise.race([Promise.resolve(promise), timeout]);
-  } finally {
-    clearTimeout(timer!);
-  }
+if (user.role === 'operator') {
+  // so mostrar sessoes onde lineLeader == user.name (case-insensitive)
+  sessions = sessions.filter(s => 
+    s.lineLeader.toLowerCase() === user.name.toLowerCase()
+  );
 }
 ```
 
-### Non-blocking refresh pattern
-
-Applied to `updateSession`, `saveSession`, and `deleteSession`:
-
-```typescript
-// Instead of: await refreshSessions();
-refreshSessions().catch(err => console.error('Background refresh failed:', err));
-return { success: true };
-```
-
-### Timeout on refreshSessions
-
-```typescript
-const refreshSessions = useCallback(async () => {
-  // ... existing checks ...
-  const [sessionsRes, itemsRes, downtimesRes] = await Promise.race([
-    Promise.all([...3 queries...]),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Refresh timed out')), 15000))
-  ]);
-  // ...
-}, [...]);
-```
+Supervisores e Admins nao sao afetados - continuam a ver todas as sessoes.
 
