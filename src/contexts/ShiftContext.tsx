@@ -319,6 +319,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const addShiftsBatch = async (shiftsData: ShiftFormData[]): Promise<ShiftOperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
     if (shiftsData.length === 0) return { success: true };
+    const timer = createPerfTimer(`addShiftsBatch(${shiftsData.length})`);
 
     try {
       // Prepare all shift data (photos are handled separately if needed)
