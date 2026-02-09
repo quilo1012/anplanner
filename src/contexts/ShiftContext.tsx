@@ -395,9 +395,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       // Single refresh at the end
       await refreshShifts();
+      timer.end();
       return { success: true };
     } catch (error) {
       console.error('Error in batch shift insert:', error);
+      timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
