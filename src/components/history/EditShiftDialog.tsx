@@ -46,32 +46,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
     return { totalProduction: total, performance: perf };
   }, [skuRows, lineTarget]);
 
-  // Reset form when session changes
-  useState(() => {
-    if (session) {
-      setDate(session.date);
-      setShiftType(session.shift);
-      setProductionLine(session.productionLine);
-      setLineLeader(session.lineLeader);
-      setStaffPlanned(session.staffPlanned);
-      setStaffActual(session.staffActual);
-      setObservations(session.comments);
-      setMonitoringPhoto(session.monitoringPhoto);
-      setPhotoFilename(session.photoFilename);
-      setStructuredDowntimes(session.structuredDowntimes || []);
-      setLineTarget(session.plannedQuantity);
-      setSkuRows(session.items.map(item => ({
-        id: item.id,
-        sku: item.sku,
-        product: item.productName,
-        productionTarget: item.quantityTarget,
-        realProduction: item.quantityActual,
-        isFoundInDb: true,
-      })));
-    }
-  });
-
-  // Also use useEffect for when session prop changes
   const [prevSessionId, setPrevSessionId] = useState<string | null>(null);
   if (session && session.id !== prevSessionId) {
     setPrevSessionId(session.id);
