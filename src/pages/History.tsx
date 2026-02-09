@@ -143,13 +143,15 @@ export function History() {
                 {uniqueLines.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
-            <div>
-              <label className="label text-xs">Leader</label>
-              <select value={filterLeader} onChange={e => setFilterLeader(e.target.value)} className="select-field w-full text-sm">
-                <option value="">All</option>
-                {uniqueLeaders.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
+            {!isOperator && (
+              <div>
+                <label className="label text-xs">Leader</label>
+                <select value={filterLeader} onChange={e => setFilterLeader(e.target.value)} className="select-field w-full text-sm">
+                  <option value="">All</option>
+                  {uniqueLeaders.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <label className="label text-xs">SKU</label>
               <select value={filterSku} onChange={e => setFilterSku(e.target.value)} className="select-field w-full text-sm">
