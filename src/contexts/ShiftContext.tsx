@@ -296,8 +296,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         await supabase.from('structured_downtimes').insert(downtimesToInsert);
       }
 
-      await refreshSessions();
       timer.end();
+      refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true, sessionId };
     } catch (error) {
       console.error('Error saving session:', error);
