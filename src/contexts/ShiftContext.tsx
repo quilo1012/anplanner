@@ -71,19 +71,22 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Parallel fetch: sessions, items, downtimes
-      const [sessionsRes, itemsRes, downtimesRes] = await Promise.all([
-        supabase
-          .from('production_sessions')
-          .select('*')
-          .order('date', { ascending: false }),
-        supabase
-          .from('production_items')
-          .select('*'),
-        supabase
-          .from('structured_downtimes')
-          .select('*'),
-      ]);
+      // Parallel fetch with 15s timeout
+      const [sessionsRes, itemsRes, downtimesRes] = await withTimeout(
+        Promise.all([
+          supabase
+            .from('production_sessions')
+            .select('*')
+            .order('date', { ascending: false }),
+          supabase
+            .from('production_items')
+            .select('*'),
+          supabase
+            .from('structured_downtimes')
+            .select('*'),
+        ]),
+        15000
+      );
 
       if (sessionsRes.error) {
         console.error('Error fetching sessions:', sessionsRes.error);
