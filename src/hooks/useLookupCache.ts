@@ -18,9 +18,8 @@ interface LookupCacheState {
   lastFetched: Date | null;
 }
 
-const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_DURATION_MS = 60 * 60 * 1000;
 
-// Singleton cache
 let globalLines: string[] = [];
 let globalLeaders: string[] = [];
 let globalCategories: DowntimeCategoryItem[] = DOWNTIME_CATEGORIES_FALLBACK;
@@ -30,34 +29,22 @@ let globalIsLoading = false;
 let globalIsLoaded = false;
 let loadPromise: Promise<void> | null = null;
 
-// State update listeners
 let listeners: Array<() => void> = [];
-function notifyListeners() {
-  listeners.forEach(fn => fn());
-}
+function notifyListeners() { listeners.forEach(fn => fn()); }
 
 export function useLookupCache() {
   const [state, setState] = useState<LookupCacheState>({
-    lines: globalLines,
-    leaders: globalLeaders,
-    categories: globalCategories,
-    reasonsByCategory: globalReasonsByCategory,
-    isLoading: globalIsLoading,
-    isLoaded: globalIsLoaded,
-    lastFetched: globalLastFetched,
+    lines: globalLines, leaders: globalLeaders,
+    categories: globalCategories, reasonsByCategory: globalReasonsByCategory,
+    isLoading: globalIsLoading, isLoaded: globalIsLoaded, lastFetched: globalLastFetched,
   });
 
-  // Subscribe to global updates
   useEffect(() => {
     const sync = () => {
       setState({
-        lines: globalLines,
-        leaders: globalLeaders,
-        categories: globalCategories,
-        reasonsByCategory: globalReasonsByCategory,
-        isLoading: globalIsLoading,
-        isLoaded: globalIsLoaded,
-        lastFetched: globalLastFetched,
+        lines: globalLines, leaders: globalLeaders,
+        categories: globalCategories, reasonsByCategory: globalReasonsByCategory,
+        isLoading: globalIsLoading, isLoaded: globalIsLoaded, lastFetched: globalLastFetched,
       });
     };
     listeners.push(sync);
@@ -71,30 +58,23 @@ export function useLookupCache() {
 
   const loadLookups = useCallback(async (force = false) => {
     if (!force && isCacheValid()) return;
-
-    if (loadPromise) {
-      await loadPromise;
-      notifyListeners();
-      return;
-    }
+    if (loadPromise) { await loadPromise; notifyListeners(); return; }
 
     globalIsLoading = true;
     notifyListeners();
 
     loadPromise = (async () => {
       try {
-        // Parallel fetch: shifts, categories, reasons
-        const [shiftsRes, catsRes, reasonsRes] = await Promise.all([
-          supabase.from('shifts').select('production_line, line_leader'),
+        const [sessionsRes, catsRes, reasonsRes] = await Promise.all([
+          supabase.from('production_sessions').select('production_line, line_leader'),
           supabase.from('downtime_categories').select('name, label'),
           supabase.from('downtime_reasons').select('category_name, name, label'),
         ]);
 
-        // Lines & Leaders
-        if (!shiftsRes.error && shiftsRes.data) {
+        if (!sessionsRes.error && sessionsRes.data) {
           const linesSet = new Set<string>();
           const leadersSet = new Set<string>();
-          shiftsRes.data.forEach(s => {
+          sessionsRes.data.forEach((s: any) => {
             if (s.production_line) linesSet.add(s.production_line);
             if (s.line_leader) leadersSet.add(s.line_leader);
           });
@@ -102,22 +82,19 @@ export function useLookupCache() {
           globalLeaders = Array.from(leadersSet).sort();
         }
 
-        // Categories
         if (!catsRes.error && catsRes.data && catsRes.data.length > 0) {
           globalCategories = catsRes.data
-            .map(c => ({ value: c.name, label: c.label }))
-            .sort((a, b) => a.label.localeCompare(b.label));
+            .map((c: any) => ({ value: c.name, label: c.label }))
+            .sort((a: any, b: any) => a.label.localeCompare(b.label));
         }
 
-        // Reasons grouped by category
         if (!reasonsRes.error && reasonsRes.data && reasonsRes.data.length > 0) {
           const grouped: Record<string, DowntimeReason[]> = {};
-          reasonsRes.data.forEach(r => {
+          reasonsRes.data.forEach((r: any) => {
             const cat = r.category_name;
             if (!grouped[cat]) grouped[cat] = [];
             grouped[cat].push({ value: r.name, label: r.label });
           });
-          // Sort reasons within each category
           Object.keys(grouped).forEach(k => {
             grouped[k].sort((a, b) => a.label.localeCompare(b.label));
           });
@@ -126,7 +103,6 @@ export function useLookupCache() {
 
         globalLastFetched = new Date();
         globalIsLoaded = true;
-        console.log(`[LookupCache] Loaded ${globalLines.length} lines, ${globalLeaders.length} leaders, ${globalCategories.length} categories`);
       } catch (err) {
         console.error('[LookupCache] Failed to load:', err);
       } finally {
@@ -153,62 +129,39 @@ export function useLookupCache() {
     }
   }, []);
 
-  // Add new category: upsert to DB + update cache instantly
   const addCategory = useCallback(async (label: string): Promise<string | null> => {
     const normalized = label.trim().toLowerCase().replace(/\s+/g, '_');
     if (!normalized) return null;
-
-    // Check cache first
     const existing = globalCategories.find(c => c.value === normalized);
     if (existing) return normalized;
 
-    // Upsert to DB
     const { error } = await supabase
       .from('downtime_categories')
       .upsert({ name: normalized, label: label.trim() }, { onConflict: 'name' });
 
-    if (error) {
-      console.error('[LookupCache] Failed to add category:', error);
-      toast.error('Failed to create category');
-      return null;
-    }
+    if (error) { console.error('[LookupCache] Failed to add category:', error); toast.error('Failed to create category'); return null; }
 
-    // Update cache instantly
     globalCategories = [...globalCategories, { value: normalized, label: label.trim() }]
       .sort((a, b) => a.label.localeCompare(b.label));
-    if (!globalReasonsByCategory[normalized]) {
-      globalReasonsByCategory[normalized] = [];
-    }
+    if (!globalReasonsByCategory[normalized]) globalReasonsByCategory[normalized] = [];
     notifyListeners();
     toast.success('New category created');
     return normalized;
   }, []);
 
-  // Add new reason: upsert to DB + update cache instantly
   const addReason = useCallback(async (categoryName: string, label: string): Promise<string | null> => {
     const normalized = label.trim().toLowerCase().replace(/\s+/g, '_');
     if (!normalized || !categoryName) return null;
-
-    // Check cache first
     const catReasons = globalReasonsByCategory[categoryName] || [];
     const existing = catReasons.find(r => r.value === normalized);
     if (existing) return normalized;
 
-    // Upsert to DB
     const { error } = await supabase
       .from('downtime_reasons')
-      .upsert(
-        { category_name: categoryName, name: normalized, label: label.trim() },
-        { onConflict: 'category_name,name' }
-      );
+      .upsert({ category_name: categoryName, name: normalized, label: label.trim() }, { onConflict: 'category_name,name' });
 
-    if (error) {
-      console.error('[LookupCache] Failed to add reason:', error);
-      toast.error('Failed to create reason');
-      return null;
-    }
+    if (error) { console.error('[LookupCache] Failed to add reason:', error); toast.error('Failed to create reason'); return null; }
 
-    // Update cache instantly
     const updated = [...catReasons, { value: normalized, label: label.trim() }]
       .sort((a, b) => a.label.localeCompare(b.label));
     globalReasonsByCategory = { ...globalReasonsByCategory, [categoryName]: updated };
@@ -218,9 +171,7 @@ export function useLookupCache() {
   }, []);
 
   const getDowntimeCategories = useCallback(() => globalCategories, []);
-  const getDowntimeReasons = useCallback((category: string) => {
-    return globalReasonsByCategory[category] || [];
-  }, []);
+  const getDowntimeReasons = useCallback((category: string) => globalReasonsByCategory[category] || [], []);
 
   const invalidateCache = useCallback(async () => {
     globalLastFetched = null;
@@ -229,20 +180,10 @@ export function useLookupCache() {
   }, [loadLookups]);
 
   return {
-    lines: state.lines,
-    leaders: state.leaders,
-    categories: state.categories,
-    reasonsByCategory: state.reasonsByCategory,
-    isLoading: state.isLoading,
-    isLoaded: state.isLoaded,
-    loadLookups,
-    addLine,
-    addLeader,
-    addCategory,
-    addReason,
-    getDowntimeCategories,
-    getDowntimeReasons,
-    invalidateCache,
-    isCacheValid,
+    lines: state.lines, leaders: state.leaders,
+    categories: state.categories, reasonsByCategory: state.reasonsByCategory,
+    isLoading: state.isLoading, isLoaded: state.isLoaded,
+    loadLookups, addLine, addLeader, addCategory, addReason,
+    getDowntimeCategories, getDowntimeReasons, invalidateCache, isCacheValid,
   };
 }

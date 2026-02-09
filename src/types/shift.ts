@@ -1,3 +1,4 @@
+// Backward compatibility layer - re-exports from production types
 import { StructuredDowntime, DowntimeCategory } from './downtime';
 
 export type ShiftType = 'DAY' | 'NIGHT';
@@ -25,6 +26,8 @@ export interface Downtime {
   notes?: string;
 }
 
+// ShiftReport is now an alias for the legacy interface
+// All new code should use ProductionSession from production.ts
 export interface ShiftReport {
   id: string;
   date: string;
