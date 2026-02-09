@@ -240,6 +240,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
   const addShift = async (data: ShiftFormData, skipRefresh = false): Promise<ShiftOperationResult> => {
     if (!user) return { success: false, error: 'User not authenticated' };
+    const timer = createPerfTimer('addShift');
 
     try {
       const performance = calculatePerformance(data.realProduction, data.productionTarget);
