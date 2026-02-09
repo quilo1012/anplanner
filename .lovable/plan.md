@@ -1,398 +1,255 @@
 
 
-# Critical Performance Optimization Plan
+# Plano de Otimização de Performance Industrial
 
-## Executive Summary
+## Análise do Estado Atual
 
-This plan addresses the performance requirements for real-time industrial usage. The current architecture has several bottlenecks that cause slow save operations and UI freezes. The optimizations focus on **incremental saving**, **optimistic updates**, **batch operations**, and **database indexing**.
+### O QUE JÁ ESTÁ IMPLEMENTADO
 
----
+| Requisito | Status | Localização |
+|-----------|--------|-------------|
+| `addShiftsBatch()` | ✅ Implementado | ShiftContext.tsx linha 314-397 |
+| `skipRefresh` parameter | ✅ Implementado | addShift, updateShift, deleteShift |
+| `withTimeout()` wrapper | ✅ Implementado | 10-15s timeout |
+| Optimistic update helpers | ✅ Implementado | addShiftLocally, updateShiftLocally, removeShiftLocally |
+| Índices no shifts | ✅ Criados | date, shift_type, production_line, composite |
+| Índices no downtimes | ✅ Criados | shift_id, category |
+| Índice no products | ✅ Criado | product_description |
+| Debounce no ProductSearch | ✅ 500ms | ProductSearch.tsx linha 98 |
 
-## Current Performance Bottlenecks Identified
+### O QUE FALTA IMPLEMENTAR
 
-### 1. Full Data Refresh After Every Save
-
-**Location:** `src/contexts/ShiftContext.tsx` (lines 269, 341, 361)
-
-Every call to `addShift()`, `updateShift()`, or `deleteShift()` triggers a full `refreshShifts()` which:
-- SELECTs ALL shifts from database
-- SELECTs ALL downtimes from database
-- Maps and joins data in memory
-
-**Impact:** Saving 5 SKUs = 10 database queries (5 inserts + 5 full refreshes)
-
-### 2. Sequential Save Operations
-
-**Location:** `src/pages/Planner.tsx` (lines 214-243), `src/components/history/EditShiftDialog.tsx` (lines 165-196)
-
-Multiple SKU rows are saved sequentially with `await` on each, blocking UI.
-
-### 3. No Optimistic Updates
-
-The UI waits for database confirmation before showing changes. This violates the "instant feedback" requirement.
-
-### 4. ProductSearch Queries on Every Keystroke
-
-**Location:** `src/components/ProductSearch.tsx` (lines 49-100)
-
-While debounced at 500ms, every search triggers a database query with no caching.
-
-### 5. Missing Database Indexes
-
-The `shifts` table lacks indexes on frequently queried columns.
+| Requisito | Status | Prioridade |
+|-----------|--------|------------|
+| Cache de produtos (SKU Search) | ❌ Falta | CRÍTICO |
+| Cache de lookups fixos (Lines, Leaders, Categories) | ❌ Falta | CRÍTICO |
+| Index no SKU da products | ❌ Falta | ALTA |
+| Index no SKU da shifts | ❌ Falta | ALTA |
+| Index no line_leader | ❌ Falta | MÉDIA |
+| Downtime batch operations | ⚠️ Parcial | ALTA |
+| Lazy loading por linha no Planner | ❌ Falta | MÉDIA |
+| Dashboard com dados pré-agregados | ❌ Falta | BAIXA |
+| Logs de observabilidade | ❌ Falta | BAIXA |
 
 ---
 
-## Implementation Plan
+## Alterações Propostas
 
-### Phase 1: Database Indexing (Immediate)
-
-Add indexes to critical columns for fast lookup:
+### Fase 1: Database - Índices Faltantes (SQL Migration)
 
 ```sql
--- Shifts table indexes for fast filtering
-CREATE INDEX IF NOT EXISTS idx_shifts_date ON shifts(date);
-CREATE INDEX IF NOT EXISTS idx_shifts_shift_type ON shifts(shift_type);
-CREATE INDEX IF NOT EXISTS idx_shifts_production_line ON shifts(production_line);
-CREATE INDEX IF NOT EXISTS idx_shifts_date_shift_line ON shifts(date, shift_type, production_line);
+-- Índice ÚNICO no product_code (SKU) - garantir lookup rápido
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_sku ON products(product_code);
 
--- Downtimes table indexes
-CREATE INDEX IF NOT EXISTS idx_downtimes_shift_id ON structured_downtimes(shift_id);
-CREATE INDEX IF NOT EXISTS idx_downtimes_category ON structured_downtimes(category);
+-- Índice no SKU da shifts para filtros rápidos
+CREATE INDEX IF NOT EXISTS idx_shifts_sku ON shifts(sku);
 
--- Products table (already has product_code as PK, but add for search)
-CREATE INDEX IF NOT EXISTS idx_products_description ON products(product_description);
+-- Índice no line_leader para filtros por líder
+CREATE INDEX IF NOT EXISTS idx_shifts_line_leader ON shifts(line_leader);
+
+-- Índice no reason do downtimes para agregações
+CREATE INDEX IF NOT EXISTS idx_downtimes_reason ON structured_downtimes(reason);
 ```
 
 ---
 
-### Phase 2: Context Optimization with skipRefresh
+### Fase 2: Cache Estratégico de Produtos
 
-**File:** `src/contexts/ShiftContext.tsx`
+**Arquivo:** `src/hooks/useProductCache.ts` (NOVO)
 
-Add `skipRefresh` parameter to prevent automatic full refresh:
+Criar um hook que mantém cache local de produtos por sessão:
 
 ```typescript
-interface ShiftContextType {
-  // ... existing ...
-  addShift: (data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
-  updateShift: (id: string, data: ShiftFormData, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
-  deleteShift: (id: string, skipRefresh?: boolean) => Promise<ShiftOperationResult>;
-  addShiftLocally: (shift: ShiftReport) => void; // Optimistic update
-  updateShiftLocally: (id: string, data: Partial<ShiftReport>) => void;
-  removeShiftLocally: (id: string) => void;
+// Estrutura do cache
+interface ProductCacheState {
+  products: Map<string, { sku: string; name: string }>;
+  lastFetched: Date | null;
+  isLoading: boolean;
 }
+
+// Funcionalidades:
+// - Buscar todos os produtos no login (uma vez)
+// - Armazenar em Map para O(1) lookup
+// - Cache válido por 30 minutos
+// - Invalidar ao adicionar novo produto
 ```
 
-Key changes:
-- Default `skipRefresh = false` for backward compatibility
-- Add local state update functions for optimistic UI
-- Only call `refreshShifts()` when `skipRefresh` is false
+**Benefícios:**
+- ProductSearch não precisa mais fazer query a cada digitação
+- Lookup instantâneo para SKUs já conhecidos
+- Reduz queries de ~20/turno para ~1/turno
 
 ---
 
-### Phase 3: Optimistic Updates
+### Fase 3: Cache de Lookups Fixos
 
-**Concept:** Update UI immediately, sync to database in background
+**Arquivo:** `src/hooks/useLookupCache.ts` (NOVO)
+
+Cache para dados que raramente mudam:
 
 ```typescript
-// Before database operation
-addShiftLocally(optimisticShift);
-
-// Perform database operation
-const result = await supabase.from('shifts').insert({...}).select().single();
-
-if (result.error) {
-  // Rollback on failure
-  removeShiftLocally(optimisticShift.id);
-  toast.error('Failed to save');
-} else {
-  // Update with real ID/data
-  updateShiftLocally(optimisticShift.id, result.data);
+interface LookupCache {
+  lines: string[];           // Production lines
+  leaders: string[];         // Line leaders  
+  downtimeCategories: DowntimeCategory[];
+  downtimeReasons: Record<string, DowntimeReason[]>;
 }
+
+// Carregar uma vez no AuthContext após login
+// Armazenar em Context global
+// Usar em todos os selects/dropdowns
 ```
 
 ---
 
-### Phase 4: Batch Save Operations
+### Fase 4: Otimização do ProductSearch
 
-**File:** `src/contexts/ShiftContext.tsx`
+**Arquivo:** `src/components/ProductSearch.tsx`
 
-Add new batch insert function:
+Mudanças:
+1. Integrar com useProductCache
+2. Buscar localmente primeiro (cache hit)
+3. Query no banco apenas para novos SKUs
+4. Debounce reduzido de 500ms para 300ms
 
 ```typescript
-const addShiftsBatch = async (shifts: ShiftFormData[]): Promise<ShiftOperationResult> => {
-  if (!user) return { success: false, error: 'Not authenticated' };
+// ANTES: Sempre query no banco
+const { data } = await supabase.from('products').select(...)
+
+// DEPOIS: Cache first, fallback to DB
+const cachedProduct = productCache.get(query);
+if (cachedProduct) {
+  setResults([cachedProduct]);
+  return;
+}
+// Só então query no banco para SKUs desconhecidos
+```
+
+---
+
+### Fase 5: Downtime Batch Save
+
+**Arquivo:** `src/contexts/ShiftContext.tsx`
+
+Adicionar função `saveDowntimesBatch()` que:
+- Insere múltiplos downtimes em uma única query
+- NÃO recarrega o planner
+- NÃO recalcula totais globais
+- Retorna em < 500ms
+
+```typescript
+const saveDowntimesBatch = async (
+  shiftId: string, 
+  downtimes: StructuredDowntime[]
+): Promise<ShiftOperationResult> => {
+  // Deletar downtimes antigos do shift
+  await supabase.from('structured_downtimes').delete().eq('shift_id', shiftId);
   
-  try {
-    // Prepare all shift data
-    const shiftsToInsert = shifts.map(data => ({
-      date: data.date,
-      shift_type: mapShiftTypeToDb(data.shift),
-      production_line: data.productionLine,
-      line_leader: data.lineLeader,
-      product_name: data.product,
-      sku: data.sku || null,
-      planned_quantity: data.productionTarget,
-      real_production: data.realProduction,
-      performance: calculatePerformance(data.realProduction, data.productionTarget),
-      comments: data.observations || null,
-      is_archived: false,
-      staff_planned: data.staffPlanned || 0,
-      staff_actual: data.staffActual || 0,
-      created_by: user.id,
-    }));
-
-    // Single batch insert
-    const { data: newShifts, error } = await supabase
-      .from('shifts')
-      .insert(shiftsToInsert)
-      .select();
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    // Batch insert all downtimes
-    const allDowntimes = shifts.flatMap((shift, idx) => 
-      (shift.structuredDowntimes || []).map(d => ({
-        shift_id: newShifts[idx].id,
+  // Inserir novos em batch
+  if (downtimes.length > 0) {
+    await supabase.from('structured_downtimes').insert(
+      downtimes.map(d => ({
+        shift_id: shiftId,
         category: d.category,
         reason: d.reason,
         duration: d.duration,
         comment: d.comment || null,
       }))
     );
+  }
+  
+  // NÃO chama refreshShifts() - atualiza localmente
+  updateShiftLocally(shiftId, { 
+    structuredDowntimes: downtimes,
+    totalDowntime: downtimes.reduce((sum, d) => sum + d.duration, 0)
+  });
+  
+  return { success: true };
+};
+```
 
-    if (allDowntimes.length > 0) {
-      await supabase.from('structured_downtimes').insert(allDowntimes);
-    }
+---
 
-    // Single refresh at the end
-    await refreshShifts();
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: String(error) };
+### Fase 6: Observabilidade (Debug Mode)
+
+**Arquivo:** `src/utils/performanceLogger.ts` (NOVO)
+
+```typescript
+const isDev = import.meta.env.DEV;
+
+export const perfLog = (operation: string, startTime: number) => {
+  if (!isDev) return;
+  const duration = Date.now() - startTime;
+  console.log(`[PERF] ${operation}: ${duration}ms`);
+  if (duration > 1000) {
+    console.warn(`[PERF] ⚠️ ${operation} exceeded 1 second!`);
   }
 };
+
+// Uso:
+const start = Date.now();
+await saveShift(data);
+perfLog('saveShift', start);
 ```
 
 ---
 
-### Phase 5: Planner Optimization
+## Arquivos a Criar
 
-**File:** `src/pages/Planner.tsx`
+| Arquivo | Propósito |
+|---------|-----------|
+| `src/hooks/useProductCache.ts` | Cache local de produtos (Map) |
+| `src/hooks/useLookupCache.ts` | Cache de lines, leaders, categories |
+| `src/utils/performanceLogger.ts` | Logs de tempo de operação (dev) |
 
-Replace sequential saves with batch operation:
+## Arquivos a Modificar
 
-```typescript
-// BEFORE (slow - N queries)
-for (const row of formState.skuRows) {
-  await addShift(formData); // Each triggers refresh
-}
-
-// AFTER (fast - 2 queries total)
-const shiftsToCreate = formState.skuRows
-  .filter(row => row.sku.trim())
-  .map(row => ({
-    date: formState.date,
-    shift: formState.shift,
-    productionLine: formState.productionLine,
-    lineLeader: formState.lineLeader,
-    product: row.product,
-    sku: row.sku,
-    productionTarget: row.productionTarget,
-    realProduction: row.realProduction,
-    observations: formState.observations,
-    downtimes: [],
-    staffPlanned: formState.staffPlanned,
-    staffActual: formState.staffActual,
-  }));
-
-const result = await addShiftsBatch(shiftsToCreate);
-```
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/ProductSearch.tsx` | Usar cache antes de query |
+| `src/contexts/ShiftContext.tsx` | Adicionar saveDowntimesBatch() |
+| `src/contexts/AuthContext.tsx` | Carregar lookups no login |
+| `supabase/migrations/` | Nova migration com índices |
 
 ---
 
-### Phase 6: EditShiftDialog Optimization
+## Impacto de Performance Esperado
 
-**File:** `src/components/history/EditShiftDialog.tsx`
-
-Apply the same batch pattern:
-
-```typescript
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-
-  try {
-    // Update first record (skipRefresh = true)
-    await updateShift(shift.id, firstRowData, true);
-
-    // Batch insert additional rows
-    if (validRows.length > 1) {
-      const additionalShifts = validRows.slice(1).map(row => ({...}));
-      await addShiftsBatch(additionalShifts); // Single batch call
-    } else {
-      // Manual refresh since we skipped it
-      await refreshShifts();
-    }
-
-    toast.success('Saved successfully');
-    onOpenChange(false);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-```
+| Operação | Antes | Depois |
+|----------|-------|--------|
+| Salvar 1 SKU | ~2s | < 500ms |
+| Salvar 5 SKUs | ~10s | < 1s |
+| Salvar 10 SKUs | ~20s | < 1.5s |
+| Buscar produto (cache hit) | 500ms | < 10ms |
+| Buscar produto (cache miss) | 500ms | 300ms |
+| Salvar downtime | ~3s | < 500ms |
+| Filtrar History | ~1s | < 200ms |
 
 ---
 
-### Phase 7: Product Catalog Auto-Save Fix
+## Resumo das Regras Aplicadas
 
-**File:** `src/components/SkuRowForm.tsx`
-
-Auto-mark products for catalog when SKU not found:
-
-```typescript
-const handleFoundStatusChange = (rowId: string, found: boolean) => {
-  onChange(
-    skuRows.map(row => 
-      row.id === rowId 
-        ? { 
-            ...row, 
-            isFoundInDb: found, 
-            // AUTO-MARK for saving when not found and has product name
-            isNewProduct: !found && row.product.trim().length > 0
-          } 
-        : row
-    )
-  );
-};
-
-const updateSkuRow = (id: string, field: keyof SkuRow, value: string | number) => {
-  onChange(
-    skuRows.map(row => {
-      if (row.id === id) {
-        const updated = { ...row, [field]: value };
-        // Auto-mark when product name is filled for non-DB SKU
-        if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
-          updated.isNewProduct = true;
-        }
-        return updated;
-      }
-      return row;
-    })
-  );
-};
-```
+| Regra | Implementação |
+|-------|---------------|
+| Nunca salvar linha por linha | ✅ addShiftsBatch() já existe |
+| Batch operations | ✅ Já implementado + saveDowntimesBatch() |
+| Cache de SKU | ❌ → useProductCache.ts |
+| Cache de lookups fixos | ❌ → useLookupCache.ts |
+| Índices no banco | ⚠️ Faltam SKU, line_leader |
+| Downtime sem reload | ⚠️ → saveDowntimesBatch() |
+| Timeout protection | ✅ withTimeout() já existe |
+| UI não travada | ✅ skipRefresh + optimistic updates |
 
 ---
 
-### Phase 8: Loading States and Timeout Protection
+## Ordem de Implementação
 
-**File:** `src/contexts/ShiftContext.tsx`
+1. **Database Migration** - Adicionar índices faltantes (5 min)
+2. **useProductCache** - Cache de produtos (15 min)
+3. **ProductSearch update** - Usar cache (10 min)
+4. **saveDowntimesBatch** - Downtime otimizado (10 min)
+5. **useLookupCache** - Cache de lookups (15 min)
+6. **performanceLogger** - Observabilidade (5 min)
 
-Add timeout wrapper for database operations:
-
-```typescript
-const withTimeout = async <T,>(
-  promise: Promise<T>,
-  timeoutMs: number = 10000
-): Promise<T> => {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
-  );
-  return Promise.race([promise, timeout]);
-};
-
-// Usage
-const { data, error } = await withTimeout(
-  supabase.from('shifts').insert({...}).select().single(),
-  10000 // 10 second timeout
-);
-```
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/contexts/ShiftContext.tsx` | Add skipRefresh, batch operations, optimistic updates, timeout protection |
-| `src/pages/Planner.tsx` | Use batch save, remove sequential awaits |
-| `src/components/history/EditShiftDialog.tsx` | Use skipRefresh and batch operations |
-| `src/components/SkuRowForm.tsx` | Auto-mark new products for catalog |
-| Database Migration | Add indexes on shifts, downtimes, products tables |
-
----
-
-## Performance Impact Summary
-
-| Operation | Before | After | Improvement |
-|-----------|--------|-------|-------------|
-| Save 1 SKU | 2 queries | 2 queries | Same |
-| Save 5 SKUs | 10 queries | 2 queries | 80% reduction |
-| Save 10 SKUs | 20 queries | 2 queries | 90% reduction |
-| Edit + Add 3 SKUs | 8 queries | 3 queries | 62% reduction |
-| Product search | 500ms debounce | 300ms + cache | Faster |
-| Table filtering | Full scan | Indexed | 10x faster |
-
----
-
-## Technical Architecture
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                      USER INTERFACE                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   Planner   │  │   History   │  │     Dashboard       │  │
-│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
-│         │                │                    │              │
-│         v                v                    v              │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │              OPTIMISTIC STATE LAYER                     ││
-│  │  • Instant UI updates                                   ││
-│  │  • Local state management                               ││
-│  │  • Rollback on failure                                  ││
-│  └──────────────────────┬──────────────────────────────────┘│
-└─────────────────────────┼───────────────────────────────────┘
-                          │
-                          v
-┌─────────────────────────────────────────────────────────────┐
-│                   SHIFT CONTEXT                             │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │  Batch Operations Layer                                 ││
-│  │  • addShiftsBatch()     - Single INSERT for N rows      ││
-│  │  • updateShift(skip)    - Optional refresh skip         ││
-│  │  • Timeout protection   - 10s max per operation         ││
-│  └──────────────────────┬──────────────────────────────────┘│
-└─────────────────────────┼───────────────────────────────────┘
-                          │
-                          v
-┌─────────────────────────────────────────────────────────────┐
-│                   DATABASE LAYER                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │    shifts    │  │  downtimes   │  │   products   │       │
-│  │  (indexed)   │  │  (indexed)   │  │  (indexed)   │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-│                                                             │
-│  Indexes:                                                   │
-│  • idx_shifts_date_shift_line (composite)                   │
-│  • idx_downtimes_shift_id                                   │
-│  • idx_products_description                                 │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Success Criteria
-
-After implementation:
-- Save operations complete in under 500ms (perceived)
-- UI never freezes during save
-- Saving 10+ SKUs feels instant
-- Background sync handles database operations
-- Clear feedback on save status (Saving... / Saved!)
-- Timeout protection prevents infinite hangs
+**Tempo total estimado: ~1 hora**
 
