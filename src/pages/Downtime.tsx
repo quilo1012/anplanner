@@ -151,11 +151,7 @@ export function Downtime() {
         const updatedDowntimes = (shift.structuredDowntimes || []).filter(
           dt => dt.id !== deleteEntry.id
         );
-        await updateShift(shift.id, {
-          ...shift,
-          structuredDowntimes: updatedDowntimes,
-        });
-        await refreshShifts();
+        await saveDowntimesBatch(shift.id, updatedDowntimes);
         toast.success('Downtime entry deleted');
       }
     } catch (error) {

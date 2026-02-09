@@ -567,9 +567,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         totalDowntime,
       });
 
+      timer.end();
       return { success: true };
     } catch (error) {
       console.error('Error saving downtimes batch:', error);
+      timer.end();
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
