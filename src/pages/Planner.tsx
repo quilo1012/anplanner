@@ -52,6 +52,7 @@ export function Planner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [showProductUpload, setShowProductUpload] = useState(false);
+  const [showIntouchImport, setShowIntouchImport] = useState(false);
 
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
