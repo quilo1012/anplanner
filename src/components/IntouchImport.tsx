@@ -238,13 +238,9 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
   return (
     <Dialog open={open} onOpenChange={v => !v && handleClose()}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="sr-only">
-            Import iTouching Work-To-List
-          </DialogTitle>
-          <DialogDescription>
-            Upload the XLSX file exported from iTouching. The system will detect production lines automatically.
-          </DialogDescription>
+        <DialogHeader className="sr-only">
+          <DialogTitle>Import iTouching</DialogTitle>
+          <DialogDescription>Upload iTouching XLSX file</DialogDescription>
         </DialogHeader>
 
         {rows.length === 0 ? (
