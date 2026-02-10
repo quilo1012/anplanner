@@ -67,11 +67,11 @@ export function Dashboard() {
 
   const filteredSessions = useMemo(() => {
     return sessions.filter(s => {
-      if (isOperator && user?.name && s.lineLeader.toLowerCase() !== user.name.toLowerCase()) return false;
+      if (isOperator && user?.name && s.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()) return false;
       const matchesDate = s.date >= startDate && s.date <= endDate;
       const matchesShift = s.shift === selectedShift;
-      const matchesLine = !selectedLine || s.productionLine === selectedLine;
-      const matchesLeader = !selectedLeader || s.lineLeader === selectedLeader;
+      const matchesLine = !selectedLine || s.productionLine.trim() === selectedLine;
+      const matchesLeader = !selectedLeader || s.lineLeader.trim() === selectedLeader;
       return matchesDate && matchesShift && matchesLine && matchesLeader;
     });
   }, [sessions, startDate, endDate, selectedShift, selectedLine, selectedLeader, isOperator, user?.name]);
@@ -124,6 +124,8 @@ export function Dashboard() {
       
       return {
         line: session.productionLine,
+        date: session.date,
+        shift: session.shift,
         avgPerformance: session.performance,
         totalDowntime: session.totalDowntime,
         currentSku: firstSku,
@@ -305,7 +307,7 @@ export function Dashboard() {
               {lineStats.length > 0 ? (
                 lineStats.map((line) => (
                   <LineStatusCard
-                    key={line.line}
+                    key={`${line.line}-${line.date}-${line.shift}`}
                     lineName={line.line}
                     sku={line.currentSku}
                     product={line.currentProduct}
