@@ -29,9 +29,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: authError } = await anonClient.auth.getClaims(token);
-    const user = authError ? null : { id: claimsData?.claims?.sub as string };
+    const { data: { user }, error: authError } = await anonClient.auth.getUser();
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
