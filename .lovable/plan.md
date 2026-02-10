@@ -1,39 +1,91 @@
 
-
-# Add CSV Export to Weekly Report
+# Import iTouching Work-To-List into Planner
 
 ## Overview
 
-Add a "Download CSV" button next to the existing "Print Report" button on the Weekly Report page. The CSV will be generated client-side from the already-fetched report data (no additional backend call needed).
+Add support for importing the iTouching monitoring system's "Work To List" export (XLSX/CSV) into the Planner. Since the iTouching file contains only product-level data (Part Code, Description, Order Quantity) without Date, Shift, or Production Line, the user will first fill in the shift information on the Planner form, then import the iTouching file to populate the SKU rows.
 
-## Implementation
+## How It Works
 
-### File: `src/pages/WeeklyReport.tsx`
+1. User opens Planner and fills in **Date, Shift, Production Line, Line Leader** as usual
+2. User clicks a new **"Import iTouching"** button in the SKU section
+3. A modal opens where they upload the `.xlsx` or `.csv` file exported from iTouching
+4. The system auto-detects the iTouching columns and maps them:
 
-1. **Add Download button** next to the Print button, using the `Download` icon from lucide-react
-2. **Add `handleExportCsv` function** that:
-   - Takes the current `data.days` array and `data.totals`
-   - Builds CSV with headers: `Day, Shift, Planned, Actual, Performance (%), Downtime`
-   - Adds a totals row at the bottom: `WEEK TOTAL, , {planned}, {actual}, {perf}, {downtime}`
-   - Formats downtime as HH:MM (reuses existing `formatDowntime` helper)
-   - Performance shown as number with 1 decimal or empty for null
-   - Uses BOM prefix for Excel compatibility
-   - Filename pattern: `Weekly_Report_{Line}_{WeekStart}_{date}.csv`
-3. **Button disabled** when no data is loaded (same as Print)
+| iTouching Column   | Maps To              |
+|--------------------|----------------------|
+| Part Code          | SKU                  |
+| Description        | Product Name         |
+| Order Quantity     | Production Target    |
+| Order No.          | Displayed in preview (not saved) |
 
-### Technical Details
+5. User sees a preview table with all parsed rows and validation status
+6. On confirm, the SKU rows in the Planner form are populated (replacing empty rows)
+7. User can then adjust quantities, add/remove rows, and submit as normal
 
-The CSV export reuses the same blob-download pattern from `src/utils/exportCsv.ts` but with a simpler structure since weekly report data is already aggregated (no nested items).
+## Changes Required
 
+### New File: `src/components/IntouchImport.tsx`
+
+A modal component similar to `ExcelUpload.tsx` but specifically for iTouching format:
+
+- Accepts `.xlsx` and `.csv` files
+- Auto-detects iTouching columns by looking for "Part Code", "Order Quantity", "Description"
+- Also handles common variations: "Part_Code", "PartCode", etc.
+- Parses each row into `{ sku, product, quantity, orderNo }`
+- Shows preview table with: Order No., Part Code, Description, Quantity, Status
+- Returns an array of `SkuRow` objects on confirm
+- Validates: Part Code required, Quantity must be > 0
+
+### Modified File: `src/pages/Planner.tsx`
+
+- Import the new `IntouchImport` component
+- Add state `showIntouchImport` (boolean)
+- Add **"Import iTouching"** button inside the SKU card section (next to the "Add Product" button area in `SkuRowForm`)
+- Add handler `handleIntouchImport(rows: SkuRow[])` that:
+  - Replaces empty SKU rows with the imported ones
+  - If there are existing non-empty rows, appends the imported rows
+  - Closes the modal
+
+### Modified File: `src/components/SkuRowForm.tsx`
+
+- Add an optional `onImportIntouch` callback prop
+- Render an "Import iTouching" button in the header area (alongside "Add Product")
+- The button triggers the callback which opens the modal in the parent
+
+## Technical Details
+
+**Column detection logic:**
 ```text
-// CSV structure
-Day,Shift,Planned,Actual,Performance (%),Downtime
-Mon 03,DAY,5000,4800,96.0,0:45
-Mon 03,NIGHT,4000,3900,97.5,0:20
-...
-WEEK TOTAL,,35000,33500,95.7,4:40
+// Map iTouching headers to internal fields
+const INTOUCH_COLUMN_MAP = {
+  'Part Code': 'sku',
+  'PartCode': 'sku',
+  'Part_Code': 'sku',
+  'Description': 'product',
+  'Order Quantity': 'quantity',
+  'OrderQuantity': 'quantity',
+  'Order_Quantity': 'quantity',
+  'Order No.': 'orderNo',
+  'Order No': 'orderNo',
+  'OrderNo': 'orderNo',
+};
 ```
 
-### No other files need changes
+**File format support:**
+- XLSX: parsed with ExcelJS (already installed)
+- CSV: parsed with simple string splitting (no extra dependency needed)
 
-The export is self-contained in the WeeklyReport page component using the data already available from the edge function response.
+**Preview table columns:**
+```text
+Status | Order No. | Part Code | Description | Quantity
+  OK   | WO-12345  | SKU-001   | Product X   | 5,000
+  OK   | WO-12346  | SKU-002   | Product Y   | 3,000
+```
+
+**Button placement:** Inside the SKU card, the header will show:
+```text
+Production Items                    [Import iTouching] [+ Add Product]
+```
+
+The Import iTouching button uses the `FileSpreadsheet` icon with a distinct label to differentiate from the existing "Import Plan" button (which imports full sessions with date/shift/line).
