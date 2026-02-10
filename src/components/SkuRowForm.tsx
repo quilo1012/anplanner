@@ -9,7 +9,6 @@ interface SkuRowFormProps {
   canReview?: boolean;
   errors?: Record<string, string>;
   showTarget?: boolean; // When false, hides target field (default: true)
-  onImportIntouch?: () => void;
 }
 
 // Planner SKU Form - Now captures Target and Real Production per SKU
