@@ -342,7 +342,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                             <TableCell className="text-right font-medium">{row.quantity.toLocaleString()}</TableCell>
                           </TableRow>
                         ))}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>

@@ -297,7 +297,9 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       timer.end();
-      refreshSessions().catch(err => console.error('Background refresh failed:', err));
+      if (!options?.skipRefresh) {
+        refreshSessions().catch(err => console.error('Background refresh failed:', err));
+      }
       return { success: true, sessionId };
     } catch (error) {
       console.error('Error saving session:', error);
