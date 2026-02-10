@@ -39,8 +39,8 @@ export function History() {
     const leaders = new Set<string>();
     const skus = new Set<string>();
     sessions.forEach(s => {
-      if (s.productionLine) lines.add(s.productionLine);
-      if (s.lineLeader) leaders.add(s.lineLeader);
+      if (s.productionLine) lines.add(s.productionLine.trim());
+      if (s.lineLeader) leaders.add(s.lineLeader.trim());
       s.items.forEach(i => { if (i.sku) skus.add(i.sku); });
     });
     return {

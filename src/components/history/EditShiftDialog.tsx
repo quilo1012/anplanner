@@ -99,7 +99,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
       }
 
       const result = await updateSession(session.id, {
-        date, shift: shiftType, productionLine, lineLeader,
+        date, shift: shiftType, productionLine: productionLine.trim(), lineLeader: lineLeader.trim(),
         plannedQuantity: lineTarget,
         items: validRows.map(row => ({
           sku: row.sku, productName: row.product,

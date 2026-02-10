@@ -321,11 +321,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       const { error: sessionError } = await withTimeout(
         supabase
           .from('production_sessions')
-          .update({
-            production_line: data.productionLine,
+           .update({
+            production_line: data.productionLine.trim(),
             date: data.date,
             shift_type: mapShiftTypeToDb(data.shift),
-            line_leader: data.lineLeader,
+            line_leader: data.lineLeader.trim(),
             staff_planned: data.staffPlanned || 0,
             staff_actual: data.staffActual || 0,
             planned_quantity: data.plannedQuantity,

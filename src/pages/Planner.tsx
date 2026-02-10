@@ -192,8 +192,8 @@ export function Planner() {
       const sessionData = {
         date: formState.date,
         shift: formState.shift,
-        productionLine: formState.productionLine,
-        lineLeader: formState.lineLeader,
+        productionLine: formState.productionLine.trim(),
+        lineLeader: formState.lineLeader.trim(),
         plannedQuantity: totalPlanned,
         items: validRows.map(row => ({
           sku: row.sku,
