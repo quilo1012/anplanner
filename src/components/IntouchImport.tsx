@@ -19,13 +19,14 @@ interface ParsedRow {
 
 export interface LineGroup {
   line: string;
+  lineLeader: string;
   rows: { sku: string; product: string; quantityTarget: number }[];
 }
 
 interface IntouchImportProps {
   open: boolean;
   onClose: () => void;
-  onImport: (groups: LineGroup[], date: string, shift: ShiftType, lineLeader: string) => void;
+  onImport: (groups: LineGroup[], date: string, shift: ShiftType) => Promise<void>;
 }
 
 const HEADER_MAP: Record<string, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {
@@ -155,9 +156,10 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [shift, setShift] = useState<ShiftType>('DAY');
-  const [lineLeader, setLineLeader] = useState('');
+  const [lineLeaders, setLineLeaders] = useState<Record<string, string>>({});
   const [collapsedLines, setCollapsedLines] = useState<Set<string>>(new Set());
 
   const handleFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,10 +202,13 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
     });
   };
 
-  const handleConfirm = () => {
-    if (!lineLeader.trim()) return;
+  const allLinesHaveLeader = grouped.length > 0 && grouped.every(([line]) => lineLeaders[line]?.trim());
+
+  const handleConfirm = async () => {
+    if (!allLinesHaveLeader) return;
     const groups: LineGroup[] = grouped.map(([line, lineRows]) => ({
       line,
+      lineLeader: lineLeaders[line]?.trim() || '',
       rows: lineRows.filter(r => r.valid).map(r => ({
         sku: r.sku,
         product: r.product,
@@ -211,17 +216,22 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
       })),
     })).filter(g => g.rows.length > 0);
 
-    onImport(groups, date, shift, lineLeader);
-    setRows([]);
-    setDate(new Date().toISOString().split('T')[0]);
-    setShift('DAY');
-    setLineLeader('');
+    setSubmitting(true);
+    try {
+      await onImport(groups, date, shift);
+      setRows([]);
+      setDate(new Date().toISOString().split('T')[0]);
+      setShift('DAY');
+      setLineLeaders({});
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
     setRows([]);
     setError('');
-    setLineLeader('');
+    setLineLeaders({});
     onClose();
   };
 
@@ -262,7 +272,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
         ) : (
           <>
             {/* Session fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
               <div>
                 <Label htmlFor="itouch-date" className="text-xs">Date</Label>
                 <Input id="itouch-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
@@ -272,18 +282,6 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                 <select id="itouch-shift" value={shift} onChange={e => setShift(e.target.value as ShiftType)} className="select-field h-10">
                   {SHIFT_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-              </div>
-              <div>
-                <Label htmlFor="itouch-leader" className="text-xs">
-                  Line Leader <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="itouch-leader"
-                  value={lineLeader}
-                  onChange={e => setLineLeader(e.target.value)}
-                  placeholder="Leader name"
-                  maxLength={100}
-                />
               </div>
             </div>
 
@@ -311,12 +309,22 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                           onClick={() => toggleLine(line)}
                         >
                           <TableCell colSpan={5}>
-                            <div className="flex items-center gap-2 font-semibold text-sm">
+                            <div className="flex items-center gap-2 font-semibold text-sm flex-wrap">
                               {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                               <span className="text-primary">{line}</span>
                               <span className="text-muted-foreground font-normal">
                                 — {lineValid} product{lineValid !== 1 ? 's' : ''}
                               </span>
+                              <div className="ml-auto flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                <Label className="text-xs text-muted-foreground font-normal">Leader:</Label>
+                                <Input
+                                  value={lineLeaders[line] || ''}
+                                  onChange={e => setLineLeaders(prev => ({ ...prev, [line]: e.target.value }))}
+                                  placeholder="Leader name"
+                                  className="h-7 w-36 text-xs"
+                                  maxLength={100}
+                                />
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -354,11 +362,17 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={validCount === 0 || !lineLeader.trim()}
+              disabled={validCount === 0 || !allLinesHaveLeader || submitting}
               className="btn-primary"
             >
-              <CheckCircle2 size={16} />
-              Import {validCount} Product{validCount !== 1 ? 's' : ''} ({lineCount} Line{lineCount !== 1 ? 's' : ''})
+              {submitting ? (
+                <span className="animate-pulse">Saving...</span>
+              ) : (
+                <>
+                  <CheckCircle2 size={16} />
+                  Import {validCount} Product{validCount !== 1 ? 's' : ''} ({lineCount} Line{lineCount !== 1 ? 's' : ''})
+                </>
+              )}
             </button>
           )}
         </DialogFooter>

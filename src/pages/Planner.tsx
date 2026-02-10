@@ -382,7 +382,7 @@ export function Planner() {
           <IntouchImport
             open={showIntouchImport}
             onClose={() => setShowIntouchImport(false)}
-            onImport={async (groups: LineGroup[], importDate: string, importShift: ShiftType, leader: string) => {
+            onImport={async (groups: LineGroup[], importDate: string, importShift: ShiftType) => {
               let hasError = false;
               for (const group of groups) {
                 const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
@@ -390,7 +390,7 @@ export function Planner() {
                   date: importDate,
                   shift: importShift,
                   productionLine: group.line,
-                  lineLeader: leader,
+                  lineLeader: group.lineLeader,
                   plannedQuantity: totalPlanned,
                   items: group.rows.map(r => ({
                     sku: r.sku,
