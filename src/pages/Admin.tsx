@@ -160,9 +160,9 @@ export function Admin() {
                       onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
                       className="select-field"
                     >
-                      <option value="operator">Operator</option>
+                      <option value="operator">Lider</option>
                       <option value="supervisor">Supervisor</option>
-                      <option value="admin">Administrator</option>
+                      <option value="admin">Manager</option>
                     </select>
                   </div>
                 </div>
