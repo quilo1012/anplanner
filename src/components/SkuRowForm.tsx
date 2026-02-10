@@ -1,4 +1,4 @@
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, FileSpreadsheet } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
@@ -9,7 +9,6 @@ interface SkuRowFormProps {
   canReview?: boolean;
   errors?: Record<string, string>;
   showTarget?: boolean; // When false, hides target field (default: true)
-  onImportIntouch?: () => void;
 }
 
 // Planner SKU Form - Now captures Target and Real Production per SKU
@@ -19,7 +18,6 @@ export function SkuRowForm({
   canReview = false,
   errors = {},
   showTarget = true,
-  onImportIntouch,
 }: SkuRowFormProps) {
   const addSkuRow = () => {
     onChange([...skuRows, createEmptySkuRow()]);
@@ -104,16 +102,6 @@ export function SkuRowForm({
           </p>
         </div>
         <div className="flex gap-2">
-          {onImportIntouch && (
-            <button
-              type="button"
-              onClick={onImportIntouch}
-              className="btn-secondary text-sm"
-            >
-              <FileSpreadsheet size={16} />
-              Import iTouching
-            </button>
-          )}
           <button
             type="button"
             onClick={addSkuRow}
