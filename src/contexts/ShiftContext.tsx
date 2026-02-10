@@ -225,10 +225,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       // Step 1: Upsert session
       const sessionData = {
-        production_line: data.productionLine,
+        production_line: data.productionLine.trim(),
         date: data.date,
         shift_type: mapShiftTypeToDb(data.shift),
-        line_leader: data.lineLeader,
+        line_leader: data.lineLeader.trim(),
         staff_planned: data.staffPlanned || 0,
         staff_actual: data.staffActual || 0,
         planned_quantity: data.plannedQuantity,
