@@ -309,12 +309,22 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                           onClick={() => toggleLine(line)}
                         >
                           <TableCell colSpan={5}>
-                            <div className="flex items-center gap-2 font-semibold text-sm">
+                            <div className="flex items-center gap-2 font-semibold text-sm flex-wrap">
                               {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                               <span className="text-primary">{line}</span>
                               <span className="text-muted-foreground font-normal">
                                 — {lineValid} product{lineValid !== 1 ? 's' : ''}
                               </span>
+                              <div className="ml-auto flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                <Label className="text-xs text-muted-foreground font-normal">Leader:</Label>
+                                <Input
+                                  value={lineLeaders[line] || ''}
+                                  onChange={e => setLineLeaders(prev => ({ ...prev, [line]: e.target.value }))}
+                                  placeholder="Leader name"
+                                  className="h-7 w-36 text-xs"
+                                  maxLength={100}
+                                />
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
