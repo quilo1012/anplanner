@@ -376,6 +376,15 @@ export function Planner() {
           {showProductUpload && (
             <ProductCsvUpload onClose={() => setShowProductUpload(false)} />
           )}
+          <IntouchImport
+            open={showIntouchImport}
+            onClose={() => setShowIntouchImport(false)}
+            onImport={(imported) => {
+              const nonEmpty = formState.skuRows.filter(r => r.sku.trim());
+              handleSkuRowsChange([...nonEmpty, ...imported]);
+              setShowIntouchImport(false);
+            }}
+          />
         </div>
       </div>
     </>
