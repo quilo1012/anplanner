@@ -1,111 +1,52 @@
 
 
-# Weekly Production Report
+# Fix Weekly Report - 2 Bugs Found
 
-## Overview
+## Issues Identified
 
-A new **read-only** Weekly Production Report page accessible from the sidebar navigation. It displays a professional table summarizing production performance per line, per day, per shift for a selected calendar week, with week-to-date totals and print support.
+### Bug 1: Missing QueryClientProvider
+The app crashes with "No QueryClient set, use QueryClientProvider to set one" because `main.tsx` renders `<App />` without a `QueryClientProvider`. The `WeeklyReport` page uses `useQuery` from TanStack React Query, which requires this provider.
 
-## New Route and Navigation
+### Bug 2: Edge Function Parameter Mismatch
+The frontend calls the edge function with `body: { line, week_start, shift }` using `method: 'GET'`, but the edge function reads parameters from `url.searchParams`. The Supabase `functions.invoke` with a `body` sends a POST request body, not query parameters -- so the edge function never receives the filter values and returns "Missing required params".
 
-- Add `/weekly-report` route in `App.tsx`
-- Add "Weekly Report" nav item in `Sidebar.tsx` (icon: `FileBarChart`) -- visible to all roles
+## Fixes
 
-## Backend: Edge Function
+### File 1: `src/main.tsx`
+- Import `QueryClient` and `QueryClientProvider` from `@tanstack/react-query`
+- Create a `QueryClient` instance
+- Wrap `<App />` with `<QueryClientProvider>`
 
-Create a new edge function `weekly-report` that performs all calculations server-side using SQL aggregation. This ensures sub-second response times and avoids frontend per-cell calculations.
+### File 2: `src/pages/WeeklyReport.tsx`
+- Change the edge function call to use `POST` method (since we're sending a body), or alternatively send params as query string
+- The simplest fix: change `method: 'GET'` to `method: 'POST'` since `supabase.functions.invoke` sends a JSON body anyway
 
-**Endpoint**: `GET /weekly-report?line=Line 1&week_start=2026-02-02&shift=ALL`
+### File 3: `supabase/functions/weekly-report/index.ts`
+- Update to read parameters from the JSON request body (for POST) instead of query params
+- Parse `req.json()` to get `{ line, week_start, shift }`
 
-**SQL Logic**:
-- Query `production_sessions` joined with `production_items` and `structured_downtimes`
-- `GROUP BY` production_line, date, shift_type
-- Return pre-aggregated rows: `{ date, shift, planned_qty, actual_qty, performance, downtime_minutes }`
-- Performance: `CASE WHEN planned > 0 THEN ROUND((actual::numeric / planned) * 100, 1) ELSE NULL END`
-- Downtime: `SUM(duration)` from structured_downtimes
+## Technical Details
 
-**Access Control**: The edge function checks the user's JWT. If role is `operator`, it filters by `line_leader = user.name`. Supervisors/admins see all.
-
-**Response Shape**:
+**main.tsx change:**
 ```text
-{
-  line: "Line 1",
-  week_start: "2026-02-02",
-  days: [
-    { date: "2026-02-02", day_name: "Mon", shift: "DAY", planned: 5000, actual: 4800, performance: 96.0, downtime_minutes: 45 },
-    { date: "2026-02-02", day_name: "Mon", shift: "NIGHT", planned: 4000, actual: 3900, performance: 97.5, downtime_minutes: 20 },
-    ...
-  ],
-  totals: { planned: 35000, actual: 33500, performance: 95.7, downtime_minutes: 280 }
-}
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+const queryClient = new QueryClient();
+// Wrap <App /> with <QueryClientProvider client={queryClient}>
 ```
 
-## Frontend: New Page `src/pages/WeeklyReport.tsx`
-
-### Filter Bar
-- **Production Line** dropdown (required) -- operators see only their line
-- **Week Selector**: calendar-based week picker (Mon-Sun), showing "Week 6: 02 Feb - 08 Feb 2026"
-- **Shift**: DAY / NIGHT / ALL (default: ALL)
-- Navigation arrows to move between weeks quickly
-
-### Report Table
-
+**WeeklyReport.tsx change:**
 ```text
-+--------+-------+---------+--------+-------------+----------+
-|  Day   | Shift | Planned | Actual | Performance | Downtime |
-+--------+-------+---------+--------+-------------+----------+
-| Mon 02 | DAY   |   5,000 |  4,800 |      96.0%  |  0:45    |
-| Mon 02 | NIGHT |   4,000 |  3,900 |      97.5%  |  0:20    |
-| Tue 03 | DAY   |   5,000 |  5,100 |     102.0%  |  0:10    |
-| ...    |       |         |        |             |          |
-+--------+-------+---------+--------+-------------+----------+
-| WEEK TOTAL     |  35,000 | 33,500 |      95.7%  |  4:40    |
-+--------+-------+---------+--------+-------------+----------+
+// Change method from GET to POST (body is already correct)
+const res = await supabase.functions.invoke('weekly-report', {
+  method: 'POST',
+  body: { line: selectedLine, week_start: weekStart, shift: shiftFilter },
+});
 ```
 
-### Visual Rules
-- Performance >= 100%: green background
-- Performance 90-99%: yellow/amber background
-- Performance < 90%: red background
-- No plan (null): gray dash "--"
-- Downtime always displayed in HH:MM format
-- Zero downtime shown as "0:00" (never hidden)
-
-### Empty States
-- "No data for this week" message when no sessions exist
-- Never shows errors or blocks other pages
-
-### Print Button
-- "Print Weekly Report" button (top right)
-- Opens print-optimized view: black and white, A4, table only, no charts
-- Header with: company name, line, week, shift filter, generation timestamp
-
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `supabase/functions/weekly-report/index.ts` | CREATE - Edge function with SQL aggregation |
-| `src/pages/WeeklyReport.tsx` | CREATE - Full page component with filters, table, print |
-| `src/App.tsx` | MODIFY - Add `/weekly-report` route |
-| `src/components/Sidebar.tsx` | MODIFY - Add nav item |
-| `src/components/MobileMenu.tsx` | MODIFY - Add nav item |
-
-## Access Control
-
-- **Operators**: Line dropdown is pre-filtered to show only lines where they are the leader. The edge function also enforces this server-side.
-- **Supervisors/Admins**: Can select any line, print reports.
-
-## Performance
-
-- All aggregation happens in the edge function SQL query (single query with JOINs and GROUP BY)
-- Frontend receives max ~14 rows per week (7 days x 2 shifts)
-- No dependency on ShiftContext -- uses its own fetch via the edge function
-- Does not trigger planner or dashboard refreshes
-
-## Data Safety
-
-- Missing data shows empty cells or dashes
-- Division by zero prevented in SQL with `CASE WHEN planned > 0`
-- Edge function returns empty array for weeks with no data
-- Errors caught and displayed as toast, never crash the page
+**Edge function change:**
+```text
+// Read from request body instead of URL params
+const { line, week_start, shift } = await req.json();
+const shiftFilter = shift || "ALL";
+```
 
