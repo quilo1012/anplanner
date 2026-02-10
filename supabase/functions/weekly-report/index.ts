@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
       return {
         date: s.date,
         day_name: dayName,
-        shift: s.shift_type,
+        shift: s.shift_type.toUpperCase(),
         planned,
         actual,
         performance,
