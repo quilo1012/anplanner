@@ -45,7 +45,7 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { saveSession, updateSession, getSessionById } = useShifts();
+  const { saveSession, updateSession, getSessionById, refreshSessions } = useShifts();
   const { user, hasRole } = useAuth();
   const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
