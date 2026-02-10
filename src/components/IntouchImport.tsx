@@ -362,7 +362,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={validCount === 0 || !lineLeader.trim()}
+              disabled={validCount === 0 || !allLinesHaveLeader || submitting}
               className="btn-primary"
             >
               <CheckCircle2 size={16} />
