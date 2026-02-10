@@ -382,10 +382,37 @@ export function Planner() {
           <IntouchImport
             open={showIntouchImport}
             onClose={() => setShowIntouchImport(false)}
-            onImport={(imported) => {
-              const nonEmpty = formState.skuRows.filter(r => r.sku.trim());
-              handleSkuRowsChange([...nonEmpty, ...imported]);
-              setShowIntouchImport(false);
+            onImport={async (groups: LineGroup[], importDate: string, importShift: ShiftType, leader: string) => {
+              let hasError = false;
+              for (const group of groups) {
+                const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
+                const result = await saveSession({
+                  date: importDate,
+                  shift: importShift,
+                  productionLine: group.line,
+                  lineLeader: leader,
+                  plannedQuantity: totalPlanned,
+                  items: group.rows.map(r => ({
+                    sku: r.sku,
+                    productName: r.product,
+                    quantityTarget: r.quantityTarget,
+                    quantityActual: 0,
+                  })),
+                  comments: '',
+                  staffPlanned: 0,
+                  staffActual: 0,
+                });
+                if (!result.success) {
+                  toast.error(`Failed to import ${group.line}: ${result.error}`);
+                  hasError = true;
+                  break;
+                }
+              }
+              if (!hasError) {
+                toast.success(`Imported ${groups.length} line(s) successfully!`);
+                setShowIntouchImport(false);
+                navigate('/history');
+              }
             }}
           />
         </div>
