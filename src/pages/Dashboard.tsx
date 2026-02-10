@@ -60,8 +60,8 @@ export function Dashboard() {
   }, [startDate, endDate]);
 
   const { uniqueLines, uniqueLeaders } = useMemo(() => {
-    const lines = [...new Set(sessions.map(s => s.productionLine))].sort();
-    const leaders = [...new Set(sessions.map(s => s.lineLeader))].sort();
+    const lines = [...new Set(sessions.map(s => s.productionLine.trim()))].sort();
+    const leaders = [...new Set(sessions.map(s => s.lineLeader.trim()))].sort();
     return { uniqueLines: lines, uniqueLeaders: leaders };
   }, [sessions]);
 
