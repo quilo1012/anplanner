@@ -202,10 +202,13 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
     });
   };
 
-  const handleConfirm = () => {
-    if (!lineLeader.trim()) return;
+  const allLinesHaveLeader = grouped.length > 0 && grouped.every(([line]) => lineLeaders[line]?.trim());
+
+  const handleConfirm = async () => {
+    if (!allLinesHaveLeader) return;
     const groups: LineGroup[] = grouped.map(([line, lineRows]) => ({
       line,
+      lineLeader: lineLeaders[line]?.trim() || '',
       rows: lineRows.filter(r => r.valid).map(r => ({
         sku: r.sku,
         product: r.product,
@@ -213,11 +216,16 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
       })),
     })).filter(g => g.rows.length > 0);
 
-    onImport(groups, date, shift, lineLeader);
-    setRows([]);
-    setDate(new Date().toISOString().split('T')[0]);
-    setShift('DAY');
-    setLineLeader('');
+    setSubmitting(true);
+    try {
+      await onImport(groups, date, shift);
+      setRows([]);
+      setDate(new Date().toISOString().split('T')[0]);
+      setShift('DAY');
+      setLineLeaders({});
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
