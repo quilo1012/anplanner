@@ -215,7 +215,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                         {row.valid ? (
                           <CheckCircle2 size={16} className="text-green-600" />
                         ) : (
-                          <AlertTriangle size={16} className="text-destructive" title={row.error} />
+                          <span title={row.error}><AlertTriangle size={16} className="text-destructive" /></span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{row.orderNo}</TableCell>

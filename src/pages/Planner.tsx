@@ -299,7 +299,13 @@ export function Planner() {
 
             {/* SKU Rows */}
             <div className="card p-4 sm:p-6">
-              <SkuRowForm skuRows={formState.skuRows} onChange={handleSkuRowsChange} canReview={canReview} errors={errors} />
+              <SkuRowForm
+                skuRows={formState.skuRows}
+                onChange={handleSkuRowsChange}
+                canReview={canReview}
+                errors={errors}
+                onImportIntouch={() => setShowIntouchImport(true)}
+              />
               {errors.skuRows && <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>}
             </div>
 
