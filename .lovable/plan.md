@@ -1,45 +1,98 @@
 
 
-# Fix Dashboard Filter and Duplicate Key Issues
+# Fix iTouching Import Save Timeout
 
-## Problems Identified
+## Root Cause
 
-### 1. Filter comparisons don't use `.trim()` on session data
-The filter dropdown values are trimmed (line 64), but the actual filter comparison (lines 73-74) compares the raw `s.lineLeader` and `s.productionLine` against the trimmed dropdown value. If in-memory sessions were loaded before the database cleanup, or if new data has spaces, the comparison fails and results appear inconsistent.
+In `src/pages/Planner.tsx` (lines 385-407), the iTouching import callback uses a sequential `for...of` loop:
 
-**Fix**: Add `.trim()` to both comparisons in `filteredSessions`:
 ```
-const matchesLine = !selectedLine || s.productionLine.trim() === selectedLine;
-const matchesLeader = !selectedLeader || s.lineLeader.trim() === selectedLeader;
-```
-
-### 2. Duplicate React keys when multiple sessions share the same line name
-When a date range spans multiple days, there can be multiple sessions for the same line (e.g., "Filler Line 2" on Monday and Tuesday). The `lineStats` array maps sessions 1:1, so `key={line.line}` produces duplicate keys -- exactly what the console error shows.
-
-**Fix**: Change `lineStats` key to include date + shift to guarantee uniqueness. Update `LineStatusCard` rendering:
-```
-key={`${session.productionLine}-${session.date}-${session.shift}`}
+for (const group of groups) {
+  const result = await saveSession({...});  // waits 10s timeout
+  // saveSession internally calls refreshSessions() after EACH save
+}
 ```
 
-### 3. Operator filter also needs `.trim()`
-Line 70 compares `s.lineLeader.toLowerCase()` against `user.name.toLowerCase()` without trimming.
+Each `saveSession` call:
+1. Upserts the session (DB call with 10s timeout)
+2. Deletes old items (DB call)
+3. Inserts new items (DB call)
+4. Fires `refreshSessions()` in background -- fetches ALL sessions, items, and downtimes
 
-**Fix**: Add `.trim()`:
-```
-s.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()
+With 5 lines imported, that's 15+ sequential DB operations and 5 concurrent full-data reloads fighting for bandwidth. This causes the 10-second timeout to trigger.
+
+## Solution
+
+### 1. Add batch-aware flag to `saveSession` in `src/contexts/ShiftContext.tsx`
+
+Add an optional `skipRefresh` parameter to `saveSession`. When true, skip the `refreshSessions()` call at the end. This lets the caller do one refresh after all saves complete.
+
+```typescript
+const saveSession = async (
+  data: ProductionSessionFormData, 
+  options?: { skipRefresh?: boolean }
+): Promise<OperationResult & { sessionId?: string }> => {
+  // ... existing save logic ...
+  
+  // Only refresh if not in batch mode
+  if (!options?.skipRefresh) {
+    refreshSessions().catch(...);
+  }
+  return { success: true, sessionId };
+};
 ```
 
----
+### 2. Update iTouching import in `src/pages/Planner.tsx`
+
+- Pass `{ skipRefresh: true }` to each `saveSession` call
+- Use `Promise.allSettled` to save all lines in parallel instead of sequentially
+- Call `refreshSessions()` once at the end
+
+```typescript
+onImport={async (groups, importDate, importShift) => {
+  const results = await Promise.allSettled(
+    groups.map(group => saveSession({
+      date: importDate,
+      shift: importShift,
+      productionLine: group.line,
+      lineLeader: group.lineLeader,
+      plannedQuantity: totalPlanned,
+      items: group.rows.map(...),
+      comments: '',
+      staffPlanned: 0,
+      staffActual: 0,
+    }, { skipRefresh: true }))
+  );
+  
+  const failures = results.filter(r => r.status === 'rejected' || !r.value.success);
+  if (failures.length > 0) {
+    toast.error(`Failed to import ${failures.length} line(s)`);
+  } else {
+    toast.success(`Imported ${groups.length} line(s) successfully!`);
+  }
+  
+  await refreshSessions(); // single refresh
+  navigate('/history');
+}}
+```
+
+### 3. Increase timeout for upsert operations
+
+In `saveSession`, increase the upsert timeout from 10s to 20s as a safety net, since parallel saves may compete for DB connections.
+
+### 4. Fix React duplicate key warning in IntouchImport
+
+The `<>` fragment wrapping grouped rows (line 305) lacks a key. Wrap with `<Fragment key={line}>` instead.
 
 ## Files Modified
-- **`src/pages/Dashboard.tsx`**: Add `.trim()` to filter comparisons (lines 70, 73, 74) and fix duplicate key in `lineStats` rendering (line 308)
 
-## Technical Details
+- `src/contexts/ShiftContext.tsx` -- Add `skipRefresh` option to `saveSession`, expose `refreshSessions` in context, increase timeout
+- `src/pages/Planner.tsx` -- Parallel import with `Promise.allSettled`, single refresh after batch
+- `src/components/IntouchImport.tsx` -- Fix React Fragment key warning
 
-All changes are in `src/pages/Dashboard.tsx`:
+## Expected Result
 
-1. Line 70: `s.lineLeader.trim().toLowerCase()` 
-2. Line 73: `s.productionLine.trim() === selectedLine`
-3. Line 74: `s.lineLeader.trim() === selectedLeader`
-4. Line 308: `key={\`${line.line}-${line.date}-${line.shift}\`}` (requires passing `date` and `shift` through `lineStats`)
+- iTouching imports complete in ~2-3 seconds instead of 50+ seconds (parallel instead of sequential, no redundant refreshes)
+- No more timeout errors
+- No more duplicate key React warnings
 
