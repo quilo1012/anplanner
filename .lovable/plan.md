@@ -1,52 +1,44 @@
 
 
-# Fix Weekly Report - 2 Bugs Found
+# Fix Weekly Report Data Mismatches
 
-## Issues Identified
+## Problems Found
 
-### Bug 1: Missing QueryClientProvider
-The app crashes with "No QueryClient set, use QueryClientProvider to set one" because `main.tsx` renders `<App />` without a `QueryClientProvider`. The `WeeklyReport` page uses `useQuery` from TanStack React Query, which requires this provider.
+Two data format mismatches prevent the Weekly Report from returning any results:
 
-### Bug 2: Edge Function Parameter Mismatch
-The frontend calls the edge function with `body: { line, week_start, shift }` using `method: 'GET'`, but the edge function reads parameters from `url.searchParams`. The Supabase `functions.invoke` with a `body` sends a POST request body, not query parameters -- so the edge function never receives the filter values and returns "Missing required params".
+1. **Production Line**: The database stores production lines as plain numbers (`"1"`, `"2"`, `"3"`...), but the frontend sends `"Line 1"`, `"Line 2"`, etc. The edge function query `.eq("production_line", "Line 1")` never matches.
+
+2. **Shift Type Case**: The database stores shift types in lowercase (`"day"`, `"night"`), but the frontend sends uppercase (`"DAY"`, `"NIGHT"`). The edge function query `.eq("shift_type", "DAY")` never matches.
 
 ## Fixes
 
-### File 1: `src/main.tsx`
-- Import `QueryClient` and `QueryClientProvider` from `@tanstack/react-query`
-- Create a `QueryClient` instance
-- Wrap `<App />` with `<QueryClientProvider>`
+### File 1: `supabase/functions/weekly-report/index.ts`
+
+- Extract the line number from the frontend value (e.g., `"Line 1"` becomes `"1"`) before querying
+- Convert shift filter to lowercase before querying (e.g., `"DAY"` becomes `"day"`)
+- Convert shift type back to uppercase in the response for frontend display
 
 ### File 2: `src/pages/WeeklyReport.tsx`
-- Change the edge function call to use `POST` method (since we're sending a body), or alternatively send params as query string
-- The simplest fix: change `method: 'GET'` to `method: 'POST'` since `supabase.functions.invoke` sends a JSON body anyway
 
-### File 3: `supabase/functions/weekly-report/index.ts`
-- Update to read parameters from the JSON request body (for POST) instead of query params
-- Parse `req.json()` to get `{ line, week_start, shift }`
+- No changes needed -- the frontend format is consistent with the rest of the app
 
 ## Technical Details
 
-**main.tsx change:**
+In the edge function, before building the query:
+
 ```text
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-const queryClient = new QueryClient();
-// Wrap <App /> with <QueryClientProvider client={queryClient}>
+// Extract line number: "Line 1" -> "1"
+const lineNumber = line.replace(/^Line\s+/i, "");
+
+// Query uses lineNumber
+.eq("production_line", lineNumber)
+
+// Shift filter: "DAY" -> "day"  
+const shiftFilterDb = shiftFilter.toLowerCase();
+.eq("shift_type", shiftFilterDb)
+
+// In response, convert back: "day" -> "DAY"
+shift: s.shift_type.toUpperCase()
 ```
 
-**WeeklyReport.tsx change:**
-```text
-// Change method from GET to POST (body is already correct)
-const res = await supabase.functions.invoke('weekly-report', {
-  method: 'POST',
-  body: { line: selectedLine, week_start: weekStart, shift: shiftFilter },
-});
-```
-
-**Edge function change:**
-```text
-// Read from request body instead of URL params
-const { line, week_start, shift } = await req.json();
-const shiftFilter = shift || "ALL";
-```
-
+This aligns with the existing pattern in `ShiftContext.tsx` which uses `mapShiftTypeToDb` (to lowercase) and `mapDbShiftType` (to uppercase) for the same conversion.
