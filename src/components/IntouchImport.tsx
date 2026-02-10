@@ -302,9 +302,8 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                     const collapsed = collapsedLines.has(line);
                     const lineValid = lineRows.filter(r => r.valid).length;
                     return (
-                      <> 
+                      <Fragment key={line}>
                         <TableRow
-                          key={`header-${line}`}
                           className="bg-muted/50 cursor-pointer hover:bg-muted"
                           onClick={() => toggleLine(line)}
                         >
