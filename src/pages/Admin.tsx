@@ -93,7 +93,7 @@ export function Admin() {
       />
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
-        <div className="max-w-4xl mx-auto">
+        <div>
           {/* User Management */}
           <div className="card p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
