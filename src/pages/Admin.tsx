@@ -309,10 +309,10 @@ export function Admin() {
               <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
                 <h4 className="font-medium text-red-800 dark:text-red-300 mb-2 text-sm sm:text-base">Manager</h4>
                 <ul className="text-xs sm:text-sm text-red-700 dark:text-red-400 space-y-1">
-                  <li>• Todos os acessos do Supervisor</li>
-                  <li>• Gerenciar utilizadores</li>
-                  <li>• Atribuir papéis</li>
-                  <li>• Configurações do sistema</li>
+                  <li>• All Supervisor permissions</li>
+                  <li>• Manage users</li>
+                  <li>• Assign roles</li>
+                  <li>• System settings</li>
                 </ul>
               </div>
             </div>
