@@ -67,7 +67,7 @@ export function Dashboard() {
 
   const filteredSessions = useMemo(() => {
     return sessions.filter(s => {
-      if (isOperator && user?.name && s.lineLeader.toLowerCase() !== user.name.toLowerCase()) return false;
+      if (isOperator && user?.name && s.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()) return false;
       const matchesDate = s.date >= startDate && s.date <= endDate;
       const matchesShift = s.shift === selectedShift;
       const matchesLine = !selectedLine || s.productionLine === selectedLine;
