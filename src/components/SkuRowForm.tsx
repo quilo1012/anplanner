@@ -103,14 +103,26 @@ export function SkuRowForm({
             {skuRows.length} product(s) planned • Add unlimited SKUs per line
           </p>
         </div>
-        <button
-          type="button"
-          onClick={addSkuRow}
-          className="btn-primary text-sm"
-        >
-          <Plus size={16} />
-          Add SKU
-        </button>
+        <div className="flex gap-2">
+          {onImportIntouch && (
+            <button
+              type="button"
+              onClick={onImportIntouch}
+              className="btn-secondary text-sm"
+            >
+              <FileSpreadsheet size={16} />
+              Import iTouching
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={addSkuRow}
+            className="btn-primary text-sm"
+          >
+            <Plus size={16} />
+            Add SKU
+          </button>
+        </div>
       </div>
 
       {skuRows.length === 0 ? (
