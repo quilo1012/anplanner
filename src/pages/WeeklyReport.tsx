@@ -75,8 +75,7 @@ export function WeeklyReport() {
       if (!session) throw new Error('Not authenticated');
 
       const res = await supabase.functions.invoke('weekly-report', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
         body: { line: selectedLine, week_start: weekStart, shift: shiftFilter },
       });
 
