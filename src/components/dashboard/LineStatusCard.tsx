@@ -19,11 +19,6 @@ interface LineStatusCardProps {
 }
 
 const LINE_COLORS: Record<string, string> = {
-  'Line 1': 'border-l-industrial-blue bg-gradient-to-r from-industrial-blue/5 to-transparent',
-  'Line 2': 'border-l-industrial-cyan bg-gradient-to-r from-industrial-cyan/5 to-transparent',
-  'Line 3': 'border-l-industrial-purple bg-gradient-to-r from-industrial-purple/5 to-transparent',
-  'Line 4': 'border-l-industrial-green bg-gradient-to-r from-industrial-green/5 to-transparent',
-  'Line 5': 'border-l-industrial-orange bg-gradient-to-r from-industrial-orange/5 to-transparent',
   'Filler Line 1': 'border-l-filler-1 bg-gradient-to-r from-filler-1/5 to-transparent',
   'Filler Line 2': 'border-l-filler-2 bg-gradient-to-r from-filler-2/5 to-transparent',
   'Filler Line 3': 'border-l-filler-3 bg-gradient-to-r from-filler-3/5 to-transparent',
