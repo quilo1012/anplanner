@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "npm:@supabase/supabase-js@2.93.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,12 +25,12 @@ Deno.serve(async (req) => {
     }
 
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const anonClient = createClient(supabaseUrl, anonKey);
+    const token = authHeader.replace("Bearer ", "");
 
-    const { data: { user }, error: authError } = await anonClient.auth.getUser();
+    const { data: { user }, error: authError } = await anonClient.auth.getUser(token);
     if (authError || !user) {
+      console.error("Auth error:", authError?.message, "User:", !!user);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
