@@ -1,133 +1,55 @@
 
 
-# Refactor iTouching Import - Multi-Line Auto-Split
+# Fix iTouching Import - Per-Line Leaders + Database Save
 
-## Overview
+## Problems Identified
 
-The iTouching "Work-To-List" file contains multiple production lines in a single worksheet, separated by "Machine:" rows (e.g., "Machine: Filler Line 6 / Filler - Line 6"). The import needs to detect these sections, group products by line, and create separate production sessions automatically -- just like the existing "Import Plan" feature.
+1. **Single Line Leader for all lines**: Currently the modal has one global "Line Leader" field, but each production line may have a different leader. The field needs to be per-line.
 
-## Current Problem
+2. **Import not saving to database**: The `onImport` callback in `Planner.tsx` calls `saveSession` which is an `async` function, but the `onImport` prop type in `IntouchImport.tsx` is defined as a synchronous function. The `handleConfirm` function calls `onImport(...)` without `await`, and critically, the component resets its state (`setRows([])`, etc.) immediately after calling `onImport` -- before the async saves complete. Additionally, the `handleConfirm` function doesn't mark `onImport` as async, so the database operations may be cut short.
 
-- The "Import iTouching" button is inside the SKU card (per-line context), but the file contains data for ALL lines
-- The current parser only reads the header row + data rows, missing the "Machine:" section dividers
-- All imported products go to a single production line instead of being split
+## Changes
 
-## How It Will Work
+### File: `src/components/IntouchImport.tsx`
 
-1. User clicks **"Import iTouching"** button (top-level, next to "Import Plan")
-2. Uploads the XLSX/CSV file from iTouching
-3. The parser scans for **"Machine:"** rows to identify line sections
-4. Products are grouped by production line automatically
-5. Preview shows products organized by line with a summary
-6. User selects **Date**, **Shift**, and **Line Leader** (since the file doesn't contain these)
-7. On confirm, the system creates one production session per line via `saveSession`
-8. User is redirected to History to see all created sessions
+**1. Replace single `lineLeader` state with per-line leader map:**
+- Remove `const [lineLeader, setLineLeader] = useState('')`
+- Add `const [lineLeaders, setLineLeaders] = useState<Record<string, string>>({})`
+- Remove the global Line Leader input from the session fields grid (keep only Date and Shift)
 
-## Changes Required
+**2. Add per-line leader input in the grouped preview:**
+- In each line's header row (the collapsible row with the line name), add an inline text input for the leader name
+- Example: `Filler Line 6 -- 3 products -- Leader: [________]`
 
-### 1. Move Button: `src/pages/Planner.tsx`
+**3. Fix async handling:**
+- Change `onImport` prop type to return `Promise<void>`
+- Make `handleConfirm` async
+- Await `onImport(...)` before resetting state
+- Add a `submitting` state to disable the button during save
+- Validate that ALL lines have a leader before allowing confirm
 
-- Move "Import iTouching" button from the SkuRowForm into the top button bar (next to "Import Plan" and "Import Products")
-- Change `onImport` handler to call `saveSession` for each line group (like `handleExcelImport`)
-- Add Date/Shift/Leader fields to the import modal or use form values
+**4. Pass per-line leaders in the export data:**
+- Update `LineGroup` interface to include `lineLeader: string`
+- Map leader from `lineLeaders` record into each group
 
-### 2. Remove Prop: `src/components/SkuRowForm.tsx`
+### File: `src/pages/Planner.tsx`
 
-- Remove `onImportIntouch` prop and the button from the SKU card header
+**5. Update the onImport handler to use per-line leaders:**
+- Read `lineLeader` from each `group.lineLeader` instead of the single `leader` parameter
+- Remove the `lineLeader` parameter from the callback signature (it's now per-group)
 
-### 3. Refactor Parser: `src/components/IntouchImport.tsx`
+## Technical Summary
 
-Major changes to the parsing and UI:
-
-**New ParsedRow type** -- adds `line` field:
-```
-interface ParsedRow {
-  line: string;       // extracted from "Machine:" row
-  orderNo: string;
-  sku: string;
-  product: string;
-  quantity: number;
-  valid: boolean;
-  error?: string;
-}
-```
-
-**New parsing logic for XLSX:**
-- Iterate all rows in the worksheet
-- When a row contains text matching `Machine:` pattern, extract the line name
-- Subsequent product rows belong to that line until the next "Machine:" row
-- The line name is extracted from the text (e.g., "Machine: Filler Line 6 / Filler - Line 6" becomes "Filler Line 6" or similar)
-
-**Updated preview UI:**
-- Group rows by production line in the preview table
-- Show line headers as section dividers
-- Add Date, Shift, and Line Leader input fields in the modal header
-- Summary shows: "X products across Y lines"
-
-**Updated onImport callback:**
-- Instead of returning `SkuRow[]`, returns grouped data: `{ line: string, rows: SkuRow[] }[]`
-- Parent component creates one `saveSession` call per line group
-
-### 4. Update Import Handler: `src/pages/Planner.tsx`
-
-The confirm handler will:
-- Loop through each line group
-- Call `saveSession` with date/shift from modal fields, line from parsed data
-- Show success/error toasts per line
-- Navigate to `/history` on completion
-
-## Technical Details
-
-**Machine row detection:**
 ```text
-Pattern: /machine\s*[:]/i
-Example cell values:
-  "Machine: Filler Line 6 / Filler - Line 6"
-  "Machine: Canning Line 2 / Canning - Line 2"
+IntouchImport changes:
+- LineGroup gains: lineLeader field
+- onImport type: sync -> async (Promise<void>)
+- handleConfirm: becomes async, awaits onImport, adds loading state
+- UI: leader input moves from global field to each line header row
+- Validation: all lines must have a leader to enable confirm button
 
-Extraction: Take text after "Machine:", split by "/" and use the first part, trimmed
-  "Filler Line 6"
+Planner.tsx changes:
+- onImport callback: uses group.lineLeader per line
+- Remove single leader param from callback signature
 ```
-
-**Line name extraction logic:**
-- Look for cells containing "Machine:" (case-insensitive)
-- Can appear in any column (user mentioned it's in column A)
-- Extract the line name: strip "Machine:", take first part before "/" if present, trim
-- If no "Machine:" pattern found, use a fallback or mark as "Unknown Line"
-
-**Modal fields for missing data:**
-```text
-Date:        [________]  (defaults to today)
-Shift:       [DAY | NIGHT]
-Line Leader: [________]  (required)
-```
-
-**Session creation flow (per line group):**
-```text
-For each unique line in parsed data:
-  saveSession({
-    date: modalDate,
-    shift: modalShift,
-    productionLine: parsedLineName,
-    lineLeader: modalLeader,
-    plannedQuantity: sum of quantities,
-    items: [{ sku, productName, quantityTarget, quantityActual: 0 }],
-    comments: '',
-    staffPlanned: 0,
-    staffActual: 0,
-  })
-```
-
-**File structure reference:**
-```text
-Row 1:  Headers (Expected Start Time, Expected End Time, Order No., Part Code, ...)
-Row 2-N: Product data for Line A
-Row X:  "Machine: Filler Line 6 / Filler - Line 6"  <-- line separator
-Row X+1: Product data for Line B
-Row Y:  "Machine: Canning Line 2 / ..."  <-- next line separator
-Row Y+1: Product data for Line C
-...
-```
-
-Note: The first group of products (before any "Machine:" row) may belong to the first line, whose name could appear above the header row or be the first "Machine:" row. The parser will handle both cases.
 
