@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { format, startOfWeek, addDays, subWeeks, addWeeks, getISOWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Printer, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer, CalendarDays, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
