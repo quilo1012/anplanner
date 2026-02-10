@@ -1,4 +1,4 @@
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, FileSpreadsheet } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
@@ -9,6 +9,7 @@ interface SkuRowFormProps {
   canReview?: boolean;
   errors?: Record<string, string>;
   showTarget?: boolean; // When false, hides target field (default: true)
+  onImportIntouch?: () => void;
 }
 
 // Planner SKU Form - Now captures Target and Real Production per SKU
@@ -17,7 +18,8 @@ export function SkuRowForm({
   onChange, 
   canReview = false,
   errors = {},
-  showTarget = true, // Default to true for backward compatibility
+  showTarget = true,
+  onImportIntouch,
 }: SkuRowFormProps) {
   const addSkuRow = () => {
     onChange([...skuRows, createEmptySkuRow()]);
@@ -101,14 +103,26 @@ export function SkuRowForm({
             {skuRows.length} product(s) planned • Add unlimited SKUs per line
           </p>
         </div>
-        <button
-          type="button"
-          onClick={addSkuRow}
-          className="btn-primary text-sm"
-        >
-          <Plus size={16} />
-          Add SKU
-        </button>
+        <div className="flex gap-2">
+          {onImportIntouch && (
+            <button
+              type="button"
+              onClick={onImportIntouch}
+              className="btn-secondary text-sm"
+            >
+              <FileSpreadsheet size={16} />
+              Import iTouching
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={addSkuRow}
+            className="btn-primary text-sm"
+          >
+            <Plus size={16} />
+            Add SKU
+          </button>
+        </div>
       </div>
 
       {skuRows.length === 0 ? (

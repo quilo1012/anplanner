@@ -4,6 +4,7 @@ import { Header } from '@/components/Header';
 import { SkuRowForm } from '@/components/SkuRowForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { ExcelUpload } from '@/components/ExcelUpload';
+import { IntouchImport } from '@/components/IntouchImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +52,7 @@ export function Planner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [showProductUpload, setShowProductUpload] = useState(false);
+  const [showIntouchImport, setShowIntouchImport] = useState(false);
 
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
@@ -297,7 +299,13 @@ export function Planner() {
 
             {/* SKU Rows */}
             <div className="card p-4 sm:p-6">
-              <SkuRowForm skuRows={formState.skuRows} onChange={handleSkuRowsChange} canReview={canReview} errors={errors} />
+              <SkuRowForm
+                skuRows={formState.skuRows}
+                onChange={handleSkuRowsChange}
+                canReview={canReview}
+                errors={errors}
+                onImportIntouch={() => setShowIntouchImport(true)}
+              />
               {errors.skuRows && <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>}
             </div>
 
@@ -368,6 +376,15 @@ export function Planner() {
           {showProductUpload && (
             <ProductCsvUpload onClose={() => setShowProductUpload(false)} />
           )}
+          <IntouchImport
+            open={showIntouchImport}
+            onClose={() => setShowIntouchImport(false)}
+            onImport={(imported) => {
+              const nonEmpty = formState.skuRows.filter(r => r.sku.trim());
+              handleSkuRowsChange([...nonEmpty, ...imported]);
+              setShowIntouchImport(false);
+            }}
+          />
         </div>
       </div>
     </>
