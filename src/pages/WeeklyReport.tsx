@@ -140,6 +140,44 @@ export function WeeklyReport() {
     }
   }, [data, selectedLine, weekLabel, shiftFilter]);
 
+  const handleExportCsv = useCallback(() => {
+    const rows = data?.days || [];
+    const totals = data?.totals;
+    if (!rows.length) return;
+
+    const headers = ['Day', 'Shift', 'Planned', 'Actual', 'Performance (%)', 'Downtime'];
+    const csvRows = rows.map(r => [
+      `${r.day_name} ${r.date.slice(8)}`,
+      r.shift,
+      r.planned.toString(),
+      r.actual.toString(),
+      r.performance !== null ? r.performance.toFixed(1) : '',
+      formatDowntime(r.downtime_minutes),
+    ].map(c => `"${c.replace(/"/g, '""')}"`).join(','));
+
+    if (totals) {
+      csvRows.push([
+        'WEEK TOTAL', '',
+        totals.planned.toString(),
+        totals.actual.toString(),
+        totals.performance !== null ? totals.performance.toFixed(1) : '',
+        formatDowntime(totals.downtime_minutes),
+      ].map(c => `"${c.replace(/"/g, '""')}"`).join(','));
+    }
+
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const lineSafe = selectedLine.replace(/\s+/g, '_');
+    link.download = `Weekly_Report_${lineSafe}_${weekStart}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [data, selectedLine, weekStart]);
+
   if (error) {
     toast.error('Failed to load weekly report');
   }
