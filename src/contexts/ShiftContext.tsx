@@ -207,7 +207,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
    * Save a production session: upserts session + replaces items.
    * This is the CORRECT way: 1 session per line/date/shift, N items.
    */
-  const saveSession = async (data: ProductionSessionFormData): Promise<OperationResult & { sessionId?: string }> => {
+  const saveSession = async (data: ProductionSessionFormData, options?: { skipRefresh?: boolean }): Promise<OperationResult & { sessionId?: string }> => {
     if (!user) return { success: false, error: 'User not authenticated' };
     const timer = createPerfTimer('saveSession');
 
