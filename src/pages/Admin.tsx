@@ -298,12 +298,12 @@ export function Admin() {
               <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
                 <h4 className="font-medium text-purple-800 dark:text-purple-300 mb-2 text-sm sm:text-base">Supervisor</h4>
                 <ul className="text-xs sm:text-sm text-purple-700 dark:text-purple-400 space-y-1">
-                  <li>• Acesso completo ao sistema</li>
-                  <li>• Criar, revisar e concluir turnos</li>
-                  <li>• Adicionar resultados de produção</li>
-                  <li>• Upload de fotos de monitoramento</li>
-                  <li>• Editar e excluir turnos</li>
-                  <li>• Visualizar histórico e dashboards</li>
+                  <li>• Full system access</li>
+                  <li>• Create, review, and complete shifts</li>
+                  <li>• Add production results</li>
+                  <li>• Upload monitoring photos</li>
+                  <li>• Edit and delete shifts</li>
+                  <li>• View history and dashboards</li>
                 </ul>
               </div>
               <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
