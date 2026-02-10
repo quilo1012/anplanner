@@ -189,9 +189,14 @@ export function WeeklyReport() {
           <h1 className="text-2xl font-bold text-foreground">Weekly Production Report</h1>
           <p className="text-sm text-muted-foreground">Read-only summary per line, per week</p>
         </div>
-        <Button variant="outline" onClick={handlePrint} disabled={!data?.days?.length} className="no-print">
-          <Printer className="mr-2 h-4 w-4" /> Print Report
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCsv} disabled={!data?.days?.length} className="no-print">
+            <Download className="mr-2 h-4 w-4" /> Download CSV
+          </Button>
+          <Button variant="outline" onClick={handlePrint} disabled={!data?.days?.length} className="no-print">
+            <Printer className="mr-2 h-4 w-4" /> Print Report
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
