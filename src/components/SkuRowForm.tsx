@@ -1,4 +1,4 @@
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, FileSpreadsheet } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
