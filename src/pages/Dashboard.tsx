@@ -70,8 +70,8 @@ export function Dashboard() {
       if (isOperator && user?.name && s.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()) return false;
       const matchesDate = s.date >= startDate && s.date <= endDate;
       const matchesShift = s.shift === selectedShift;
-      const matchesLine = !selectedLine || s.productionLine === selectedLine;
-      const matchesLeader = !selectedLeader || s.lineLeader === selectedLeader;
+      const matchesLine = !selectedLine || s.productionLine.trim() === selectedLine;
+      const matchesLeader = !selectedLeader || s.lineLeader.trim() === selectedLeader;
       return matchesDate && matchesShift && matchesLine && matchesLeader;
     });
   }, [sessions, startDate, endDate, selectedShift, selectedLine, selectedLeader, isOperator, user?.name]);
