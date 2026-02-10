@@ -365,8 +365,14 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
               disabled={validCount === 0 || !allLinesHaveLeader || submitting}
               className="btn-primary"
             >
-              <CheckCircle2 size={16} />
-              Import {validCount} Product{validCount !== 1 ? 's' : ''} ({lineCount} Line{lineCount !== 1 ? 's' : ''})
+              {submitting ? (
+                <span className="animate-pulse">Saving...</span>
+              ) : (
+                <>
+                  <CheckCircle2 size={16} />
+                  Import {validCount} Product{validCount !== 1 ? 's' : ''} ({lineCount} Line{lineCount !== 1 ? 's' : ''})
+                </>
+              )}
             </button>
           )}
         </DialogFooter>
