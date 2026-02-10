@@ -59,6 +59,14 @@
     --industrial-green: 145 65% 42%;
     --industrial-orange: 30 95% 55%;
     --industrial-red: 0 75% 45%;
+
+    /* Filler Line Colors */
+    --filler-1: 145 65% 45%;
+    --filler-2: 42 55% 55%;
+    --filler-3: 199 85% 73%;
+    --filler-4: 27 95% 61%;
+    --filler-5: 330 80% 70%;
+    --filler-6: 215 20% 63%;
   }
 
   .dark {
