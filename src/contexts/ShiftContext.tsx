@@ -14,7 +14,7 @@ interface ShiftContextType {
   sessions: ProductionSession[];
   isLoading: boolean;
   error: string | null;
-  saveSession: (data: ProductionSessionFormData) => Promise<OperationResult & { sessionId?: string }>;
+  saveSession: (data: ProductionSessionFormData, options?: { skipRefresh?: boolean }) => Promise<OperationResult & { sessionId?: string }>;
   updateSession: (id: string, data: ProductionSessionFormData) => Promise<OperationResult>;
   deleteSession: (id: string) => Promise<OperationResult>;
   saveDowntimesBatch: (sessionId: string, downtimes: StructuredDowntime[]) => Promise<OperationResult>;
