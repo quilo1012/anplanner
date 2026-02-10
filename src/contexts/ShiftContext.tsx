@@ -14,7 +14,7 @@ interface ShiftContextType {
   sessions: ProductionSession[];
   isLoading: boolean;
   error: string | null;
-  saveSession: (data: ProductionSessionFormData) => Promise<OperationResult & { sessionId?: string }>;
+  saveSession: (data: ProductionSessionFormData, options?: { skipRefresh?: boolean }) => Promise<OperationResult & { sessionId?: string }>;
   updateSession: (id: string, data: ProductionSessionFormData) => Promise<OperationResult>;
   deleteSession: (id: string) => Promise<OperationResult>;
   saveDowntimesBatch: (sessionId: string, downtimes: StructuredDowntime[]) => Promise<OperationResult>;
@@ -207,7 +207,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
    * Save a production session: upserts session + replaces items.
    * This is the CORRECT way: 1 session per line/date/shift, N items.
    */
-  const saveSession = async (data: ProductionSessionFormData): Promise<OperationResult & { sessionId?: string }> => {
+  const saveSession = async (data: ProductionSessionFormData, options?: { skipRefresh?: boolean }): Promise<OperationResult & { sessionId?: string }> => {
     if (!user) return { success: false, error: 'User not authenticated' };
     const timer = createPerfTimer('saveSession');
 
@@ -243,7 +243,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           .upsert(sessionData, { onConflict: 'production_line,date,shift_type' })
           .select('id')
           .single(),
-        10000
+        20000
       );
 
       if (sessionError) {
@@ -297,7 +297,9 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       timer.end();
-      refreshSessions().catch(err => console.error('Background refresh failed:', err));
+      if (!options?.skipRefresh) {
+        refreshSessions().catch(err => console.error('Background refresh failed:', err));
+      }
       return { success: true, sessionId };
     } catch (error) {
       console.error('Error saving session:', error);

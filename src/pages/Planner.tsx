@@ -45,7 +45,7 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { saveSession, updateSession, getSessionById } = useShifts();
+  const { saveSession, updateSession, getSessionById, refreshSessions } = useShifts();
   const { user, hasRole } = useAuth();
   const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -381,36 +381,38 @@ export function Planner() {
             open={showIntouchImport}
             onClose={() => setShowIntouchImport(false)}
             onImport={async (groups: LineGroup[], importDate: string, importShift: ShiftType) => {
-              let hasError = false;
-              for (const group of groups) {
-                const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
-                const result = await saveSession({
-                  date: importDate,
-                  shift: importShift,
-                  productionLine: group.line,
-                  lineLeader: group.lineLeader,
-                  plannedQuantity: totalPlanned,
-                  items: group.rows.map(r => ({
-                    sku: r.sku,
-                    productName: r.product,
-                    quantityTarget: r.quantityTarget,
-                    quantityActual: 0,
-                  })),
-                  comments: '',
-                  staffPlanned: 0,
-                  staffActual: 0,
-                });
-                if (!result.success) {
-                  toast.error(`Failed to import ${group.line}: ${result.error}`);
-                  hasError = true;
-                  break;
-                }
-              }
-              if (!hasError) {
+              const results = await Promise.allSettled(
+                groups.map(group => {
+                  const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
+                  return saveSession({
+                    date: importDate,
+                    shift: importShift,
+                    productionLine: group.line,
+                    lineLeader: group.lineLeader,
+                    plannedQuantity: totalPlanned,
+                    items: group.rows.map(r => ({
+                      sku: r.sku,
+                      productName: r.product,
+                      quantityTarget: r.quantityTarget,
+                      quantityActual: 0,
+                    })),
+                    comments: '',
+                    staffPlanned: 0,
+                    staffActual: 0,
+                  }, { skipRefresh: true });
+                })
+              );
+
+              const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
+              if (failures.length > 0) {
+                toast.error(`Failed to import ${failures.length} line(s)`);
+              } else {
                 toast.success(`Imported ${groups.length} line(s) successfully!`);
-                setShowIntouchImport(false);
-                navigate('/history');
               }
+
+              await refreshSessions();
+              setShowIntouchImport(false);
+              navigate('/history');
             }}
           />
         </div>

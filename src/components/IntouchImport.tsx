@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, Fragment } from 'react';
 import { FileSpreadsheet, Upload, CheckCircle2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from './ui/table';
@@ -302,9 +302,8 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                     const collapsed = collapsedLines.has(line);
                     const lineValid = lineRows.filter(r => r.valid).length;
                     return (
-                      <> 
+                      <Fragment key={line}>
                         <TableRow
-                          key={`header-${line}`}
                           className="bg-muted/50 cursor-pointer hover:bg-muted"
                           onClick={() => toggleLine(line)}
                         >
@@ -343,7 +342,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                             <TableCell className="text-right font-medium">{row.quantity.toLocaleString()}</TableCell>
                           </TableRow>
                         ))}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
