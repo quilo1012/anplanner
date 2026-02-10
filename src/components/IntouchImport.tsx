@@ -239,8 +239,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
     <Dialog open={open} onOpenChange={v => !v && handleClose()}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet size={20} className="text-primary" />
+          <DialogTitle>
             Import iTouching Work-To-List
           </DialogTitle>
           <DialogDescription>
