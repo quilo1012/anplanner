@@ -160,9 +160,9 @@ export function Admin() {
                       onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
                       className="select-field"
                     >
-                      <option value="operator">Operator</option>
+                      <option value="operator">Lider</option>
                       <option value="supervisor">Supervisor</option>
-                      <option value="admin">Administrator</option>
+                      <option value="admin">Manager</option>
                     </select>
                   </div>
                 </div>
@@ -288,31 +288,31 @@ export function Admin() {
               Role Permissions
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-blue-800 mb-2 text-sm sm:text-base">Operator</h4>
-                <ul className="text-xs sm:text-sm text-blue-700 space-y-1">
-                  <li>• View Dashboard</li>
-                  <li>• Create shifts (Product + Planned Qty)</li>
-                  <li>• View History</li>
+              <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 text-sm sm:text-base">Lider</h4>
+                <ul className="text-xs sm:text-sm text-blue-700 dark:text-blue-400 space-y-1">
+                  <li>• Acesso somente ao Dashboard</li>
+                  <li>• Visualiza apenas dados/turnos vinculados ao próprio nome</li>
                 </ul>
               </div>
-              <div className="p-3 sm:p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <h4 className="font-medium text-purple-800 mb-2 text-sm sm:text-base">Supervisor</h4>
-                <ul className="text-xs sm:text-sm text-purple-700 space-y-1">
-                  <li>• All Operator permissions</li>
-                  <li>• Review & complete shifts</li>
-                  <li>• Add production results</li>
-                  <li>• Upload monitoring photos</li>
-                  <li>• Edit/Delete all shifts</li>
+              <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                <h4 className="font-medium text-purple-800 dark:text-purple-300 mb-2 text-sm sm:text-base">Supervisor</h4>
+                <ul className="text-xs sm:text-sm text-purple-700 dark:text-purple-400 space-y-1">
+                  <li>• Acesso completo ao sistema</li>
+                  <li>• Criar, revisar e concluir turnos</li>
+                  <li>• Adicionar resultados de produção</li>
+                  <li>• Upload de fotos de monitoramento</li>
+                  <li>• Editar e excluir turnos</li>
+                  <li>• Visualizar histórico e dashboards</li>
                 </ul>
               </div>
-              <div className="p-3 sm:p-4 bg-red-50 rounded-lg border border-red-200">
-                <h4 className="font-medium text-red-800 mb-2 text-sm sm:text-base">Administrator</h4>
-                <ul className="text-xs sm:text-sm text-red-700 space-y-1">
-                  <li>• All Supervisor permissions</li>
-                  <li>• Manage users</li>
-                  <li>• Assign roles</li>
-                  <li>• System configuration</li>
+              <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                <h4 className="font-medium text-red-800 dark:text-red-300 mb-2 text-sm sm:text-base">Manager</h4>
+                <ul className="text-xs sm:text-sm text-red-700 dark:text-red-400 space-y-1">
+                  <li>• Todos os acessos do Supervisor</li>
+                  <li>• Gerenciar utilizadores</li>
+                  <li>• Atribuir papéis</li>
+                  <li>• Configurações do sistema</li>
                 </ul>
               </div>
             </div>

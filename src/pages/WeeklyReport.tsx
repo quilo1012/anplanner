@@ -11,8 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 
 const PRODUCTION_LINES = [
-  'Line 1', 'Line 2', 'Line 3', 'Line 4', 'Line 5',
-  'Line 6', 'Line 7', 'Line 8', 'Line 9', 'Line 10',
+  'Filler Line 1', 'Filler Line 2', 'Filler Line 3',
+  'Filler Line 4', 'Filler Line 5', 'Filler Line 6',
 ];
 
 interface WeeklyDay {
