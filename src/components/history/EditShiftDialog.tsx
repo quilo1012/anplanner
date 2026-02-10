@@ -81,14 +81,20 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
 
     setIsSubmitting(true);
     try {
-      // Save new products to catalog
-      for (const row of skuRows) {
-        if (row.isNewProduct && row.sku.trim() && row.product.trim()) {
-          const { data: existing } = await supabase.from('products').select('product_code').eq('product_code', row.sku).maybeSingle();
-          if (!existing) {
-            const { error } = await supabase.from('products').insert({ product_code: row.sku, product_description: row.product });
-            if (!error) toast.success(`Product ${row.sku} saved to catalog`);
-          }
+      // Batch save new products to catalog
+      const newProductRows = skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
+      if (newProductRows.length > 0) {
+        const { data: existingProducts } = await supabase
+          .from('products')
+          .select('product_code')
+          .in('product_code', newProductRows.map(r => r.sku));
+        const existingCodes = new Set((existingProducts || []).map(p => p.product_code));
+        const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
+        if (toInsert.length > 0) {
+          const { error } = await supabase.from('products').insert(
+            toInsert.map(r => ({ product_code: r.sku, product_description: r.product }))
+          );
+          if (!error) toast.success(`${toInsert.length} new product(s) saved to catalog`);
         }
       }
 
