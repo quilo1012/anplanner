@@ -308,7 +308,6 @@ export function Planner() {
                 onChange={handleSkuRowsChange}
                 canReview={canReview}
                 errors={errors}
-                onImportIntouch={() => setShowIntouchImport(true)}
               />
               {errors.skuRows && <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>}
             </div>
