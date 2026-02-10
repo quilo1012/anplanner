@@ -256,6 +256,10 @@ export function Planner() {
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import Plan</span>
               </button>
+              <button onClick={() => setShowIntouchImport(true)} className="btn-secondary">
+                <FileSpreadsheet size={18} />
+                <span className="hidden sm:inline">Import iTouching</span>
+              </button>
             </div>
           )}
 
