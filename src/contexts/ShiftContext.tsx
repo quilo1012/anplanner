@@ -59,7 +59,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const refreshSessions = useCallback(async () => {
-    if (authLoading) return;
+    if (authLoading || !user) return;
     if (!isAuthenticated) {
       setSessions([]);
       setIsLoading(false);
@@ -161,7 +161,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, user]);
 
   useEffect(() => {
     if (!authLoading) {

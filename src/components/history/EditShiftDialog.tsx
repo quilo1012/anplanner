@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,9 +46,9 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
     return { totalProduction: total, performance: perf };
   }, [skuRows, lineTarget]);
 
-  const [prevSessionId, setPrevSessionId] = useState<string | null>(null);
-  if (session && session.id !== prevSessionId) {
-    setPrevSessionId(session.id);
+  // Initialize form state when session changes (moved from render body to useEffect)
+  useEffect(() => {
+    if (!session) return;
     setDate(session.date);
     setShiftType(session.shift);
     setProductionLine(session.productionLine);
@@ -64,7 +64,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
       id: item.id, sku: item.sku, product: item.productName,
       productionTarget: item.quantityTarget, realProduction: item.quantityActual, isFoundInDb: true,
     })));
-  }
+  }, [session?.id]);
 
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
     setMonitoringPhoto(photo);
