@@ -272,7 +272,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
         ) : (
           <>
             {/* Session fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
               <div>
                 <Label htmlFor="itouch-date" className="text-xs">Date</Label>
                 <Input id="itouch-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
@@ -282,18 +282,6 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                 <select id="itouch-shift" value={shift} onChange={e => setShift(e.target.value as ShiftType)} className="select-field h-10">
                   {SHIFT_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-              </div>
-              <div>
-                <Label htmlFor="itouch-leader" className="text-xs">
-                  Line Leader <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="itouch-leader"
-                  value={lineLeader}
-                  onChange={e => setLineLeader(e.target.value)}
-                  placeholder="Leader name"
-                  maxLength={100}
-                />
               </div>
             </div>
 
