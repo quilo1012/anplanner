@@ -243,7 +243,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           .upsert(sessionData, { onConflict: 'production_line,date,shift_type' })
           .select('id')
           .single(),
-        10000
+        20000
       );
 
       if (sessionError) {
