@@ -19,13 +19,14 @@ interface ParsedRow {
 
 export interface LineGroup {
   line: string;
+  lineLeader: string;
   rows: { sku: string; product: string; quantityTarget: number }[];
 }
 
 interface IntouchImportProps {
   open: boolean;
   onClose: () => void;
-  onImport: (groups: LineGroup[], date: string, shift: ShiftType, lineLeader: string) => void;
+  onImport: (groups: LineGroup[], date: string, shift: ShiftType) => Promise<void>;
 }
 
 const HEADER_MAP: Record<string, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {
