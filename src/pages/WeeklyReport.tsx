@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { format, startOfWeek, addDays, subWeeks, addWeeks, getISOWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Printer, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer, CalendarDays, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -140,6 +140,44 @@ export function WeeklyReport() {
     }
   }, [data, selectedLine, weekLabel, shiftFilter]);
 
+  const handleExportCsv = useCallback(() => {
+    const rows = data?.days || [];
+    const totals = data?.totals;
+    if (!rows.length) return;
+
+    const headers = ['Day', 'Shift', 'Planned', 'Actual', 'Performance (%)', 'Downtime'];
+    const csvRows = rows.map(r => [
+      `${r.day_name} ${r.date.slice(8)}`,
+      r.shift,
+      r.planned.toString(),
+      r.actual.toString(),
+      r.performance !== null ? r.performance.toFixed(1) : '',
+      formatDowntime(r.downtime_minutes),
+    ].map(c => `"${c.replace(/"/g, '""')}"`).join(','));
+
+    if (totals) {
+      csvRows.push([
+        'WEEK TOTAL', '',
+        totals.planned.toString(),
+        totals.actual.toString(),
+        totals.performance !== null ? totals.performance.toFixed(1) : '',
+        formatDowntime(totals.downtime_minutes),
+      ].map(c => `"${c.replace(/"/g, '""')}"`).join(','));
+    }
+
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const lineSafe = selectedLine.replace(/\s+/g, '_');
+    link.download = `Weekly_Report_${lineSafe}_${weekStart}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [data, selectedLine, weekStart]);
+
   if (error) {
     toast.error('Failed to load weekly report');
   }
@@ -151,9 +189,14 @@ export function WeeklyReport() {
           <h1 className="text-2xl font-bold text-foreground">Weekly Production Report</h1>
           <p className="text-sm text-muted-foreground">Read-only summary per line, per week</p>
         </div>
-        <Button variant="outline" onClick={handlePrint} disabled={!data?.days?.length} className="no-print">
-          <Printer className="mr-2 h-4 w-4" /> Print Report
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCsv} disabled={!data?.days?.length} className="no-print">
+            <Download className="mr-2 h-4 w-4" /> Download CSV
+          </Button>
+          <Button variant="outline" onClick={handlePrint} disabled={!data?.days?.length} className="no-print">
+            <Printer className="mr-2 h-4 w-4" /> Print Report
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
