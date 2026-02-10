@@ -289,10 +289,10 @@ export function Admin() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 text-sm sm:text-base">Lider</h4>
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 text-sm sm:text-base">Leader</h4>
                 <ul className="text-xs sm:text-sm text-blue-700 dark:text-blue-400 space-y-1">
-                  <li>• Acesso somente ao Dashboard</li>
-                  <li>• Visualiza apenas dados/turnos vinculados ao próprio nome</li>
+                  <li>• Dashboard access only</li>
+                  <li>• Can only view data/shifts linked to their own name</li>
                 </ul>
               </div>
               <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
