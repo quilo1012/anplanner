@@ -18,7 +18,8 @@ export function SkuRowForm({
   onChange, 
   canReview = false,
   errors = {},
-  showTarget = true, // Default to true for backward compatibility
+  showTarget = true,
+  onImportIntouch,
 }: SkuRowFormProps) {
   const addSkuRow = () => {
     onChange([...skuRows, createEmptySkuRow()]);
