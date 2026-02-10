@@ -1,43 +1,37 @@
 
 
-# Fix: Translate Portuguese to English + Admin Page Full-Width Layout
+# Fix: Weekly Report Edge Function 401 — ES256 Token Handling
 
-## 1. Translate Portuguese text to English
+## Root Cause
 
-All Portuguese text is in `src/pages/Admin.tsx` within the Role Permissions section (lines 292-316). Changes:
+The edge function logs show: `Auth error: Auth session missing! User: false`
 
-**Leader role (lines 292-296):**
-- "Lider" -> "Leader"
-- "Acesso somente ao Dashboard" -> "Dashboard access only"
-- "Visualiza apenas dados/turnos vinculados ao proprio nome" -> "Can only view data/shifts linked to their own name"
+The current code creates a bare Supabase client and calls `getUser(token)`:
+```typescript
+const anonClient = createClient(supabaseUrl, anonKey);
+const { data: { user } } = await anonClient.auth.getUser(token);
+```
 
-**Supervisor role (lines 299-307):**
-- "Acesso completo ao sistema" -> "Full system access"
-- "Criar, revisar e concluir turnos" -> "Create, review, and complete shifts"
-- "Adicionar resultados de producao" -> "Add production results"
-- "Upload de fotos de monitoramento" -> "Upload monitoring photos"
-- "Editar e excluir turnos" -> "Edit and delete shifts"
-- "Visualizar historico e dashboards" -> "View history and dashboards"
+With ES256 signing-keys (which this project uses), this approach fails. The client needs the Authorization header set globally so Supabase can properly validate the token.
 
-**Manager role (lines 310-316):**
-- "Todos os acessos do Supervisor" -> "All Supervisor permissions"
-- "Gerenciar utilizadores" -> "Manage users"
-- "Atribuir papeis" -> "Assign roles"
-- "Configuracoes do sistema" -> "System settings"
+## Fix
 
-Also on line 163, the role dropdown option says "Lider" -- change to "Leader".
+Update `supabase/functions/weekly-report/index.ts` (lines 27-31) to create the client with the Authorization header in the global config:
 
-## 2. Fix Admin page layout to use full width
+```typescript
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+const anonClient = createClient(supabaseUrl, anonKey, {
+  global: { headers: { Authorization: authHeader } },
+});
 
-The Admin page currently uses `max-w-4xl mx-auto` (line 96), which constrains the content to ~896px and centers it, wasting horizontal space. Other pages like Dashboard use full width.
+const { data: { user }, error: authError } = await anonClient.auth.getUser();
+```
 
-**Change:** Remove `max-w-4xl mx-auto` from the container div so the Admin page content stretches to fill the available width, matching the high-density layout pattern used elsewhere.
+Key changes:
+- Pass `Authorization` header via client config `global.headers`
+- Call `getUser()` without passing the token directly — the client uses the header automatically
 
-## Technical Details
+## File to modify
 
-**File to modify:** `src/pages/Admin.tsx`
-
-- Line 96: Change `<div className="max-w-4xl mx-auto">` to `<div>`
-- Lines 292-316: Replace all Portuguese role permission text with English equivalents
-- Line 163: Change `"Lider"` to `"Leader"` in the role select dropdown
+- `supabase/functions/weekly-report/index.ts` — lines 27-31 only
 
