@@ -61,6 +61,11 @@ Deno.serve(async (req) => {
     const weekStart = body.week_start;
     const shiftFilter = body.shift || "ALL";
 
+    // Normalize: frontend sends "Line 1", DB stores "1"
+    const lineNumber = line.replace(/^Line\s+/i, "");
+    // Normalize: frontend sends "DAY"/"NIGHT", DB stores "day"/"night"
+    const shiftFilterDb = shiftFilter.toLowerCase();
+
     if (!line || !weekStart) {
       return new Response(
         JSON.stringify({ error: "Missing required params: line, week_start" }),
