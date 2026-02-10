@@ -307,7 +307,7 @@ export function Dashboard() {
               {lineStats.length > 0 ? (
                 lineStats.map((line) => (
                   <LineStatusCard
-                    key={line.line}
+                    key={`${line.line}-${line.date}-${line.shift}`}
                     lineName={line.line}
                     sku={line.currentSku}
                     product={line.currentProduct}
