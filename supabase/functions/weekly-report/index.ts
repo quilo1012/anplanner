@@ -61,6 +61,11 @@ Deno.serve(async (req) => {
     const weekStart = body.week_start;
     const shiftFilter = body.shift || "ALL";
 
+    // Normalize: frontend sends "Line 1", DB stores "1"
+    const lineNumber = line.replace(/^Line\s+/i, "");
+    // Normalize: frontend sends "DAY"/"NIGHT", DB stores "day"/"night"
+    const shiftFilterDb = shiftFilter.toLowerCase();
+
     if (!line || !weekStart) {
       return new Response(
         JSON.stringify({ error: "Missing required params: line, week_start" }),
@@ -78,12 +83,12 @@ Deno.serve(async (req) => {
     let sessionsQuery = adminClient
       .from("production_sessions")
       .select("id, date, shift_type, planned_quantity, production_line, line_leader")
-      .eq("production_line", line)
+      .eq("production_line", lineNumber)
       .gte("date", weekStart)
       .lte("date", weekEnd);
 
     if (shiftFilter !== "ALL") {
-      sessionsQuery = sessionsQuery.eq("shift_type", shiftFilter);
+      sessionsQuery = sessionsQuery.eq("shift_type", shiftFilterDb);
     }
 
     // Access control: operators only see their lines
@@ -153,7 +158,7 @@ Deno.serve(async (req) => {
       return {
         date: s.date,
         day_name: dayName,
-        shift: s.shift_type,
+        shift: s.shift_type.toUpperCase(),
         planned,
         actual,
         performance,
