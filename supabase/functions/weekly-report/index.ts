@@ -55,11 +55,11 @@ Deno.serve(async (req) => {
 
     const userName = profileData?.name || "";
 
-    // Parse query params
-    const url = new URL(req.url);
-    const line = url.searchParams.get("line");
-    const weekStart = url.searchParams.get("week_start");
-    const shiftFilter = url.searchParams.get("shift") || "ALL";
+    // Parse request body
+    const body = await req.json();
+    const line = body.line;
+    const weekStart = body.week_start;
+    const shiftFilter = body.shift || "ALL";
 
     if (!line || !weekStart) {
       return new Response(
