@@ -161,7 +161,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, user]);
 
   useEffect(() => {
     if (!authLoading) {

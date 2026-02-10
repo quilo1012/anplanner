@@ -104,7 +104,7 @@ export function History() {
   const printDate = filterFromDate || new Date().toISOString().split('T')[0];
   const printShift = filterShift || 'DAY';
 
-  const handleDialogSuccess = () => refreshSessions();
+  const handleDialogSuccess = () => { /* updateSession already triggers refreshSessions internally */ };
 
   return (
     <>
