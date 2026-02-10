@@ -102,16 +102,6 @@ export function SkuRowForm({
           </p>
         </div>
         <div className="flex gap-2">
-          {onImportIntouch && (
-            <button
-              type="button"
-              onClick={onImportIntouch}
-              className="btn-secondary text-sm"
-            >
-              <FileSpreadsheet size={16} />
-              Import iTouching
-            </button>
-          )}
           <button
             type="button"
             onClick={addSkuRow}
