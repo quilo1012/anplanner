@@ -1,55 +1,60 @@
 
+# Dashboard Filler Line Colors + Remove White Space
 
-# Fix iTouching Import - Per-Line Leaders + Database Save
+## 1. Custom Colors for Each Filler Line
 
-## Problems Identified
+Update the color maps in `src/components/dashboard/LineStatusCard.tsx` to assign unique colors per Filler Line:
 
-1. **Single Line Leader for all lines**: Currently the modal has one global "Line Leader" field, but each production line may have a different leader. The field needs to be per-line.
+| Line | Color | Description |
+|------|-------|-------------|
+| Filler Line 1 | Verde (Green) | `#22c55e` / emerald-green |
+| Filler Line 2 | Yellow/Beige | `#d4a843` / warm yellow-beige |
+| Filler Line 3 | Azul calcinha (Light blue) | `#7dd3fc` / sky blue |
+| Filler Line 4 | Orange fraco (Soft orange) | `#fb923c` / light orange |
+| Filler Line 5 | Rosa (Pink) | `#f472b6` / pink |
+| Filler Line 6 | Cinza (Grey) | `#94a3b8` / slate grey |
 
-2. **Import not saving to database**: The `onImport` callback in `Planner.tsx` calls `saveSession` which is an `async` function, but the `onImport` prop type in `IntouchImport.tsx` is defined as a synchronous function. The `handleConfirm` function calls `onImport(...)` without `await`, and critically, the component resets its state (`setRows([])`, etc.) immediately after calling `onImport` -- before the async saves complete. Additionally, the `handleConfirm` function doesn't mark `onImport` as async, so the database operations may be cut short.
+### Changes in `src/components/dashboard/LineStatusCard.tsx`:
+- Add new CSS color entries for Filler Lines 5 and 6 (currently missing)
+- Update existing Filler Line 1-4 colors to match the requested palette
+- Update both `LINE_COLORS` (border + gradient) and `LINE_HEADER_COLORS` (badge background) maps
 
-## Changes
+### Changes in `tailwind.config.ts` and `src/index.css`:
+- Add new CSS variables for the 6 filler line colors (e.g., `--filler-green`, `--filler-beige`, `--filler-skyblue`, `--filler-softorange`, `--filler-pink`, `--filler-grey`)
+- Register them in Tailwind config so classes like `bg-filler-green`, `border-l-filler-green` work
 
-### File: `src/components/IntouchImport.tsx`
+## 2. Remove White Space (max-width issue)
 
-**1. Replace single `lineLeader` state with per-line leader map:**
-- Remove `const [lineLeader, setLineLeader] = useState('')`
-- Add `const [lineLeaders, setLineLeaders] = useState<Record<string, string>>({})`
-- Remove the global Line Leader input from the session fields grid (keep only Date and Shift)
+The file `src/App.css` contains `#root { max-width: 1280px; margin: 0 auto; }` which is a leftover from the Vite template. This limits the page width and centers it, creating visible white gaps on wider screens.
 
-**2. Add per-line leader input in the grouped preview:**
-- In each line's header row (the collapsible row with the line name), add an inline text input for the leader name
-- Example: `Filler Line 6 -- 3 products -- Leader: [________]`
+### Change in `src/App.css`:
+- Remove `max-width: 1280px` and `margin: 0 auto` from `#root`
+- This lets the Layout component use the full viewport width
 
-**3. Fix async handling:**
-- Change `onImport` prop type to return `Promise<void>`
-- Make `handleConfirm` async
-- Await `onImport(...)` before resetting state
-- Add a `submitting` state to disable the button during save
-- Validate that ALL lines have a leader before allowing confirm
+## Technical Details
 
-**4. Pass per-line leaders in the export data:**
-- Update `LineGroup` interface to include `lineLeader: string`
-- Map leader from `lineLeaders` record into each group
-
-### File: `src/pages/Planner.tsx`
-
-**5. Update the onImport handler to use per-line leaders:**
-- Read `lineLeader` from each `group.lineLeader` instead of the single `leader` parameter
-- Remove the `lineLeader` parameter from the callback signature (it's now per-group)
-
-## Technical Summary
-
-```text
-IntouchImport changes:
-- LineGroup gains: lineLeader field
-- onImport type: sync -> async (Promise<void>)
-- handleConfirm: becomes async, awaits onImport, adds loading state
-- UI: leader input moves from global field to each line header row
-- Validation: all lines must have a leader to enable confirm button
-
-Planner.tsx changes:
-- onImport callback: uses group.lineLeader per line
-- Remove single leader param from callback signature
+### New CSS variables (in `src/index.css`):
+```
+--filler-1: 145 65% 45%;    /* green */
+--filler-2: 42 55% 55%;     /* yellow-beige */
+--filler-3: 199 85% 73%;    /* sky blue */
+--filler-4: 27 95% 61%;     /* soft orange */
+--filler-5: 330 80% 70%;    /* pink */
+--filler-6: 215 20% 63%;    /* slate grey */
 ```
 
+### Updated LINE_COLORS map:
+```
+'Filler Line 1': 'border-l-filler-1 bg-gradient-to-r from-filler-1/5 ...'
+'Filler Line 2': 'border-l-filler-2 ...'
+'Filler Line 3': 'border-l-filler-3 ...'
+'Filler Line 4': 'border-l-filler-4 ...'
+'Filler Line 5': 'border-l-filler-5 ...'
+'Filler Line 6': 'border-l-filler-6 ...'
+```
+
+### Files modified:
+- `src/index.css` -- add 6 filler color variables (light + dark)
+- `tailwind.config.ts` -- register filler color utilities
+- `src/components/dashboard/LineStatusCard.tsx` -- update color maps with new entries
+- `src/App.css` -- remove max-width constraint from #root
