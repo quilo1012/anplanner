@@ -83,12 +83,12 @@ Deno.serve(async (req) => {
     let sessionsQuery = adminClient
       .from("production_sessions")
       .select("id, date, shift_type, planned_quantity, production_line, line_leader")
-      .eq("production_line", line)
+      .eq("production_line", lineNumber)
       .gte("date", weekStart)
       .lte("date", weekEnd);
 
     if (shiftFilter !== "ALL") {
-      sessionsQuery = sessionsQuery.eq("shift_type", shiftFilter);
+      sessionsQuery = sessionsQuery.eq("shift_type", shiftFilterDb);
     }
 
     // Access control: operators only see their lines
