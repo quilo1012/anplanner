@@ -156,9 +156,10 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [shift, setShift] = useState<ShiftType>('DAY');
-  const [lineLeader, setLineLeader] = useState('');
+  const [lineLeaders, setLineLeaders] = useState<Record<string, string>>({});
   const [collapsedLines, setCollapsedLines] = useState<Set<string>>(new Set());
 
   const handleFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
