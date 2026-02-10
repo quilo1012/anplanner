@@ -124,6 +124,8 @@ export function Dashboard() {
       
       return {
         line: session.productionLine,
+        date: session.date,
+        shift: session.shift,
         avgPerformance: session.performance,
         totalDowntime: session.totalDowntime,
         currentSku: firstSku,
