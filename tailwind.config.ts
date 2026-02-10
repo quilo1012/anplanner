@@ -74,6 +74,14 @@ export default {
           orange: "hsl(var(--industrial-orange))",
           red: "hsl(var(--industrial-red))",
         },
+        filler: {
+          1: "hsl(var(--filler-1))",
+          2: "hsl(var(--filler-2))",
+          3: "hsl(var(--filler-3))",
+          4: "hsl(var(--filler-4))",
+          5: "hsl(var(--filler-5))",
+          6: "hsl(var(--filler-6))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

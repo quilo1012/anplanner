@@ -24,10 +24,12 @@ const LINE_COLORS: Record<string, string> = {
   'Line 3': 'border-l-industrial-purple bg-gradient-to-r from-industrial-purple/5 to-transparent',
   'Line 4': 'border-l-industrial-green bg-gradient-to-r from-industrial-green/5 to-transparent',
   'Line 5': 'border-l-industrial-orange bg-gradient-to-r from-industrial-orange/5 to-transparent',
-  'Filler Line 1': 'border-l-industrial-blue bg-gradient-to-r from-industrial-blue/5 to-transparent',
-  'Filler Line 2': 'border-l-industrial-cyan bg-gradient-to-r from-industrial-cyan/5 to-transparent',
-  'Filler Line 3': 'border-l-industrial-purple bg-gradient-to-r from-industrial-purple/5 to-transparent',
-  'Filler Line 4': 'border-l-industrial-green bg-gradient-to-r from-industrial-green/5 to-transparent',
+  'Filler Line 1': 'border-l-filler-1 bg-gradient-to-r from-filler-1/5 to-transparent',
+  'Filler Line 2': 'border-l-filler-2 bg-gradient-to-r from-filler-2/5 to-transparent',
+  'Filler Line 3': 'border-l-filler-3 bg-gradient-to-r from-filler-3/5 to-transparent',
+  'Filler Line 4': 'border-l-filler-4 bg-gradient-to-r from-filler-4/5 to-transparent',
+  'Filler Line 5': 'border-l-filler-5 bg-gradient-to-r from-filler-5/5 to-transparent',
+  'Filler Line 6': 'border-l-filler-6 bg-gradient-to-r from-filler-6/5 to-transparent',
 };
 
 const LINE_HEADER_COLORS: Record<string, string> = {
@@ -36,10 +38,12 @@ const LINE_HEADER_COLORS: Record<string, string> = {
   'Line 3': 'bg-industrial-purple',
   'Line 4': 'bg-industrial-green',
   'Line 5': 'bg-industrial-orange',
-  'Filler Line 1': 'bg-industrial-blue',
-  'Filler Line 2': 'bg-industrial-cyan',
-  'Filler Line 3': 'bg-industrial-purple',
-  'Filler Line 4': 'bg-industrial-green',
+  'Filler Line 1': 'bg-filler-1',
+  'Filler Line 2': 'bg-filler-2',
+  'Filler Line 3': 'bg-filler-3',
+  'Filler Line 4': 'bg-filler-4',
+  'Filler Line 5': 'bg-filler-5',
+  'Filler Line 6': 'bg-filler-6',
 };
 
 export function LineStatusCard({
