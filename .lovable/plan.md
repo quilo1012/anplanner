@@ -1,44 +1,39 @@
 
 
-# Fix Weekly Report Data Mismatches
+# Add CSV Export to Weekly Report
 
-## Problems Found
+## Overview
 
-Two data format mismatches prevent the Weekly Report from returning any results:
+Add a "Download CSV" button next to the existing "Print Report" button on the Weekly Report page. The CSV will be generated client-side from the already-fetched report data (no additional backend call needed).
 
-1. **Production Line**: The database stores production lines as plain numbers (`"1"`, `"2"`, `"3"`...), but the frontend sends `"Line 1"`, `"Line 2"`, etc. The edge function query `.eq("production_line", "Line 1")` never matches.
+## Implementation
 
-2. **Shift Type Case**: The database stores shift types in lowercase (`"day"`, `"night"`), but the frontend sends uppercase (`"DAY"`, `"NIGHT"`). The edge function query `.eq("shift_type", "DAY")` never matches.
+### File: `src/pages/WeeklyReport.tsx`
 
-## Fixes
+1. **Add Download button** next to the Print button, using the `Download` icon from lucide-react
+2. **Add `handleExportCsv` function** that:
+   - Takes the current `data.days` array and `data.totals`
+   - Builds CSV with headers: `Day, Shift, Planned, Actual, Performance (%), Downtime`
+   - Adds a totals row at the bottom: `WEEK TOTAL, , {planned}, {actual}, {perf}, {downtime}`
+   - Formats downtime as HH:MM (reuses existing `formatDowntime` helper)
+   - Performance shown as number with 1 decimal or empty for null
+   - Uses BOM prefix for Excel compatibility
+   - Filename pattern: `Weekly_Report_{Line}_{WeekStart}_{date}.csv`
+3. **Button disabled** when no data is loaded (same as Print)
 
-### File 1: `supabase/functions/weekly-report/index.ts`
+### Technical Details
 
-- Extract the line number from the frontend value (e.g., `"Line 1"` becomes `"1"`) before querying
-- Convert shift filter to lowercase before querying (e.g., `"DAY"` becomes `"day"`)
-- Convert shift type back to uppercase in the response for frontend display
-
-### File 2: `src/pages/WeeklyReport.tsx`
-
-- No changes needed -- the frontend format is consistent with the rest of the app
-
-## Technical Details
-
-In the edge function, before building the query:
+The CSV export reuses the same blob-download pattern from `src/utils/exportCsv.ts` but with a simpler structure since weekly report data is already aggregated (no nested items).
 
 ```text
-// Extract line number: "Line 1" -> "1"
-const lineNumber = line.replace(/^Line\s+/i, "");
-
-// Query uses lineNumber
-.eq("production_line", lineNumber)
-
-// Shift filter: "DAY" -> "day"  
-const shiftFilterDb = shiftFilter.toLowerCase();
-.eq("shift_type", shiftFilterDb)
-
-// In response, convert back: "day" -> "DAY"
-shift: s.shift_type.toUpperCase()
+// CSV structure
+Day,Shift,Planned,Actual,Performance (%),Downtime
+Mon 03,DAY,5000,4800,96.0,0:45
+Mon 03,NIGHT,4000,3900,97.5,0:20
+...
+WEEK TOTAL,,35000,33500,95.7,4:40
 ```
 
-This aligns with the existing pattern in `ShiftContext.tsx` which uses `mapShiftTypeToDb` (to lowercase) and `mapDbShiftType` (to uppercase) for the same conversion.
+### No other files need changes
+
+The export is self-contained in the WeeklyReport page component using the data already available from the edge function response.
