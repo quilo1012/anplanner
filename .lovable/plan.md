@@ -1,43 +1,43 @@
 
 
-# Fix: Signout Delays and History Edit Freezing
+# Fix: Translate Portuguese to English + Admin Page Full-Width Layout
 
-## Problems Identified
+## 1. Translate Portuguese text to English
 
-### 1. Signout Delay/Errors
-When signing out, the `ShiftContext` reacts to the auth state change and tries to refresh sessions even as the user is being cleared. This causes unnecessary database calls that fail (no auth token) and delay the redirect to login.
+All Portuguese text is in `src/pages/Admin.tsx` within the Role Permissions section (lines 292-316). Changes:
 
-### 2. History Edit Freezing
-Two issues combine to cause the freeze:
-- **Double refresh**: When saving an edit, `updateSession()` in ShiftContext already calls `refreshSessions()` at the end. Then `handleDialogSuccess` in History.tsx calls `refreshSessions()` *again* -- causing two full data reloads (3 parallel queries each = 6 total queries).
-- **State-during-render anti-pattern**: EditShiftDialog sets state directly inside the render body (lines 50-67) instead of using `useEffect`. This can trigger cascading re-renders and UI freezes, especially when combined with the double refresh flooding the component with state updates.
+**Leader role (lines 292-296):**
+- "Lider" -> "Leader"
+- "Acesso somente ao Dashboard" -> "Dashboard access only"
+- "Visualiza apenas dados/turnos vinculados ao proprio nome" -> "Can only view data/shifts linked to their own name"
 
----
+**Supervisor role (lines 299-307):**
+- "Acesso completo ao sistema" -> "Full system access"
+- "Criar, revisar e concluir turnos" -> "Create, review, and complete shifts"
+- "Adicionar resultados de producao" -> "Add production results"
+- "Upload de fotos de monitoramento" -> "Upload monitoring photos"
+- "Editar e excluir turnos" -> "Edit and delete shifts"
+- "Visualizar historico e dashboards" -> "View history and dashboards"
 
-## Plan
+**Manager role (lines 310-316):**
+- "Todos os acessos do Supervisor" -> "All Supervisor permissions"
+- "Gerenciar utilizadores" -> "Manage users"
+- "Atribuir papeis" -> "Assign roles"
+- "Configuracoes do sistema" -> "System settings"
 
-### Step 1: Fix signout race condition in ShiftContext
-- Add an early exit in `refreshSessions` that checks if `user` is null before making any DB calls.
-- Clear sessions immediately when `isAuthenticated` becomes false, without triggering a loading state.
+Also on line 163, the role dropdown option says "Lider" -- change to "Leader".
 
-### Step 2: Remove double refresh in History edit flow
-- Remove the `refreshSessions()` call from `handleDialogSuccess` in History.tsx, since `updateSession()` already handles the refresh internally.
-- OR, add a `skipRefresh` option to `updateSession` and let the caller handle it -- but the simpler fix is to just remove the redundant call.
+## 2. Fix Admin page layout to use full width
 
-### Step 3: Fix EditShiftDialog state initialization
-- Move the state initialization logic (lines 50-67) from render body into a proper `useEffect` that runs when `session` changes.
-- This prevents cascading re-renders during save/close operations.
+The Admin page currently uses `max-w-4xl mx-auto` (line 96), which constrains the content to ~896px and centers it, wasting horizontal space. Other pages like Dashboard use full width.
 
-### Step 4: Fix forwardRef warning in StructuredDowntimeForm
-- Wrap the `InlineNewInput` component with `React.forwardRef` to eliminate the console warning that adds noise during editing.
-
----
+**Change:** Remove `max-w-4xl mx-auto` from the container div so the Admin page content stretches to fill the available width, matching the high-density layout pattern used elsewhere.
 
 ## Technical Details
 
-**Files to modify:**
-- `src/contexts/ShiftContext.tsx` -- guard `refreshSessions` against null user
-- `src/pages/History.tsx` -- remove redundant `refreshSessions` call from `handleDialogSuccess`
-- `src/components/history/EditShiftDialog.tsx` -- move state init to `useEffect`
-- `src/components/StructuredDowntimeForm.tsx` -- fix forwardRef warning
+**File to modify:** `src/pages/Admin.tsx`
+
+- Line 96: Change `<div className="max-w-4xl mx-auto">` to `<div>`
+- Lines 292-316: Replace all Portuguese role permission text with English equivalents
+- Line 163: Change `"Lider"` to `"Leader"` in the role select dropdown
 
