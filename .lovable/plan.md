@@ -1,60 +1,73 @@
 
-# Dashboard Filler Line Colors + Remove White Space
+# Standardize Line Names, Fix Leader Filter, and Update RBAC
 
-## 1. Custom Colors for Each Filler Line
+## 1. Standardize Line Names to iTouching Format
 
-Update the color maps in `src/components/dashboard/LineStatusCard.tsx` to assign unique colors per Filler Line:
+The database currently has inconsistent line names: some sessions use "1", "2", "3"... while others use "Filler Line 1", "Filler Line 2"... The standard will be the iTouching format: **"Filler Line X"**.
 
-| Line | Color | Description |
-|------|-------|-------------|
-| Filler Line 1 | Verde (Green) | `#22c55e` / emerald-green |
-| Filler Line 2 | Yellow/Beige | `#d4a843` / warm yellow-beige |
-| Filler Line 3 | Azul calcinha (Light blue) | `#7dd3fc` / sky blue |
-| Filler Line 4 | Orange fraco (Soft orange) | `#fb923c` / light orange |
-| Filler Line 5 | Rosa (Pink) | `#f472b6` / pink |
-| Filler Line 6 | Cinza (Grey) | `#94a3b8` / slate grey |
+### Database Migration
+- Run an UPDATE to rename existing sessions: `UPDATE production_sessions SET production_line = 'Filler Line ' || production_line WHERE production_line IN ('1','2','3','4','5','6')`
 
-### Changes in `src/components/dashboard/LineStatusCard.tsx`:
-- Add new CSS color entries for Filler Lines 5 and 6 (currently missing)
-- Update existing Filler Line 1-4 colors to match the requested palette
-- Update both `LINE_COLORS` (border + gradient) and `LINE_HEADER_COLORS` (badge background) maps
+### Code Changes
+- **`src/components/dashboard/LineStatusCard.tsx`**: Already has "Filler Line X" entries in color maps -- remove the old "Line 1" through "Line 5" entries
+- **`src/pages/WeeklyReport.tsx`**: Update `PRODUCTION_LINES` array from `['Line 1', 'Line 2', ...]` to `['Filler Line 1', 'Filler Line 2', ..., 'Filler Line 6']`
+- **`src/pages/Planner.tsx`**: Update the placeholder text from `"e.g., Line 1"` to `"e.g., Filler Line 1"`
 
-### Changes in `tailwind.config.ts` and `src/index.css`:
-- Add new CSS variables for the 6 filler line colors (e.g., `--filler-green`, `--filler-beige`, `--filler-skyblue`, `--filler-softorange`, `--filler-pink`, `--filler-grey`)
-- Register them in Tailwind config so classes like `bg-filler-green`, `border-l-filler-green` work
+## 2. Fix Leader Names Not Being Overwritten
 
-## 2. Remove White Space (max-width issue)
+The user reports that when using the leader filter in History, leader names get overwritten. The issue is in **`src/pages/History.tsx`** -- the `filterLeader` state is correctly separate from session data, so the filter itself should not overwrite data. 
 
-The file `src/App.css` contains `#root { max-width: 1280px; margin: 0 auto; }` which is a leftover from the Vite template. This limits the page width and centers it, creating visible white gaps on wider screens.
+However, examining `EditShiftDialog.tsx`, the leader field IS editable and could be accidentally changed. The real concern seems to be about the **filter dropdown** -- if there are duplicate or near-duplicate leader names (e.g. different casing), the filter may not work correctly.
 
-### Change in `src/App.css`:
-- Remove `max-width: 1280px` and `margin: 0 auto` from `#root`
-- This lets the Layout component use the full viewport width
+### Fix
+- Ensure the leader filter in History uses exact matching (already does)
+- In EditShiftDialog, make the leader field pre-populated correctly from session data (already does)
+- No code change needed here unless the issue is about leader names from the iTouching import not being saved -- which was fixed in the previous plan (async await fix)
 
-## Technical Details
+## 3. Update RBAC Labels and Permissions
 
-### New CSS variables (in `src/index.css`):
-```
---filler-1: 145 65% 45%;    /* green */
---filler-2: 42 55% 55%;     /* yellow-beige */
---filler-3: 199 85% 73%;    /* sky blue */
---filler-4: 27 95% 61%;     /* soft orange */
---filler-5: 330 80% 70%;    /* pink */
---filler-6: 215 20% 63%;    /* slate grey */
-```
+Rename roles to match the Portuguese terminology and enforce proper access restrictions.
 
-### Updated LINE_COLORS map:
-```
-'Filler Line 1': 'border-l-filler-1 bg-gradient-to-r from-filler-1/5 ...'
-'Filler Line 2': 'border-l-filler-2 ...'
-'Filler Line 3': 'border-l-filler-3 ...'
-'Filler Line 4': 'border-l-filler-4 ...'
-'Filler Line 5': 'border-l-filler-5 ...'
-'Filler Line 6': 'border-l-filler-6 ...'
-```
+### Role Renaming
+| Internal Role | Old Label | New Label |
+|---|---|---|
+| operator | Operator | Lider |
+| supervisor | Supervisor | Supervisor |
+| admin | Administrator | Manager |
 
-### Files modified:
-- `src/index.css` -- add 6 filler color variables (light + dark)
-- `tailwind.config.ts` -- register filler color utilities
-- `src/components/dashboard/LineStatusCard.tsx` -- update color maps with new entries
-- `src/App.css` -- remove max-width constraint from #root
+### Access Restrictions for Lider (operator)
+Currently, operators can access Dashboard, Planner, Downtime, History, and Weekly Report. Per the RBAC requirements:
+- **Lider should ONLY access Dashboard** and see only their own shifts/data
+
+### Code Changes
+
+**`src/contexts/AuthContext.tsx`**:
+- Update `ROLE_LABELS`: operator -> "Lider", admin -> "Manager"
+
+**`src/types/auth.ts`**:
+- Update `ROLE_LABELS` and `ROLE_COLORS` accordingly
+
+**`src/components/Sidebar.tsx`** and **`src/components/MobileMenu.tsx`**:
+- Change nav items so that `operator` role only has access to `Dashboard` (remove Planner, Downtime, History, Weekly Report from operator's allowed roles)
+
+**`src/App.tsx`**:
+- Add route protection: Planner, Downtime, History, and Weekly Report routes should require `['supervisor', 'admin']` roles
+
+**`src/pages/Admin.tsx`**:
+- Update role dropdown labels: "Operator" -> "Lider", "Administrator" -> "Manager"
+- Update the Role Permissions info card with the correct Portuguese descriptions:
+  - **Lider**: Acesso somente ao Dashboard, visualiza apenas dados/turnos vinculados ao proprio nome
+  - **Supervisor**: Acesso completo (criar, revisar, concluir turnos, adicionar producao, upload fotos, editar/excluir, historico e dashboards)
+  - **Manager**: Todos os acessos do Supervisor + gestao de utilizadores, atribuicao de papeis, configuracoes
+
+### Summary of Files Modified
+- DB migration (rename "1"-"6" to "Filler Line 1"-"Filler Line 6")
+- `src/components/dashboard/LineStatusCard.tsx` (remove old "Line X" color entries)
+- `src/pages/WeeklyReport.tsx` (update PRODUCTION_LINES)
+- `src/pages/Planner.tsx` (update placeholder)
+- `src/contexts/AuthContext.tsx` (update ROLE_LABELS)
+- `src/types/auth.ts` (update ROLE_LABELS)
+- `src/components/Sidebar.tsx` (restrict operator nav)
+- `src/components/MobileMenu.tsx` (restrict operator nav)
+- `src/App.tsx` (add route-level role protection)
+- `src/pages/Admin.tsx` (update labels and permissions card)
