@@ -287,7 +287,7 @@ export function Planner() {
                 <div>
                   <label htmlFor="productionLine" className="label">Production Line <span className="text-destructive">*</span></label>
                   <input type="text" id="productionLine" name="productionLine" value={formState.productionLine}
-                    onChange={handleFieldChange} placeholder="e.g., Line 1"
+                    onChange={handleFieldChange} placeholder="e.g., Filler Line 1"
                     className={`input-field ${errors.productionLine ? 'border-destructive' : ''}`} maxLength={50} />
                   {errors.productionLine && <p className="text-sm text-destructive mt-1">{errors.productionLine}</p>}
                 </div>

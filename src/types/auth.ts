@@ -42,9 +42,9 @@ export const DEFAULT_USERS: (User & { password: string })[] = [
 ];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  operator: 'Operator',
+  operator: 'Lider',
   supervisor: 'Supervisor',
-  admin: 'Administrator',
+  admin: 'Manager',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {

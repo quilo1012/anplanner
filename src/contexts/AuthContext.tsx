@@ -417,9 +417,9 @@ export function useAuth() {
 
 // Re-export types for compatibility
 export const ROLE_LABELS: Record<UserRole, string> = {
-  operator: 'Operator',
+  operator: 'Lider',
   supervisor: 'Supervisor',
-  admin: 'Administrator',
+  admin: 'Manager',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {

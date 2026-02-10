@@ -28,11 +28,6 @@ const LINE_COLORS: Record<string, string> = {
 };
 
 const LINE_HEADER_COLORS: Record<string, string> = {
-  'Line 1': 'bg-industrial-blue',
-  'Line 2': 'bg-industrial-cyan',
-  'Line 3': 'bg-industrial-purple',
-  'Line 4': 'bg-industrial-green',
-  'Line 5': 'bg-industrial-orange',
   'Filler Line 1': 'bg-filler-1',
   'Filler Line 2': 'bg-filler-2',
   'Filler Line 3': 'bg-filler-3',
