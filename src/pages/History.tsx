@@ -17,8 +17,9 @@ export function History() {
   const isOperator = user?.role === 'operator';
   const printRef = useRef<HTMLDivElement>(null);
   
-  const [filterFromDate, setFilterFromDate] = useState('');
-  const [filterToDate, setFilterToDate] = useState('');
+  const today = new Date().toISOString().split('T')[0];
+  const [filterFromDate, setFilterFromDate] = useState(today);
+  const [filterToDate, setFilterToDate] = useState(today);
   const [filterShift, setFilterShift] = useState<ShiftType | ''>('');
   const [filterLine, setFilterLine] = useState('');
   const [filterLeader, setFilterLeader] = useState('');

@@ -4,6 +4,8 @@ import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShiftType, SHIFT_TYPES } from '@/types/production';
 import { DOWNTIME_CATEGORIES } from '@/types/downtime';
+import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
+import { DowntimeByReason } from '@/components/charts/DowntimeByReason';
 import { formatDate } from '@/utils/exportCsv';
 import { 
   Plus, Edit, Trash2, Filter, X, Calendar, Factory, Users, 
@@ -30,8 +32,9 @@ export function Downtime() {
   const { sessions, saveDowntimesBatch } = useShifts();
   const { hasRole } = useAuth();
   
-  const [filterFromDate, setFilterFromDate] = useState('');
-  const [filterToDate, setFilterToDate] = useState('');
+  const today = new Date().toISOString().split('T')[0];
+  const [filterFromDate, setFilterFromDate] = useState(today);
+  const [filterToDate, setFilterToDate] = useState(today);
   const [filterShift, setFilterShift] = useState<ShiftType | ''>('');
   const [filterLine, setFilterLine] = useState('');
   const [filterLeader, setFilterLeader] = useState('');
@@ -104,6 +107,17 @@ export function Downtime() {
     });
     return { total, byCategory, byLine };
   }, [filteredDowntimes]);
+
+  const filteredSessions = useMemo(() => {
+    return sessions.filter(s => {
+      if (filterFromDate && s.date < filterFromDate) return false;
+      if (filterToDate && s.date > filterToDate) return false;
+      if (filterShift && s.shift !== filterShift) return false;
+      if (filterLine && s.productionLine !== filterLine) return false;
+      if (filterLeader && s.lineLeader !== filterLeader) return false;
+      return true;
+    });
+  }, [sessions, filterFromDate, filterToDate, filterShift, filterLine, filterLeader]);
 
   const clearFilters = () => {
     setFilterFromDate(''); setFilterToDate(''); setFilterShift('');
@@ -188,6 +202,20 @@ export function Downtime() {
             <p className="text-xl font-bold text-foreground">{Object.keys(stats.byCategory).length}</p>
           </div>
         </div>
+
+        {/* Downtime Charts */}
+        {filteredDowntimes.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div className="card p-3">
+              <h3 className="text-sm font-semibold mb-2 text-foreground">Downtime by Category</h3>
+              <DowntimeByCategory sessions={filteredSessions} filterCategory={filterCategory || undefined} />
+            </div>
+            <div className="card p-3">
+              <h3 className="text-sm font-semibold mb-2 text-foreground">Top Downtime Reasons</h3>
+              <DowntimeByReason sessions={filteredSessions} filterCategory={filterCategory || undefined} />
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="card p-3 sm:p-4 mb-4">
