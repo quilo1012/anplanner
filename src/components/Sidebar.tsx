@@ -1,9 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Factory, Clock, FileBarChart } from 'lucide-react';
+import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Clock, FileBarChart, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const { user, logout, hasRole } = useAuth();
+  const [collapsed, setCollapsed] = useLocalStorage('sidebar-collapsed', false);
   
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
@@ -17,19 +20,35 @@ export function Sidebar() {
   const filteredNavItems = navItems.filter(item => hasRole(item.roles as any));
 
   return (
-    <aside className="w-52 min-h-screen bg-sidebar text-sidebar-foreground flex flex-col fixed lg:static h-screen">
+    <aside className={cn(
+      "min-h-screen bg-sidebar text-sidebar-foreground flex flex-col fixed lg:static h-screen transition-all duration-300",
+      collapsed ? "w-16" : "w-52"
+    )}>
       {/* Logo Header */}
-      <div className="p-5 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
+      <div className="p-3 border-b border-sidebar-border">
+        <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3 px-2")}>
           <img
             src="/lovable-uploads/30acb027-2373-44c6-beeb-e940da9f52c7.jpg"
             alt="Applied Nutrition"
-            className="h-10 w-auto rounded-lg bg-white p-0.5"
+            className="h-10 w-auto rounded-lg bg-white p-0.5 shrink-0"
           />
-          <div>
-            <h1 className="text-base font-bold leading-tight text-sidebar-foreground">Shift Report</h1>
-          </div>
+          {!collapsed && (
+            <div>
+              <h1 className="text-base font-bold leading-tight text-sidebar-foreground">Shift Report</h1>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Toggle Button */}
+      <div className={cn("px-3 pt-2", collapsed && "flex justify-center")}>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+        </button>
       </div>
 
       {/* Navigation */}
@@ -41,15 +60,18 @@ export function Sidebar() {
                 to={item.path}
                 end={item.path === '/'}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all duration-200 ${
+                  cn(
+                    "flex items-center rounded-lg transition-all duration-200",
+                    collapsed ? "justify-center px-2 py-3.5" : "gap-3 px-4 py-3.5",
                     isActive
                       ? 'bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-lg'
                       : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  }`
+                  )
                 }
+                title={collapsed ? item.label : undefined}
               >
                 <item.icon size={22} strokeWidth={2} />
-                <span className="text-sm">{item.label}</span>
+                {!collapsed && <span className="text-sm">{item.label}</span>}
               </NavLink>
             </li>
           ))}
@@ -59,25 +81,41 @@ export function Sidebar() {
       {/* User Info */}
       {user && (
         <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center font-bold text-sidebar-primary-foreground text-sm">
-              {user.name.charAt(0).toUpperCase()}
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center font-bold text-sidebar-primary-foreground text-sm">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <button
+                onClick={logout}
+                className="p-2 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                title="Sign Out"
+              >
+                <LogOut size={18} />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-sidebar-foreground">{user.name}</p>
-              <p className="text-xs text-sidebar-foreground/60">{ROLE_LABELS[user.role]}</p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-          >
-            <LogOut size={18} />
-            Sign Out
-          </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center font-bold text-sidebar-primary-foreground text-sm">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate text-sidebar-foreground">{user.name}</p>
+                  <p className="text-xs text-sidebar-foreground/60">{ROLE_LABELS[user.role]}</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+              >
+                <LogOut size={18} />
+                Sign Out
+              </button>
+            </>
+          )}
         </div>
       )}
-
     </aside>
   );
 }

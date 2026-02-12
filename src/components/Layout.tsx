@@ -1,8 +1,11 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileMenu } from './MobileMenu';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 export function Layout() {
+  const [collapsed] = useLocalStorage('sidebar-collapsed', false);
+
   return (
     <div className="flex min-h-screen bg-[hsl(var(--background))]">
       {/* Desktop Sidebar */}
@@ -14,7 +17,7 @@ export function Layout() {
       <MobileMenu />
       
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden lg:ml-52 pt-14 lg:pt-0">
+      <main className={`flex-1 flex flex-col overflow-hidden pt-14 lg:pt-0 transition-all duration-300 ${collapsed ? 'lg:ml-16' : 'lg:ml-52'}`}>
         <Outlet />
       </main>
     </div>

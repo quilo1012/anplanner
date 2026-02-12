@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LogIn, Eye, EyeOff, AlertCircle, UserPlus, Loader2, Mail, Lock, User } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 export function Login() {
   const navigate = useNavigate();
   const {
@@ -109,7 +110,10 @@ export function Login() {
         </div>
       </div>;
   }
-  return <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-muted/50 via-background to-muted/50">
+  return <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-muted/50 via-background to-muted/50 relative">
+      <div className="absolute top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         {/* Login Card */}
         <div className="bg-card rounded-xl border border-border shadow-xl p-6 sm:p-8">
