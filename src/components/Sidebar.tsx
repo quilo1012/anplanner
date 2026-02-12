@@ -33,22 +33,18 @@ export function Sidebar() {
             className="h-10 w-auto rounded-lg bg-white p-0.5 shrink-0"
           />
           {!collapsed && (
-            <div>
+            <div className="flex-1">
               <h1 className="text-base font-bold leading-tight text-sidebar-foreground">Shift Report</h1>
             </div>
           )}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors shrink-0"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
         </div>
-      </div>
-
-      {/* Toggle Button */}
-      <div className={cn("px-3 pt-2", collapsed && "flex justify-center")}>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
-        </button>
       </div>
 
       {/* Navigation */}
