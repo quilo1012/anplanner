@@ -19,6 +19,8 @@ import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
 import { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from '@/types/downtime';
 import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy, List } from 'lucide-react';
+import { formatDuration } from '@/utils/formatDuration';
+import { naturalLineSort } from '@/utils/naturalLineSort';
 
 const LINE_COLORS = [
   'bg-industrial-blue', 'bg-industrial-cyan', 'bg-industrial-purple',
@@ -60,7 +62,7 @@ export function Dashboard() {
   }, [startDate, endDate]);
 
   const { uniqueLines, uniqueLeaders } = useMemo(() => {
-    const lines = [...new Set(sessions.map(s => s.productionLine.trim()))].sort();
+    const lines = [...new Set(sessions.map(s => s.productionLine.trim()))].sort(naturalLineSort);
     const leaders = [...new Set(sessions.map(s => s.lineLeader.trim()))].sort();
     return { uniqueLines: lines, uniqueLeaders: leaders };
   }, [sessions]);
@@ -140,7 +142,7 @@ export function Dashboard() {
         productionTarget: session.plannedQuantity,
         skuCount: session.items.length,
       };
-    }).sort((a, b) => a.line.localeCompare(b.line));
+    }).sort((a, b) => naturalLineSort(a.line, b.line));
   }, [filteredSessions]);
 
   const trendAlerts = useMemo(() => {
@@ -283,7 +285,7 @@ export function Dashboard() {
           </div>
           <div className="bg-card border border-border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground uppercase mb-1">Total Downtime</p>
-            <p className="text-xl font-bold text-foreground tabular-nums">{stats.totalDowntime} <span className="text-sm font-normal">min</span></p>
+            <p className="text-xl font-bold text-foreground tabular-nums">{formatDuration(stats.totalDowntime)}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground uppercase mb-1">OEE</p>
@@ -428,7 +430,7 @@ export function Dashboard() {
                           <td className="font-medium">{dt.line}</td>
                           <td>{getCategoryLabel(dt.category)}</td>
                           <td>{getReasonLabel(dt.category, dt.reason)}</td>
-                          <td className="text-right font-medium">{dt.duration} min</td>
+                          <td className="text-right font-medium">{formatDuration(dt.duration)}</td>
                           <td className="text-muted-foreground text-xs max-w-[150px] truncate">{dt.comment || '—'}</td>
                         </tr>
                       ))}
