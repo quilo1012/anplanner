@@ -240,9 +240,4 @@ All production lines follow the iTouching format: `Filler Line X` (e.g., Filler 
 | Planner save reliability (double-submit guard) | Implemented |
 | Online users in sidebar (Presence) | Implemented |
 | Operator access to History (restricted edit) | Implemented |
-| Filler line color palette | Implemented (Dashboard only -- needs consistency check in other modules) |
-| Collapsible sidebar with toggle | Implemented |
-| Dark mode toggle on login | Implemented |
-
-### Action Item: Consistent Line Colors
-The filler line color palette is currently defined and applied in `LineStatusCard.tsx` (Dashboard). To maintain the standard, these colors should be centralized into a shared utility (e.g., `src/utils/lineColors.ts`) and applied in History, Daily Summary, charts, and any other module that displays line-specific data.
+| Filler line color palette | Implemented (centralized in `src/utils/lineColors.ts`, applied in Dashboard, History, Daily Summary, PerformanceByLine chart) |

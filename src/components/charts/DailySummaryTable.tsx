@@ -3,6 +3,8 @@ import { ProductionSession, ShiftType } from '@/types/production';
 import { Printer, Table } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
+import { getLineBorderClass } from '@/utils/lineColors';
+import { cn } from '@/lib/utils';
 
 interface DailySummaryTableProps {
   sessions: ProductionSession[];
@@ -84,7 +86,7 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
           <thead><tr><th>Date</th><th>Shift</th><th>Line</th><th>Leader</th><th className="text-center">SKUs</th><th className="text-right">Planned</th><th className="text-right">Actual</th><th className="text-right">Downtime</th><th className="text-center">Perf.</th></tr></thead>
           <tbody>
             {summaryData.map((row, idx) => (
-              <tr key={idx}>
+              <tr key={idx} className={cn("border-l-4", getLineBorderClass(row.line))}>
                 <td className="whitespace-nowrap">{new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
                 <td><span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{row.shift}</span></td>
                 <td className="font-medium">{row.line}</td>

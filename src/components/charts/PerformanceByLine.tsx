@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { ProductionSession } from '@/types/production';
+import { getLineChartColor } from '@/utils/lineColors';
 
 interface PerformanceByLineProps {
   sessions: ProductionSession[];
@@ -35,7 +36,9 @@ export function PerformanceByLine({ sessions }: PerformanceByLineProps) {
             formatter={(value: number, name: string) => name === 'Production' ? [value.toLocaleString(), 'Production'] : [value, name]}
             labelFormatter={(label) => { const item = chartData.find(d => d.line === label); return `${label} (${item?.skuCount || 0} products)`; }} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="production" name="Production" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="production" name="Production" radius={[4, 4, 0, 0]}>
+            {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={getLineChartColor(entry.line)} />)}
+          </Bar>
           <Bar dataKey="downtime" name="Downtime (min)" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
