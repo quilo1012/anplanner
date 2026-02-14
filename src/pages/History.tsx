@@ -11,6 +11,8 @@ import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
 import { Edit, Trash2, Download, X, Image, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
+import { getLineBorderClass } from '@/utils/lineColors';
+import { cn } from '@/lib/utils';
 
 export function History() {
   const { sessions, refreshSessions } = useShifts();
@@ -246,7 +248,7 @@ export function History() {
                       
                       return (
                         <React.Fragment key={session.id}>
-                          <tr className="hover:bg-muted/50">
+                          <tr className={cn("hover:bg-muted/50 border-l-4", getLineBorderClass(session.productionLine))}>
                             <td className="text-center">
                               <button onClick={() => toggleRow(session.id)} className={`p-1 hover:bg-muted rounded transition-colors ${hasDetails ? '' : 'opacity-30'}`} disabled={!hasDetails}>
                                 {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
