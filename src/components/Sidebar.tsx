@@ -5,21 +5,53 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import { cn } from '@/lib/utils';
 
+type NavItem = {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles: string[];
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    label: 'Operations',
+    items: [
+      { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
+      { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
+      { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
+    label: 'Reports',
+    items: [
+      { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
+      { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+    ],
+  },
+];
+
 export function Sidebar() {
   const { user, logout, hasRole } = useAuth();
   const [collapsed, setCollapsed] = useLocalStorage('sidebar-collapsed', false);
   const onlineUsers = useOnlineUsers();
-  
-  const navItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
-    { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
-    { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['supervisor', 'admin'] },
-    { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
-    { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-    { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
-  ];
-  
-  const filteredNavItems = navItems.filter(item => hasRole(item.roles as any));
+
+  const filteredGroups = navGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => hasRole(item.roles as any)),
+    }))
+    .filter(group => group.items.length > 0);
 
   return (
     <aside className={cn(
@@ -51,29 +83,39 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-3">
-        <ul className="space-y-1">
-          {filteredNavItems.map(item => (
-            <li key={item.path}>
-              <NavLink
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center rounded-lg transition-all duration-200",
-                    collapsed ? "justify-center px-2 py-3.5" : "gap-3 px-4 py-3.5",
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-lg'
-                      : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  )
-                }
-                title={collapsed ? item.label : undefined}
-              >
-                <item.icon size={22} strokeWidth={2} />
-                {!collapsed && <span className="text-sm">{item.label}</span>}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
+        {filteredGroups.map((group, gi) => (
+          <div key={group.label}>
+            {gi > 0 && <div className="my-2 h-px bg-sidebar-border" />}
+            {!collapsed && (
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 px-4 mb-1">
+                {group.label}
+              </p>
+            )}
+            <ul className="space-y-0.5">
+              {group.items.map(item => (
+                <li key={item.path}>
+                  <NavLink
+                    to={item.path}
+                    end={item.path === '/'}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex items-center rounded-lg transition-all duration-200",
+                        collapsed ? "justify-center px-2 py-3" : "gap-3 px-4 py-2.5",
+                        isActive
+                          ? 'bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-lg'
+                          : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      )
+                    }
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <item.icon size={20} strokeWidth={2} />
+                    {!collapsed && <span className="text-sm">{item.label}</span>}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* Online Users */}

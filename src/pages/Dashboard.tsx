@@ -21,11 +21,7 @@ import { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from '@/types/downt
 import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy, List } from 'lucide-react';
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-
-const LINE_COLORS = [
-  'bg-industrial-blue', 'bg-industrial-cyan', 'bg-industrial-purple',
-  'bg-industrial-green', 'bg-industrial-orange',
-];
+import appliedLogo from '@/assets/applied-logo-mono.jpg';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -136,7 +132,7 @@ export function Dashboard() {
         staffPlanned: session.staffPlanned,
         staffActual: session.staffActual,
         availability: Math.max(0, Math.min(100, 100 - (session.totalDowntime / (8 * 60)) * 100)),
-        colorClass: LINE_COLORS[index % LINE_COLORS.length],
+        colorClass: '',
         status: session.performance >= 90 ? 'running' : session.performance >= 70 ? 'warning' : 'stopped',
         realProduction: session.totalProduction,
         productionTarget: session.plannedQuantity,
@@ -268,9 +264,12 @@ export function Dashboard() {
         </div>
 
         {/* Print Header */}
-        <div className="hidden print:block mb-4">
-          <h1 className="text-2xl font-bold">Applied Nutrition - Production Report</h1>
-          <p className="text-sm">Shift: {selectedShift} | Period: {dateRangeLabel} | Generated: {new Date().toLocaleString()}</p>
+        <div className="hidden print:flex items-center gap-4 mb-4 border-b-2 border-black pb-4">
+          <img src={appliedLogo} alt="Applied Nutrition" className="h-16 w-auto" />
+          <div>
+            <h1 className="text-2xl font-bold">PRODUCTION REPORT</h1>
+            <p className="text-sm">Shift: {selectedShift} | Period: {dateRangeLabel} | Generated: {new Date().toLocaleString()}</p>
+          </div>
         </div>
 
         {/* ═══ KPI SUMMARY BAR ═══ */}

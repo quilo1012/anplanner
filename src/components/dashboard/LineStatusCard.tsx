@@ -2,6 +2,8 @@ import { CircularProgress } from '@/components/ui/circular-progress';
 import { Factory, Play, Pause, AlertTriangle, User, Package, CheckCircle, XCircle, Target, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getLineBorderClass, getLineHeaderClass } from '@/utils/lineColors';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatDuration } from '@/utils/formatDuration';
 
 interface LineStatusCardProps {
   lineName: string;
@@ -146,16 +148,28 @@ export function LineStatusCard({
               </div>
             </div>
             
-            {/* Right: KPI circle */}
-            <div className="shrink-0">
-              <CircularProgress
-                value={performance}
-                size={44}
-                strokeWidth={4}
-                label="Perf"
-                colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
-              />
-            </div>
+            {/* Right: KPI circle with tooltip */}
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="shrink-0 cursor-default">
+                    <CircularProgress
+                      value={performance}
+                      size={44}
+                      strokeWidth={4}
+                      label="Perf"
+                      colorOverride={hasTargetData ? (isOnTarget ? 'success' : 'destructive') : undefined}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="text-xs space-y-0.5">
+                  <p><strong>Performance:</strong> {performance.toFixed(1)}%</p>
+                  {hasTargetData && <p><strong>Target:</strong> {productionTarget.toLocaleString()}</p>}
+                  <p><strong>Actual:</strong> {realProduction.toLocaleString()}</p>
+                  <p><strong>Availability:</strong> {availability.toFixed(1)}%</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>
