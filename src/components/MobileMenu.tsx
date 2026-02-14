@@ -1,32 +1,62 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Factory, Clock, FileBarChart } from 'lucide-react';
+import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
+
+type NavItem = {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles: string[];
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    label: 'Operations',
+    items: [
+      { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
+      { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
+      { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
+    label: 'Reports',
+    items: [
+      { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
+      { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+    ],
+  },
+];
 
 export function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout, hasRole } = useAuth();
-  
-  const navItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
-    { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
-    { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['supervisor', 'admin'] },
-    { path: '/history', label: 'History', icon: History, roles: ['supervisor', 'admin'] },
-    { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-    { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
-  ];
-  
-  const filteredNavItems = navItems.filter(item => hasRole(item.roles as any));
-  
-  const handleNavClick = () => {
-    setIsOpen(false);
-  };
-  
+
+  const filteredGroups = navGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => hasRole(item.roles as any)),
+    }))
+    .filter(group => group.items.length > 0);
+
+  const handleNavClick = () => setIsOpen(false);
+
   const handleLogout = () => {
     setIsOpen(false);
     logout();
   };
-  
+
   return (
     <>
       {/* Mobile Header */}
@@ -39,8 +69,8 @@ export function MobileMenu() {
           />
           <span className="font-semibold text-sm">Shift Report</span>
         </div>
-        <button 
-          onClick={() => setIsOpen(!isOpen)} 
+        <button
+          onClick={() => setIsOpen(!isOpen)}
           className="p-2 hover:bg-sidebar-accent rounded-lg transition-colors"
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -50,32 +80,40 @@ export function MobileMenu() {
       {/* Mobile Menu Overlay */}
       {isOpen && (
         <div className="lg:hidden fixed inset-0 z-50 pt-14">
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsOpen(false)} />
-          
-          {/* Menu Panel */}
+
           <nav className="relative bg-sidebar text-sidebar-foreground w-64 h-full overflow-auto animate-slide-in">
-            <ul className="p-3 space-y-1">
-              {filteredNavItems.map(item => (
-                <li key={item.path}>
-                  <NavLink 
-                    to={item.path} 
-                    end={item.path === '/'} 
-                    onClick={handleNavClick} 
-                    className={({ isActive }) => 
-                      `flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all ${
-                        isActive 
-                          ? 'bg-sidebar-primary text-sidebar-primary-foreground font-semibold' 
-                          : 'text-sidebar-foreground/80 hover:bg-sidebar-accent'
-                      }`
-                    }
-                  >
-                    <item.icon size={22} strokeWidth={2} />
-                    <span className="text-sm">{item.label}</span>
-                  </NavLink>
-                </li>
+            <div className="p-3">
+              {filteredGroups.map((group, gi) => (
+                <div key={group.label}>
+                  {gi > 0 && <div className="my-2 h-px bg-sidebar-border" />}
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 px-4 mb-1">
+                    {group.label}
+                  </p>
+                  <ul className="space-y-0.5">
+                    {group.items.map(item => (
+                      <li key={item.path}>
+                        <NavLink
+                          to={item.path}
+                          end={item.path === '/'}
+                          onClick={handleNavClick}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                              isActive
+                                ? 'bg-sidebar-primary text-sidebar-primary-foreground font-semibold'
+                                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent'
+                            }`
+                          }
+                        >
+                          <item.icon size={20} strokeWidth={2} />
+                          <span className="text-sm">{item.label}</span>
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
 
             {/* User info */}
             {user && (
@@ -89,8 +127,8 @@ export function MobileMenu() {
                     <p className="text-xs text-sidebar-foreground/60">{ROLE_LABELS[user.role]}</p>
                   </div>
                 </div>
-                <button 
-                  onClick={handleLogout} 
+                <button
+                  onClick={handleLogout}
                   className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent transition-colors"
                 >
                   <LogOut size={18} />

@@ -169,6 +169,21 @@ export function Planner() {
     setIsSubmitting(true);
 
     try {
+      // Client-side duplicate check (DB has unique constraint too)
+      if (!editId) {
+        const duplicate = sessions.find(
+          s => s.productionLine.trim().toLowerCase() === formState.productionLine.trim().toLowerCase()
+            && s.date === formState.date
+            && s.shift === formState.shift
+        );
+        if (duplicate) {
+          toast.error(`A session for ${formState.productionLine.trim()} on ${formState.date} (${formState.shift}) already exists. Edit it from History instead.`);
+          setIsSubmitting(false);
+          submittingRef.current = false;
+          return;
+        }
+      }
+
       // Batch save new products to catalog
       const newProductRows = formState.skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
       if (newProductRows.length > 0) {
