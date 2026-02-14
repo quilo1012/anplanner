@@ -21,9 +21,10 @@ interface EditShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  isOperator?: boolean;
 }
 
-export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: EditShiftDialogProps) {
+export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOperator = false }: EditShiftDialogProps) {
   const { updateSession } = useShifts();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -139,6 +140,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!isOperator && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="h-9" /></div>
             <div className="space-y-1"><Label className="text-xs">Shift</Label>
@@ -152,7 +154,9 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
             <div className="space-y-1"><Label className="text-xs">Staff Planned</Label><Input type="number" min={0} value={staffPlanned} onChange={(e) => setStaffPlanned(parseInt(e.target.value) || 0)} className="h-9" /></div>
             <div className="space-y-1"><Label className="text-xs">Staff Actual</Label><Input type="number" min={0} value={staffActual} onChange={(e) => setStaffActual(parseInt(e.target.value) || 0)} className="h-9" /></div>
           </div>
+          )}
 
+          {!isOperator && (
           <div className="border-t pt-4">
             <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
               <Label className="text-sm flex items-center gap-2 font-medium"><Target size={16} className="text-primary" />Line Production Target</Label>
@@ -162,9 +166,10 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
               </div>
             </div>
           </div>
+          )}
 
           <div className="border-t pt-4">
-            <SkuRowForm skuRows={skuRows} onChange={setSkuRows} canReview={true} errors={{}} showTarget={false} />
+            <SkuRowForm skuRows={skuRows} onChange={setSkuRows} canReview={!isOperator} errors={{}} showTarget={false} />
           </div>
 
           <div className="p-4 bg-muted rounded-lg border">
@@ -187,6 +192,8 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
             </div>
           </div>
 
+          {!isOperator && (
+          <>
           <div className="space-y-1 border-t pt-4">
             <Label className="text-xs">Comments / Observations</Label>
             <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
@@ -200,6 +207,8 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess }: Edit
           <div className="space-y-2 border-t pt-4">
             <StructuredDowntimeForm downtimes={structuredDowntimes} onChange={setStructuredDowntimes} downtimeThreshold={60} />
           </div>
+          </>
+          )}
 
           <DialogFooter className="pt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>

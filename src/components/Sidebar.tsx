@@ -1,18 +1,20 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Clock, FileBarChart, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Clock, FileBarChart, PanelLeftClose, PanelLeftOpen, Circle } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const { user, logout, hasRole } = useAuth();
   const [collapsed, setCollapsed] = useLocalStorage('sidebar-collapsed', false);
+  const onlineUsers = useOnlineUsers();
   
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
     { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['supervisor', 'admin'] },
-    { path: '/history', label: 'History', icon: History, roles: ['supervisor', 'admin'] },
+    { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
     { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
     { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
   ];
@@ -73,6 +75,29 @@ export function Sidebar() {
           ))}
         </ul>
       </nav>
+
+      {/* Online Users */}
+      {onlineUsers.length > 0 && (
+        <div className={cn("px-3 py-2 border-t border-sidebar-border", collapsed ? "text-center" : "")}>
+          {collapsed ? (
+            <div className="flex justify-center">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-400 text-xs font-bold">{onlineUsers.length}</span>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wide mb-1.5">Online ({onlineUsers.length})</p>
+              <div className="space-y-1 max-h-24 overflow-y-auto">
+                {onlineUsers.map(u => (
+                  <div key={u.id} className="flex items-center gap-2 text-xs text-sidebar-foreground/80">
+                    <Circle size={8} className="fill-green-500 text-green-500 shrink-0" />
+                    <span className="truncate">{u.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* User Info */}
       {user && (

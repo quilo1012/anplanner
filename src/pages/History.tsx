@@ -10,6 +10,7 @@ import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
 import { Edit, Trash2, Download, X, Image, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
+import { formatDuration } from '@/utils/formatDuration';
 
 export function History() {
   const { sessions, refreshSessions } = useShifts();
@@ -32,7 +33,7 @@ export function History() {
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const [deleteSessionState, setDeleteSessionState] = useState<ProductionSession | null>(null);
 
-  const canEdit = hasRole(['supervisor', 'admin']);
+  const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
 
   const { uniqueLines, uniqueLeaders, uniqueSkus } = useMemo(() => {
@@ -45,7 +46,7 @@ export function History() {
       s.items.forEach(i => { if (i.sku) skus.add(i.sku); });
     });
     return {
-      uniqueLines: Array.from(lines).sort(),
+      uniqueLines: Array.from(lines).sort(naturalLineSort),
       uniqueLeaders: Array.from(leaders).sort(),
       uniqueSkus: Array.from(skus).sort(),
     };
@@ -261,7 +262,7 @@ export function History() {
                             <td className="text-right font-medium text-sm">{session.plannedQuantity.toLocaleString()}</td>
                             <td className="text-right font-medium text-sm">{session.totalProduction.toLocaleString()}</td>
                             <td><span className={getPerformanceClass(session.performance)}>{session.performance.toFixed(0)}%</span></td>
-                            <td className="text-right text-sm">{session.totalDowntime} min</td>
+                            <td className="text-right text-sm">{formatDuration(session.totalDowntime)}</td>
                             <td className="text-center text-sm">
                               <span className={session.staffActual < session.staffPlanned ? 'text-destructive font-medium' : ''}>{session.staffActual}/{session.staffPlanned}</span>
                             </td>
@@ -312,7 +313,7 @@ export function History() {
                                           <div key={dt.id} className="flex items-center gap-3 text-xs bg-card p-2 rounded border border-border">
                                             <span className="font-medium capitalize">{dt.category}</span>
                                             <span className="text-muted-foreground">{dt.reason}</span>
-                                            <span className="font-medium">{dt.duration} min</span>
+                                            <span className="font-medium">{formatDuration(dt.duration)}</span>
                                             {dt.comment && <span className="text-muted-foreground italic">"{dt.comment}"</span>}
                                           </div>
                                         ))}
@@ -362,6 +363,7 @@ export function History() {
           open={!!editSession}
           onOpenChange={(open) => { if (!open) setEditSession(null); }}
           onSuccess={handleDialogSuccess}
+          isOperator={isOperator}
         />
 
         {/* Delete Dialog */}

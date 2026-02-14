@@ -1,6 +1,8 @@
 import { useMemo, useRef } from 'react';
 import { ProductionSession, ShiftType } from '@/types/production';
 import { Printer, Table } from 'lucide-react';
+import { naturalLineSort } from '@/utils/naturalLineSort';
+import { formatDuration } from '@/utils/formatDuration';
 
 interface DailySummaryTableProps {
   sessions: ProductionSession[];
@@ -17,7 +19,11 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
       skuCount: s.items.length, totalPlanned: s.plannedQuantity, totalActual: s.totalProduction,
       totalDowntime: s.totalDowntime,
       performance: s.plannedQuantity > 0 ? Math.round((s.totalProduction / s.plannedQuantity) * 100) : 0,
-    })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    })).sort((a, b) => {
+      const lineSort = naturalLineSort(a.line, b.line);
+      if (lineSort !== 0) return lineSort;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
   }, [sessions]);
 
   const totals = useMemo(() => {
@@ -86,7 +92,7 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
                 <td className="text-center">{row.skuCount}</td>
                 <td className="text-right">{row.totalPlanned.toLocaleString()}</td>
                 <td className="text-right font-medium">{row.totalActual.toLocaleString()}</td>
-                <td className="text-right">{row.totalDowntime} min</td>
+                <td className="text-right">{formatDuration(row.totalDowntime)}</td>
                 <td className="text-center"><span className={getPerformanceClass(row.performance)}>{row.performance}%</span></td>
               </tr>
             ))}
@@ -97,7 +103,7 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
                 <td colSpan={5} className="text-right text-muted-foreground">TOTALS</td>
                 <td className="text-right">{totals.totalPlanned.toLocaleString()}</td>
                 <td className="text-right">{totals.totalActual.toLocaleString()}</td>
-                <td className="text-right">{totals.totalDowntime} min</td>
+                <td className="text-right">{formatDuration(totals.totalDowntime)}</td>
                 <td className="text-center"><span className={getPerformanceClass(totals.avgPerformance)}>{totals.avgPerformance}%</span></td>
               </tr>
             </tfoot>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SkuRowForm } from '@/components/SkuRowForm';
@@ -13,6 +13,7 @@ import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { naturalLineSort } from '@/utils/naturalLineSort';
 
 interface PlannerFormState {
   date: string;
@@ -45,8 +46,14 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { saveSession, updateSession, getSessionById, refreshSessions } = useShifts();
+  const { saveSession, updateSession, getSessionById, refreshSessions, sessions } = useShifts();
   const { user, hasRole } = useAuth();
+
+  const { uniqueLines, uniqueLeaders } = useMemo(() => {
+    const lines = [...new Set(sessions.map(s => s.productionLine.trim()).filter(Boolean))].sort(naturalLineSort);
+    const leaders = [...new Set(sessions.map(s => s.lineLeader.trim()).filter(Boolean))].sort();
+    return { uniqueLines: lines, uniqueLeaders: leaders };
+  }, [sessions]);
   const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,9 +159,13 @@ export function Planner() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const submittingRef = useRef(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -227,6 +238,7 @@ export function Planner() {
       toast.error('An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
@@ -285,15 +297,21 @@ export function Planner() {
                 <div>
                   <label htmlFor="productionLine" className="label">Production Line <span className="text-destructive">*</span></label>
                   <input type="text" id="productionLine" name="productionLine" value={formState.productionLine}
-                    onChange={handleFieldChange} placeholder="e.g., Filler Line 1"
+                    onChange={handleFieldChange} placeholder="e.g., Filler Line 1" list="line-options"
                     className={`input-field ${errors.productionLine ? 'border-destructive' : ''}`} maxLength={50} />
+                  <datalist id="line-options">
+                    {uniqueLines.map(l => <option key={l} value={l} />)}
+                  </datalist>
                   {errors.productionLine && <p className="text-sm text-destructive mt-1">{errors.productionLine}</p>}
                 </div>
                 <div>
                   <label htmlFor="lineLeader" className="label">Line Leader <span className="text-destructive">*</span></label>
                   <input type="text" id="lineLeader" name="lineLeader" value={formState.lineLeader}
-                    onChange={handleFieldChange} placeholder="Leader name"
+                    onChange={handleFieldChange} placeholder="Leader name" list="leader-options"
                     className={`input-field ${errors.lineLeader ? 'border-destructive' : ''}`} maxLength={100} />
+                  <datalist id="leader-options">
+                    {uniqueLeaders.map(l => <option key={l} value={l} />)}
+                  </datalist>
                   {errors.lineLeader && <p className="text-sm text-destructive mt-1">{errors.lineLeader}</p>}
                 </div>
               </div>

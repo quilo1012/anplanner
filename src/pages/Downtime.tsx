@@ -7,6 +7,8 @@ import { DOWNTIME_CATEGORIES } from '@/types/downtime';
 import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
 import { DowntimeByReason } from '@/components/charts/DowntimeByReason';
 import { formatDate } from '@/utils/exportCsv';
+import { formatDuration } from '@/utils/formatDuration';
+import { naturalLineSort } from '@/utils/naturalLineSort';
 import { 
   Plus, Edit, Trash2, Filter, X, Calendar, Factory, Users, 
   Clock, AlertTriangle, Lock, Download, ChevronDown, ChevronUp 
@@ -79,7 +81,7 @@ export function Downtime() {
       if (d.category) categories.add(d.category);
     });
     return {
-      uniqueLines: Array.from(lines).sort(),
+      uniqueLines: Array.from(lines).sort(naturalLineSort),
       uniqueLeaders: Array.from(leaders).sort(),
       uniqueCategories: Array.from(categories).sort(),
     };
@@ -180,14 +182,14 @@ export function Downtime() {
 
   return (
     <>
-      <Header title="Downtime Management" subtitle={`${filteredDowntimes.length} entries • ${stats.total} min total`} />
+      <Header title="Downtime Management" subtitle={`${filteredDowntimes.length} entries • ${formatDuration(stats.total)} total`} />
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <div className="card p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Clock size={14} />Total Downtime</div>
-            <p className="text-xl font-bold text-foreground">{stats.total} <span className="text-sm font-normal">min</span></p>
+            <p className="text-xl font-bold text-foreground">{formatDuration(stats.total)}</p>
           </div>
           <div className="card p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertTriangle size={14} />Entries</div>
@@ -292,7 +294,7 @@ export function Downtime() {
                         {DOWNTIME_CATEGORIES.find(c => c.value === entry.category)?.label || entry.category}
                       </span>
                     </div>
-                    <span className="text-lg font-bold text-foreground">{entry.duration} min</span>
+                    <span className="text-lg font-bold text-foreground">{formatDuration(entry.duration)}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-xs mb-2">
                     <div><span className="text-muted-foreground">Line:</span> <span className="font-medium">{entry.productionLine}</span></div>
@@ -344,7 +346,7 @@ export function Downtime() {
                           <td className="font-medium text-sm">{entry.productionLine}</td>
                           <td><span className={`px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(entry.category)}`}>{DOWNTIME_CATEGORIES.find(c => c.value === entry.category)?.label || entry.category}</span></td>
                           <td className="text-sm">{entry.reason}</td>
-                          <td className="text-right font-medium text-sm">{entry.duration} min</td>
+                          <td className="text-right font-medium text-sm">{formatDuration(entry.duration)}</td>
                           <td className="text-sm">{entry.lineLeader}</td>
                           {canDelete && (
                             <td>

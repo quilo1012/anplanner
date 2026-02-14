@@ -30,7 +30,7 @@ const App = () => (
               <Route index element={<Dashboard />} />
               <Route path="planner" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Planner /></ProtectedRoute>} />
               <Route path="downtime" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Downtime /></ProtectedRoute>} />
-              <Route path="history" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><History /></ProtectedRoute>} />
+              <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><History /></ProtectedRoute>} />
               <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><WeeklyReport /></ProtectedRoute>} />
               <Route
                 path="admin"
