@@ -102,14 +102,6 @@ export function Login() {
     setError('');
     setSignupSuccess(false);
   };
-  if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 size={48} className="animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>;
-  }
   return <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-muted/50 via-background to-muted/50 relative">
       <div className="absolute top-4 right-4 z-50">
         <ThemeToggle />
