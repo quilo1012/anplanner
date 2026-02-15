@@ -1,147 +1,86 @@
 
 
-# Upgrade: Dashboard Produto x Linha + Importacao de Downtime
+# Import iTouching Downtime no Modulo Downtime
 
-## Resumo
+## Objetivo
 
-Tres modulos novos que transformam dados historicos em recomendacoes automaticas de linha para cada produto.
+Adicionar um botao "Import iTouching" na pagina Downtime que permite importar apenas os dados de downtime de um relatorio iTouching (.xlsx) e associa-los automaticamente as sessoes de producao existentes (linhas ativas do turno).
 
 ---
 
-## Fase 1: Utilidades e Calculo de Score
+## O que muda
 
-### Novo arquivo: `src/utils/calcProductLineMetrics.ts`
+### 1. Novo componente: `src/components/DowntimeImport.tsx`
 
-Funcao pura que recebe sessoes e calcula, para cada par (produto, linha):
+Componente modal dedicado para importar downtimes, diferente do IntouchImport existente (que importa producao + downtimes juntos). Este foca exclusivamente em downtimes:
+
+- Upload de arquivo .xlsx
+- Parser reutiliza a logica existente de detecao de colunas de downtime (Category, Reason, Duration, Comment) e separadores "Machine:"
+- Preview mostra downtimes agrupados por linha com contagens e validacao
+- Selecao de Data e Turno para localizar as sessoes existentes
+- O sistema cruza cada linha do arquivo com sessoes existentes (mesma linha + data + turno)
+- Se nao encontrar sessao existente para uma linha, mostra alerta amarelo
+- Ao confirmar, salva os downtimes nas sessoes correspondentes via `saveDowntimesBatch`
+- Mostra resumo final: X downtimes importados, Y linhas atualizadas
+
+### 2. Modificar: `src/pages/Downtime.tsx`
+
+- Importar o novo componente `DowntimeImport`
+- Adicionar estado `showImport` para controlar o modal
+- Adicionar botao "Import iTouching" ao lado do botao Export, visivel apenas para supervisores e admins
+- Icone: `FileSpreadsheet` (consistente com o importador existente)
+- Ao fechar o modal apos importacao bem-sucedida, os dados ja aparecem na tabela (via `refreshSessions` chamado internamente)
+
+---
+
+## Fluxo do Usuario
 
 ```text
-score = 0.6 * performance + 0.2 * stability + 0.2 * downtimeScore
-
-performance = SUM(quantity_actual) / SUM(quantity_target) * 100
-stability   = sessions_sem_downtime / total_sessions * 100  
-downtimeScore = 100 - (total_downtime / max_downtime_global * 100)
+1. Shift termina
+2. Usuario vai a pagina Downtime
+3. Clica "Import iTouching"
+4. Seleciona data, turno e arquivo .xlsx
+5. Sistema parseia e mostra preview dos downtimes por linha
+6. Sistema indica quais linhas tem sessao existente (verde) e quais nao (amarelo)
+7. Usuario confirma
+8. Downtimes sao salvos nas sessoes correspondentes
+9. Dashboard e metricas atualizam automaticamente
 ```
 
-Retorna um Map com chave `sku|line` contendo: score, performance, stability, downtimeScore, totalSessions, totalProduction, totalTarget, totalDowntimeMinutes.
+---
 
-### Novo arquivo: `src/utils/normalizeLineName.ts`
+## Detalhes Tecnicos
 
-Funcao para padronizar nomes: "filler line 6" -> "Filler Line 6". Reutiliza o padrao ja existente no projeto.
+### Parser de Downtimes
+
+Reutiliza a mesma logica do `IntouchImport.tsx`:
+- Procura aba "downtime" ou "parad" ou segunda aba do workbook
+- Detecta colunas via `DOWNTIME_HEADER_MAP` (category, reason, duration, comment)
+- Agrupa por linha usando separadores "Machine:"
+- Normaliza nomes de linha com `normalizeLineName`
+
+### Associacao com Sessoes
+
+- Busca sessoes existentes filtrando por `date` + `shift` + `production_line`
+- Para cada linha do arquivo com downtimes validos, encontra a sessao correspondente
+- Chama `saveDowntimesBatch(sessionId, downtimes)` para cada sessao
+- Se a sessao ja tem downtimes, os novos sao adicionados (merge)
+
+### Verificacao de Duplicidade
+
+Antes de salvar, compara downtimes existentes na sessao com os novos (mesma category + reason + duration) para evitar duplicatas.
 
 ---
 
-## Fase 2: Hook de Recomendacoes
-
-### Novo arquivo: `src/hooks/useProductLineRecommendations.ts`
-
-Hook React que:
-- Consome `sessions` do ShiftContext
-- Chama `calcProductLineMetrics` com memo
-- Expoe funcoes:
-  - `getTopLinesForProduct(sku, limit=3)` -- retorna linhas ordenadas por score
-  - `getScoreMatrix()` -- retorna matriz completa para o heatmap
-  - `getProblematicLines(threshold=50)` -- linhas com score abaixo do limiar
-
----
-
-## Fase 3: Pagina Product Performance Dashboard
-
-### Novo arquivo: `src/pages/ProductPerformance.tsx`
-
-Pagina com:
-- Filtros de periodo (igual ao Dashboard existente)
-- Heatmap visual (tabela com celulas coloridas verde/amarelo/vermelho)
-- Ranking Top 3 linhas por produto selecionado
-- Lista de alertas para linhas problematicas
-
-### Novo arquivo: `src/components/charts/ProductHeatmap.tsx`
-
-Componente de tabela onde:
-- Eixo X = Linhas de producao
-- Eixo Y = Produtos (SKUs)
-- Celulas coloridas por score (verde >= 75, amarelo >= 50, vermelho < 50)
-- Tooltip com detalhes (performance, downtime, sessoes)
-
-### Novo arquivo: `src/components/charts/ProductRanking.tsx`
-
-Componente que mostra Top 3 linhas para um produto selecionado, com barras visuais de score e indicadores de performance/stability/downtime.
-
----
-
-## Fase 4: Importador iTouching com Downtimes
-
-### Modificar: `src/components/IntouchImport.tsx`
-
-Expandir o parser para detectar colunas adicionais de downtime na planilha:
-- Categoria, Motivo, Duracao, Comentario
-- Se presentes, agrupar por sessao e importar automaticamente via `saveDowntimesBatch`
-- Preview mostra tanto produtos quanto downtimes detectados
-- Verificacao de duplicidade antes de importar (mesma linha + data + turno)
-
-A interface `LineGroup` ganha um campo opcional `downtimes`:
-
-```typescript
-export interface LineGroup {
-  line: string;
-  lineLeader: string;
-  rows: { sku: string; product: string; quantityTarget: number }[];
-  downtimes?: { category: string; reason: string; duration: number; comment?: string }[];
-}
-```
-
-### Modificar: `src/pages/Planner.tsx`
-
-Apos importar grupos, se houver downtimes, chamar `saveDowntimesBatch` para cada sessao criada.
-
----
-
-## Fase 5: Integracao com Planner
-
-### Modificar: `src/pages/Planner.tsx`
-
-Quando o usuario seleciona um SKU no formulario:
-- Mostrar badge com "Recommended: Filler Line X (score: 85)"
-- Usar o hook `useProductLineRecommendations`
-- Nao forcar -- apenas sugestao visual
-
----
-
-## Fase 6: Navegacao
-
-### Modificar: `src/components/Sidebar.tsx`
-
-Adicionar link "Product Performance" no grupo "Reports" com icone `Activity`, visivel para supervisor e admin.
-
-### Modificar: `src/App.tsx`
-
-Adicionar rota `/product-performance` com `ProtectedRoute` para supervisor/admin.
-
----
-
-## Arquivos a Criar (6)
+## Arquivos a Criar (1)
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `src/utils/calcProductLineMetrics.ts` | Calculo de score ponderado |
-| `src/utils/normalizeLineName.ts` | Padronizacao de nomes de linha |
-| `src/hooks/useProductLineRecommendations.ts` | Hook com recomendacoes |
-| `src/pages/ProductPerformance.tsx` | Pagina dashboard produto x linha |
-| `src/components/charts/ProductHeatmap.tsx` | Heatmap visual |
-| `src/components/charts/ProductRanking.tsx` | Ranking top 3 linhas |
+| `src/components/DowntimeImport.tsx` | Modal de importacao de downtimes do iTouching |
 
-## Arquivos a Modificar (4)
+## Arquivos a Modificar (1)
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/components/IntouchImport.tsx` | Parser de downtimes + preview |
-| `src/pages/Planner.tsx` | Import downtimes + badge de recomendacao |
-| `src/components/Sidebar.tsx` | Link Product Performance |
-| `src/App.tsx` | Rota /product-performance |
-
-## Notas Tecnicas
-
-- Nenhuma mudanca de schema no banco -- todos os dados necessarios ja existem nas tabelas `production_sessions`, `production_items`, e `structured_downtimes`
-- Os calculos sao feitos client-side usando os dados ja carregados no ShiftContext
-- O heatmap usa cores CSS com classes Tailwind condicionais (sem dependencia extra)
-- O parser de downtime no iTouching e opcional -- se a planilha nao tiver colunas de downtime, funciona como antes
+| `src/pages/Downtime.tsx` | Botao "Import iTouching" + estado do modal |
 
