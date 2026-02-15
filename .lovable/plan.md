@@ -1,73 +1,53 @@
 
 
-# Fix Login Not Working on Published URL
-
-## Problem
-When accessing the published URL (anplanner.lovable.app), the login page gets stuck showing "Loading..." forever. The login form never appears because `authLoading` from AuthContext never becomes `false`.
+# Fix Login Failing on Published URL
 
 ## Root Cause
-The `initializeAuth` function in `AuthContext.tsx` calls `getSession()` which may return a stale session with an expired JWT. It then calls `fetchUserData()` which queries the database with the expired token. These queries can hang or fail silently, preventing `setIsLoading(false)` from being reached in edge cases.
 
-Additionally, the Login page blocks rendering the form entirely while `authLoading` is true, meaning any delay in auth initialization prevents the user from even seeing the login form.
+Two race conditions in `AuthContext.tsx` cause the login to silently fail:
 
-## Fix (2 changes)
+1. **Auth listener overwrites successful login**: After `login()` succeeds and calls `setUser(userData)`, the `onAuthStateChange` listener fires a `SIGNED_IN` event. This triggers a second `fetchUserData` call. If it fails (network timing, concurrent requests), `setUser(null)` is called, erasing the valid user state. ProtectedRoute then redirects back to `/login`.
 
-### 1. Add timeout to auth initialization (`src/contexts/AuthContext.tsx`)
-Wrap `initializeAuth` with a safety timeout so that if it takes longer than 5 seconds, `isLoading` is forced to `false`. This ensures users always see the login form.
+2. **Login returns success even when user data is null**: The `login()` function sets `setUser(null)` and returns `{ success: true }` when `fetchUserData` fails, causing a redirect to a protected route with no user.
+
+## Fix (1 file: `src/contexts/AuthContext.tsx`)
+
+### Change 1: Protect login() from null userData (lines 224-230)
+If `fetchUserData` returns null after successful authentication, return an error instead of pretending success:
 
 ```typescript
-// In the useEffect, add a safety timeout
-const safetyTimeout = setTimeout(() => {
-  if (isMounted) {
-    setIsLoading(false);
-    isInitializing.current = false;
+if (data.user) {
+  const userData = await fetchUserData(data.user);
+  if (userData) {
+    setUser(userData);
+    if (userData.role === 'admin') {
+      await refreshUsers();
+    }
+    return { success: true };
   }
-}, 5000);
-
-initializeAuth().finally(() => {
-  isInitializing.current = false;
-  clearTimeout(safetyTimeout);
-});
-
-// In cleanup:
-return () => {
-  isMounted = false;
-  clearTimeout(safetyTimeout);
-  subscription.unsubscribe();
-};
+  return { success: false, error: 'Unable to load user profile. Please try again.' };
+}
 ```
 
-### 2. Show login form even during auth loading on the Login page (`src/pages/Login.tsx`)
-Instead of blocking the entire login page with a spinner when `authLoading` is true, only redirect if already authenticated. Show the login form immediately so the user can start typing while auth state resolves in the background. If auth resolves and user is authenticated, the existing `useEffect` redirect will kick in.
-
-Change the loading guard (lines 105-111) to only apply when on a protected route, not the login page itself. The login page should always render the form, with a subtle loading indicator if needed.
-
-### 3. Add error recovery for stale sessions (`src/contexts/AuthContext.tsx`)
-If `fetchUserData` fails or returns null during initialization, clear the session to prevent a stale auth state from blocking the app:
+### Change 2: Prevent auth listener from overwriting valid user state (lines 189-196)
+In the `onAuthStateChange` handler, skip setting user to `null` on `SIGNED_IN`/`TOKEN_REFRESHED` events. Only update user if `fetchUserData` returns a valid result:
 
 ```typescript
 if (session?.user) {
   const userData = await fetchUserData(session.user);
-  if (isMounted) {
-    if (userData) {
-      setUser(userData);
-      if (userData.role === 'admin') {
-        await refreshUsers();
-      }
-    } else {
-      // Stale session, clear it
-      await supabase.auth.signOut();
+  if (isMounted && userData) {
+    setUser(userData);
+    if (userData.role === 'admin') {
+      await refreshUsers();
     }
   }
+  // If userData is null, don't overwrite existing user state
 }
 ```
 
-## Files to Modify
-1. `src/contexts/AuthContext.tsx` -- Add safety timeout + stale session recovery
-2. `src/pages/Login.tsx` -- Remove blocking loading spinner, always show the form
+## Why this fixes the published URL specifically
 
-## Technical Notes
-- The safety timeout (5s) is generous enough for slow networks but prevents infinite loading
-- The login form rendering immediately improves perceived performance
-- Stale session cleanup prevents zombie auth states on the published domain
-- No database changes needed
+The published domain (`anplanner.lovable.app`) has slightly different network timing than the preview. The `onAuthStateChange` event fires faster there, creating a race where the second `fetchUserData` call interferes with the first. By making both the `login()` function and the listener resilient to null results, the login will work reliably regardless of timing.
+
+## Files to modify
+- `src/contexts/AuthContext.tsx` (2 small changes)
