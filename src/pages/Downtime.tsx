@@ -11,8 +11,9 @@ import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { 
   Plus, Edit, Trash2, Filter, X, Calendar, Factory, Users, 
-  Clock, AlertTriangle, Lock, Download, ChevronDown, ChevronUp 
+  Clock, AlertTriangle, Lock, Download, ChevronDown, ChevronUp, FileSpreadsheet 
 } from 'lucide-react';
+import { DowntimeImport } from '@/components/DowntimeImport';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export function Downtime() {
   const [deleteEntry, setDeleteEntry] = useState<DowntimeEntry | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [showImport, setShowImport] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']);
   const canDelete = hasRole(['supervisor', 'admin']);
@@ -262,6 +264,11 @@ export function Downtime() {
             </div>
             <div className="flex items-end gap-2">
               {hasFilters && <button onClick={clearFilters} className="btn-secondary text-xs py-2 px-2" title="Clear filters"><X size={14} /></button>}
+              {canEdit && (
+                <button onClick={() => setShowImport(true)} className="btn-secondary text-xs py-2">
+                  <FileSpreadsheet size={14} /><span className="hidden sm:inline">Import</span>
+                </button>
+              )}
               <button onClick={exportToCSV} className="btn-success text-xs py-2" disabled={filteredDowntimes.length === 0}>
                 <Download size={14} /><span className="hidden sm:inline">Export</span>
               </button>
@@ -386,6 +393,8 @@ export function Downtime() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <DowntimeImport open={showImport} onClose={() => setShowImport(false)} />
     </>
   );
 }
