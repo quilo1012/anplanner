@@ -1,95 +1,73 @@
 
 
-# UI Polish: Dashboard Colors, Sidebar, Print Layout, and Data Integrity
+# Fix Login Not Working on Published URL
 
-## 1. Dashboard -- Softer, More Professional Color Palette
+## Problem
+When accessing the published URL (anplanner.lovable.app), the login page gets stuck showing "Loading..." forever. The login form never appears because `authLoading` from AuthContext never becomes `false`.
 
-**Problem:** The filler line colors (bright green, pink, sky blue, orange) are visually fatiguing. The `LINE_COLORS` array on line 25-28 of Dashboard.tsx still references old `industrial-*` colors that conflict with the centralized `lineColors.ts`.
+## Root Cause
+The `initializeAuth` function in `AuthContext.tsx` calls `getSession()` which may return a stale session with an expired JWT. It then calls `fetchUserData()` which queries the database with the expired token. These queries can hang or fail silently, preventing `setIsLoading(false)` from being reached in edge cases.
 
-**Changes:**
+Additionally, the Login page blocks rendering the form entirely while `authLoading` is true, meaning any delay in auth initialization prevents the user from even seeing the login form.
 
-### Soften the filler line CSS variables (`src/index.css`)
-Shift the palette toward muted, corporate-friendly tones while preserving distinctiveness:
+## Fix (2 changes)
 
-| Line | Current | New (Light) | Description |
-|---|---|---|---|
-| Filler 1 | 145 65% 45% (bright green) | 160 35% 48% (muted teal-green) | Calmer, professional |
-| Filler 2 | 42 55% 55% (yellow-beige) | 42 40% 55% (muted sand) | Less saturated |
-| Filler 3 | 199 85% 73% (sky blue) | 210 45% 58% (steel blue) | Easier on eyes |
-| Filler 4 | 27 95% 61% (bright orange) | 25 60% 55% (muted amber) | Toned down |
-| Filler 5 | 330 80% 70% (bright pink) | 280 30% 58% (muted lavender) | Corporate-friendly |
-| Filler 6 | 215 20% 63% (grey) | 200 15% 55% (neutral slate) | Stays understated |
+### 1. Add timeout to auth initialization (`src/contexts/AuthContext.tsx`)
+Wrap `initializeAuth` with a safety timeout so that if it takes longer than 5 seconds, `isLoading` is forced to `false`. This ensures users always see the login form.
 
-Dark mode variants will be +5% lightness as before.
+```typescript
+// In the useEffect, add a safety timeout
+const safetyTimeout = setTimeout(() => {
+  if (isMounted) {
+    setIsLoading(false);
+    isInitializing.current = false;
+  }
+}, 5000);
 
-### Remove the old `LINE_COLORS` array from Dashboard.tsx (line 25-28)
-The `LineStatusCard` already uses the centralized `getLineBorderClass`/`getLineHeaderClass`. Remove the unused `LINE_COLORS` constant and the `colorClass` prop passing.
+initializeAuth().finally(() => {
+  isInitializing.current = false;
+  clearTimeout(safetyTimeout);
+});
 
-### Add tooltips to LineStatusCard
-Wrap the performance circle and target indicator with `<Tooltip>` from Radix, showing a quick summary (e.g., "Performance: 92.3% | Target: 15,000 | Actual: 13,800 | Downtime: 45 min").
+// In cleanup:
+return () => {
+  isMounted = false;
+  clearTimeout(safetyTimeout);
+  subscription.unsubscribe();
+};
+```
 
-### Visual hierarchy in charts
-Add subtle section dividers between Performance Analytics, Downtime Analytics, and Trends sections (already present as horizontal rules -- just ensure consistent spacing).
+### 2. Show login form even during auth loading on the Login page (`src/pages/Login.tsx`)
+Instead of blocking the entire login page with a spinner when `authLoading` is true, only redirect if already authenticated. Show the login form immediately so the user can start typing while auth state resolves in the background. If auth resolves and user is authenticated, the existing `useEffect` redirect will kick in.
 
-## 2. Production Line Deduplication
+Change the loading guard (lines 105-111) to only apply when on a protected route, not the login page itself. The login page should always render the form, with a subtle loading indicator if needed.
 
-**Problem:** No check for duplicate production line names.
+### 3. Add error recovery for stale sessions (`src/contexts/AuthContext.tsx`)
+If `fetchUserData` fails or returns null during initialization, clear the session to prevent a stale auth state from blocking the app:
 
-**Changes in `src/pages/Planner.tsx`:**
-- Before save, normalize the line name (trim + standardize casing to "Filler Line X").
-- Check if a session already exists for the same line + date + shift. The database already has a UNIQUE constraint, but add a client-side pre-check with a clear toast: "A session for Filler Line 3 on this date/shift already exists. Edit it from History instead."
-- The `datalist` autocomplete already encourages reusing existing names, which reduces accidental duplicates.
+```typescript
+if (session?.user) {
+  const userData = await fetchUserData(session.user);
+  if (isMounted) {
+    if (userData) {
+      setUser(userData);
+      if (userData.role === 'admin') {
+        await refreshUsers();
+      }
+    } else {
+      // Stale session, clear it
+      await supabase.auth.signOut();
+    }
+  }
+}
+```
 
-No new database ID column needed -- the existing `production_line` + `date` + `shift_type` unique constraint already serves as the unique identifier.
+## Files to Modify
+1. `src/contexts/AuthContext.tsx` -- Add safety timeout + stale session recovery
+2. `src/pages/Login.tsx` -- Remove blocking loading spinner, always show the form
 
-## 3. Sidebar -- Professional Cleanup
-
-**Problem:** Sidebar nav items are flat (no grouping), and the mobile menu lacks operator History access.
-
-**Changes:**
-
-### Sidebar (`src/components/Sidebar.tsx`)
-- Group nav items visually with subtle uppercase labels:
-  - **Operations**: Dashboard, Planner, Downtime
-  - **Reports**: History, Weekly Report
-  - **System**: Admin
-- Use a thin separator line between groups.
-- Keep icons exactly as-is (already consistent Lucide icons at size 22).
-- Reduce icon size to 20 and font to `text-sm` for a cleaner look.
-
-### Mobile Menu (`src/components/MobileMenu.tsx`)
-- Add `'operator'` to the History nav item roles (currently missing -- only Sidebar was updated).
-- Mirror the same grouping structure as the desktop sidebar.
-
-## 4. Print Layout -- Professional Report
-
-**Problem:** `PrintReport.tsx` lacks polish: no alternating row styling, downtime shows raw minutes, no clear section separation.
-
-**Changes in `src/components/PrintReport.tsx`:**
-- Add alternating row backgrounds (`even:bg-gray-50`) for readability.
-- Use `formatDuration()` for the downtime column.
-- Add clear section borders with thicker bottom borders on headers.
-- Sort sessions by natural line order using `naturalLineSort`.
-- Remove heavy background colors; use subtle left-border accents only.
-- Add a "Leader" column to the "Production by Line" table.
-- Add a "Downtime Summary" section grouping by category with totals.
-
-### Dashboard print header (already in Dashboard.tsx line 271-274)
-- Replace the plain text header with the Applied Nutrition logo import (already available as `appliedLogo`).
-- Format: Logo left, title + metadata right, matching PrintReport.tsx style.
-
-### Print CSS improvements (`src/index.css`)
-- Add `tr:nth-child(even) { background: #f9f9f9; }` for print tables.
-- Ensure `border-left` colors print correctly with `print-color-adjust: exact`.
-
-## 5. Summary of Files to Modify
-
-1. **`src/index.css`** -- Soften filler line CSS variables (light + dark), improve print CSS
-2. **`src/pages/Dashboard.tsx`** -- Remove unused `LINE_COLORS`, add logo to print header, add tooltips
-3. **`src/components/dashboard/LineStatusCard.tsx`** -- Add Radix Tooltip wrapper on performance circle
-4. **`src/components/Sidebar.tsx`** -- Add nav group labels with separators
-5. **`src/components/MobileMenu.tsx`** -- Add operator History access, add grouping
-6. **`src/components/PrintReport.tsx`** -- Alternating rows, formatDuration, natural sort, leader column, downtime summary
-7. **`src/pages/Planner.tsx`** -- Add client-side duplicate check before save
-8. **`src/utils/lineColors.ts`** -- No changes needed (already centralized)
-
+## Technical Notes
+- The safety timeout (5s) is generous enough for slow networks but prevents infinite loading
+- The login form rendering immediately improves perceived performance
+- Stale session cleanup prevents zombie auth states on the published domain
+- No database changes needed
