@@ -1,0 +1,105 @@
+import { ProductionSession } from '@/types/production';
+import { normalizeLineName } from './normalizeLineName';
+
+export interface ProductLineMetric {
+  sku: string;
+  productName: string;
+  line: string;
+  score: number;
+  performance: number;
+  stability: number;
+  downtimeScore: number;
+  totalSessions: number;
+  totalProduction: number;
+  totalTarget: number;
+  totalDowntimeMinutes: number;
+}
+
+/**
+ * Calculate weighted score for every (product, line) pair from historical sessions.
+ * score = 0.6 * performance + 0.2 * stability + 0.2 * downtimeScore
+ */
+export function calcProductLineMetrics(sessions: ProductionSession[]): Map<string, ProductLineMetric> {
+  // Accumulator: key = "sku|line"
+  const acc = new Map<string, {
+    sku: string;
+    productName: string;
+    line: string;
+    totalActual: number;
+    totalTarget: number;
+    totalDowntime: number;
+    totalSessions: number;
+    sessionsWithoutDowntime: number;
+  }>();
+
+  for (const session of sessions) {
+    const line = normalizeLineName(session.productionLine);
+    const sessionHasDowntime = session.totalDowntime > 0;
+
+    for (const item of session.items) {
+      if (!item.sku.trim()) continue;
+      const key = `${item.sku}|${line}`;
+      const existing = acc.get(key);
+
+      if (existing) {
+        existing.totalActual += item.quantityActual;
+        existing.totalTarget += item.quantityTarget;
+        existing.totalDowntime += session.totalDowntime;
+        existing.totalSessions += 1;
+        if (!sessionHasDowntime) existing.sessionsWithoutDowntime += 1;
+        if (!existing.productName && item.productName) existing.productName = item.productName;
+      } else {
+        acc.set(key, {
+          sku: item.sku,
+          productName: item.productName || '',
+          line,
+          totalActual: item.quantityActual,
+          totalTarget: item.quantityTarget,
+          totalDowntime: session.totalDowntime,
+          totalSessions: 1,
+          sessionsWithoutDowntime: sessionHasDowntime ? 0 : 1,
+        });
+      }
+    }
+  }
+
+  // Find max downtime globally for normalization
+  let maxDowntime = 0;
+  for (const v of acc.values()) {
+    if (v.totalDowntime > maxDowntime) maxDowntime = v.totalDowntime;
+  }
+
+  const result = new Map<string, ProductLineMetric>();
+
+  for (const [key, v] of acc.entries()) {
+    const performance = v.totalTarget > 0
+      ? Math.min((v.totalActual / v.totalTarget) * 100, 150) // cap at 150%
+      : 0;
+
+    const stability = v.totalSessions > 0
+      ? (v.sessionsWithoutDowntime / v.totalSessions) * 100
+      : 0;
+
+    const downtimeScore = maxDowntime > 0
+      ? 100 - (v.totalDowntime / maxDowntime) * 100
+      : 100;
+
+    const score = 0.6 * performance + 0.2 * stability + 0.2 * downtimeScore;
+
+    result.set(key, {
+      sku: v.sku,
+      productName: v.productName,
+      line: v.line,
+      score: Math.round(score * 10) / 10,
+      performance: Math.round(performance * 10) / 10,
+      stability: Math.round(stability * 10) / 10,
+      downtimeScore: Math.round(downtimeScore * 10) / 10,
+      totalSessions: v.totalSessions,
+      totalProduction: v.totalActual,
+      totalTarget: v.totalTarget,
+      totalDowntimeMinutes: v.totalDowntime,
+    });
+  }
+
+  return result;
+}

@@ -8,9 +8,10 @@ import { IntouchImport, LineGroup } from '@/components/IntouchImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProductLineRecommendations } from '@/hooks/useProductLineRecommendations';
 import { ShiftType, SHIFT_TYPES } from '@/types/production';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
-import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
+import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { naturalLineSort } from '@/utils/naturalLineSort';
@@ -48,18 +49,28 @@ export function Planner() {
 
   const { saveSession, updateSession, getSessionById, refreshSessions, sessions } = useShifts();
   const { user, hasRole } = useAuth();
+  const { getTopLinesForProduct } = useProductLineRecommendations();
 
   const { uniqueLines, uniqueLeaders } = useMemo(() => {
     const lines = [...new Set(sessions.map(s => s.productionLine.trim()).filter(Boolean))].sort(naturalLineSort);
     const leaders = [...new Set(sessions.map(s => s.lineLeader.trim()).filter(Boolean))].sort();
     return { uniqueLines: lines, uniqueLeaders: leaders };
   }, [sessions]);
+
   const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [showProductUpload, setShowProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
+
+  // Recommendation: find best line for the first SKU entered
+  const recommendation = useMemo(() => {
+    const firstSku = formState.skuRows.find(r => r.sku.trim())?.sku.trim();
+    if (!firstSku) return null;
+    const top = getTopLinesForProduct(firstSku, 1);
+    return top.length > 0 ? top[0] : null;
+  }, [formState.skuRows, getTopLinesForProduct]);
 
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
@@ -318,6 +329,16 @@ export function Planner() {
                     {uniqueLines.map(l => <option key={l} value={l} />)}
                   </datalist>
                   {errors.productionLine && <p className="text-sm text-destructive mt-1">{errors.productionLine}</p>}
+                  {recommendation && !formState.productionLine.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setFormState(prev => ({ ...prev, productionLine: recommendation.line }))}
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
+                    >
+                      <Sparkles size={12} />
+                      Recommended: {recommendation.line} (score: {recommendation.score.toFixed(0)})
+                    </button>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="lineLeader" className="label">Line Leader <span className="text-destructive">*</span></label>
@@ -430,6 +451,13 @@ export function Planner() {
                       quantityActual: 0,
                     })),
                     comments: '',
+                    structuredDowntimes: group.downtimes?.map(d => ({
+                      id: crypto.randomUUID(),
+                      category: d.category,
+                      reason: d.reason,
+                      duration: d.duration,
+                      comment: d.comment,
+                    })),
                     staffPlanned: 0,
                     staffActual: 0,
                   }, { skipRefresh: true });
@@ -437,10 +465,11 @@ export function Planner() {
               );
 
               const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
+              const dtCount = groups.reduce((sum, g) => sum + (g.downtimes?.length || 0), 0);
               if (failures.length > 0) {
                 toast.error(`Failed to import ${failures.length} line(s)`);
               } else {
-                toast.success(`Imported ${groups.length} line(s) successfully!`);
+                toast.success(`Imported ${groups.length} line(s)${dtCount > 0 ? ` with ${dtCount} downtime(s)` : ''} successfully!`);
               }
 
               await refreshSessions();
