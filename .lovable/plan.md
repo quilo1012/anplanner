@@ -1,53 +1,147 @@
 
 
-# Fix Login Failing on Published URL
+# Upgrade: Dashboard Produto x Linha + Importacao de Downtime
 
-## Root Cause
+## Resumo
 
-Two race conditions in `AuthContext.tsx` cause the login to silently fail:
+Tres modulos novos que transformam dados historicos em recomendacoes automaticas de linha para cada produto.
 
-1. **Auth listener overwrites successful login**: After `login()` succeeds and calls `setUser(userData)`, the `onAuthStateChange` listener fires a `SIGNED_IN` event. This triggers a second `fetchUserData` call. If it fails (network timing, concurrent requests), `setUser(null)` is called, erasing the valid user state. ProtectedRoute then redirects back to `/login`.
+---
 
-2. **Login returns success even when user data is null**: The `login()` function sets `setUser(null)` and returns `{ success: true }` when `fetchUserData` fails, causing a redirect to a protected route with no user.
+## Fase 1: Utilidades e Calculo de Score
 
-## Fix (1 file: `src/contexts/AuthContext.tsx`)
+### Novo arquivo: `src/utils/calcProductLineMetrics.ts`
 
-### Change 1: Protect login() from null userData (lines 224-230)
-If `fetchUserData` returns null after successful authentication, return an error instead of pretending success:
+Funcao pura que recebe sessoes e calcula, para cada par (produto, linha):
+
+```text
+score = 0.6 * performance + 0.2 * stability + 0.2 * downtimeScore
+
+performance = SUM(quantity_actual) / SUM(quantity_target) * 100
+stability   = sessions_sem_downtime / total_sessions * 100  
+downtimeScore = 100 - (total_downtime / max_downtime_global * 100)
+```
+
+Retorna um Map com chave `sku|line` contendo: score, performance, stability, downtimeScore, totalSessions, totalProduction, totalTarget, totalDowntimeMinutes.
+
+### Novo arquivo: `src/utils/normalizeLineName.ts`
+
+Funcao para padronizar nomes: "filler line 6" -> "Filler Line 6". Reutiliza o padrao ja existente no projeto.
+
+---
+
+## Fase 2: Hook de Recomendacoes
+
+### Novo arquivo: `src/hooks/useProductLineRecommendations.ts`
+
+Hook React que:
+- Consome `sessions` do ShiftContext
+- Chama `calcProductLineMetrics` com memo
+- Expoe funcoes:
+  - `getTopLinesForProduct(sku, limit=3)` -- retorna linhas ordenadas por score
+  - `getScoreMatrix()` -- retorna matriz completa para o heatmap
+  - `getProblematicLines(threshold=50)` -- linhas com score abaixo do limiar
+
+---
+
+## Fase 3: Pagina Product Performance Dashboard
+
+### Novo arquivo: `src/pages/ProductPerformance.tsx`
+
+Pagina com:
+- Filtros de periodo (igual ao Dashboard existente)
+- Heatmap visual (tabela com celulas coloridas verde/amarelo/vermelho)
+- Ranking Top 3 linhas por produto selecionado
+- Lista de alertas para linhas problematicas
+
+### Novo arquivo: `src/components/charts/ProductHeatmap.tsx`
+
+Componente de tabela onde:
+- Eixo X = Linhas de producao
+- Eixo Y = Produtos (SKUs)
+- Celulas coloridas por score (verde >= 75, amarelo >= 50, vermelho < 50)
+- Tooltip com detalhes (performance, downtime, sessoes)
+
+### Novo arquivo: `src/components/charts/ProductRanking.tsx`
+
+Componente que mostra Top 3 linhas para um produto selecionado, com barras visuais de score e indicadores de performance/stability/downtime.
+
+---
+
+## Fase 4: Importador iTouching com Downtimes
+
+### Modificar: `src/components/IntouchImport.tsx`
+
+Expandir o parser para detectar colunas adicionais de downtime na planilha:
+- Categoria, Motivo, Duracao, Comentario
+- Se presentes, agrupar por sessao e importar automaticamente via `saveDowntimesBatch`
+- Preview mostra tanto produtos quanto downtimes detectados
+- Verificacao de duplicidade antes de importar (mesma linha + data + turno)
+
+A interface `LineGroup` ganha um campo opcional `downtimes`:
 
 ```typescript
-if (data.user) {
-  const userData = await fetchUserData(data.user);
-  if (userData) {
-    setUser(userData);
-    if (userData.role === 'admin') {
-      await refreshUsers();
-    }
-    return { success: true };
-  }
-  return { success: false, error: 'Unable to load user profile. Please try again.' };
+export interface LineGroup {
+  line: string;
+  lineLeader: string;
+  rows: { sku: string; product: string; quantityTarget: number }[];
+  downtimes?: { category: string; reason: string; duration: number; comment?: string }[];
 }
 ```
 
-### Change 2: Prevent auth listener from overwriting valid user state (lines 189-196)
-In the `onAuthStateChange` handler, skip setting user to `null` on `SIGNED_IN`/`TOKEN_REFRESHED` events. Only update user if `fetchUserData` returns a valid result:
+### Modificar: `src/pages/Planner.tsx`
 
-```typescript
-if (session?.user) {
-  const userData = await fetchUserData(session.user);
-  if (isMounted && userData) {
-    setUser(userData);
-    if (userData.role === 'admin') {
-      await refreshUsers();
-    }
-  }
-  // If userData is null, don't overwrite existing user state
-}
-```
+Apos importar grupos, se houver downtimes, chamar `saveDowntimesBatch` para cada sessao criada.
 
-## Why this fixes the published URL specifically
+---
 
-The published domain (`anplanner.lovable.app`) has slightly different network timing than the preview. The `onAuthStateChange` event fires faster there, creating a race where the second `fetchUserData` call interferes with the first. By making both the `login()` function and the listener resilient to null results, the login will work reliably regardless of timing.
+## Fase 5: Integracao com Planner
 
-## Files to modify
-- `src/contexts/AuthContext.tsx` (2 small changes)
+### Modificar: `src/pages/Planner.tsx`
+
+Quando o usuario seleciona um SKU no formulario:
+- Mostrar badge com "Recommended: Filler Line X (score: 85)"
+- Usar o hook `useProductLineRecommendations`
+- Nao forcar -- apenas sugestao visual
+
+---
+
+## Fase 6: Navegacao
+
+### Modificar: `src/components/Sidebar.tsx`
+
+Adicionar link "Product Performance" no grupo "Reports" com icone `Activity`, visivel para supervisor e admin.
+
+### Modificar: `src/App.tsx`
+
+Adicionar rota `/product-performance` com `ProtectedRoute` para supervisor/admin.
+
+---
+
+## Arquivos a Criar (6)
+
+| Arquivo | Descricao |
+|---------|-----------|
+| `src/utils/calcProductLineMetrics.ts` | Calculo de score ponderado |
+| `src/utils/normalizeLineName.ts` | Padronizacao de nomes de linha |
+| `src/hooks/useProductLineRecommendations.ts` | Hook com recomendacoes |
+| `src/pages/ProductPerformance.tsx` | Pagina dashboard produto x linha |
+| `src/components/charts/ProductHeatmap.tsx` | Heatmap visual |
+| `src/components/charts/ProductRanking.tsx` | Ranking top 3 linhas |
+
+## Arquivos a Modificar (4)
+
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/components/IntouchImport.tsx` | Parser de downtimes + preview |
+| `src/pages/Planner.tsx` | Import downtimes + badge de recomendacao |
+| `src/components/Sidebar.tsx` | Link Product Performance |
+| `src/App.tsx` | Rota /product-performance |
+
+## Notas Tecnicas
+
+- Nenhuma mudanca de schema no banco -- todos os dados necessarios ja existem nas tabelas `production_sessions`, `production_items`, e `structured_downtimes`
+- Os calculos sao feitos client-side usando os dados ja carregados no ShiftContext
+- O heatmap usa cores CSS com classes Tailwind condicionais (sem dependencia extra)
+- O parser de downtime no iTouching e opcional -- se a planilha nao tiver colunas de downtime, funciona como antes
+
