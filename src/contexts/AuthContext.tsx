@@ -188,9 +188,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (session?.user) {
           const userData = await fetchUserData(session.user);
-          if (isMounted) {
+          if (isMounted && userData) {
             setUser(userData);
-            if (userData?.role === 'admin') {
+            if (userData.role === 'admin') {
               await refreshUsers();
             }
           }
@@ -223,11 +223,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.user) {
         const userData = await fetchUserData(data.user);
-        setUser(userData);
-        if (userData?.role === 'admin') {
-          await refreshUsers();
+        if (userData) {
+          setUser(userData);
+          if (userData.role === 'admin') {
+            await refreshUsers();
+          }
+          return { success: true };
         }
-        return { success: true };
+        return { success: false, error: 'Unable to load user profile. Please try again.' };
       }
 
       return { success: false, error: 'Login failed' };
