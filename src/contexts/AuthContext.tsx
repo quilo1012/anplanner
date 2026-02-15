@@ -142,9 +142,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           const userData = await fetchUserData(session.user);
           if (isMounted) {
-            setUser(userData);
-            if (userData?.role === 'admin') {
-              await refreshUsers();
+            if (userData) {
+              setUser(userData);
+              if (userData.role === 'admin') {
+                await refreshUsers();
+              }
+            } else {
+              // Stale session — clear it to prevent zombie auth state
+              await supabase.auth.signOut();
             }
           }
         }
@@ -157,8 +162,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Safety timeout: force loading to false after 5s to prevent infinite spinner
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        setIsLoading(false);
+        isInitializing.current = false;
+      }
+    }, 5000);
+
     initializeAuth().finally(() => {
       isInitializing.current = false;
+      clearTimeout(safetyTimeout);
     });
 
     // Set up auth state listener for subsequent changes
@@ -191,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
