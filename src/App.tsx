@@ -11,6 +11,7 @@ import { History } from '@/pages/History';
 import { Login } from '@/pages/Login';
 import { Admin } from '@/pages/Admin';
 import { WeeklyReport } from '@/pages/WeeklyReport';
+import { ProductPerformance } from '@/pages/ProductPerformance';
 
 const App = () => (
   <ErrorBoundary>
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="downtime" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Downtime /></ProtectedRoute>} />
               <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><History /></ProtectedRoute>} />
               <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><WeeklyReport /></ProtectedRoute>} />
+              <Route path="product-performance" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><ProductPerformance /></ProtectedRoute>} />
               <Route
                 path="admin"
                 element={

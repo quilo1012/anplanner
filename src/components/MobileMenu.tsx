@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart } from 'lucide-react';
+import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart, Activity } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 
 type NavItem = {
@@ -29,6 +29,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
       { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
+      { path: '/product-performance', label: 'Product Performance', icon: Activity, roles: ['supervisor', 'admin'] },
     ],
   },
   {

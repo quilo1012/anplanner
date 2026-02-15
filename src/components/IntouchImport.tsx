@@ -17,10 +17,21 @@ interface ParsedRow {
   error?: string;
 }
 
+interface ParsedDowntime {
+  line: string;
+  category: string;
+  reason: string;
+  duration: number;
+  comment: string;
+  valid: boolean;
+  error?: string;
+}
+
 export interface LineGroup {
   line: string;
   lineLeader: string;
   rows: { sku: string; product: string; quantityTarget: number }[];
+  downtimes?: { category: string; reason: string; duration: number; comment?: string }[];
 }
 
 interface IntouchImportProps {
@@ -42,6 +53,21 @@ const HEADER_MAP: Record<string, keyof Omit<ParsedRow, 'line' | 'valid' | 'error
   'orderno': 'orderNo',
 };
 
+const DOWNTIME_HEADER_MAP: Record<string, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> = {
+  'category': 'category',
+  'categoria': 'category',
+  'reason': 'reason',
+  'motivo': 'reason',
+  'duration': 'duration',
+  'duracao': 'duration',
+  'duração': 'duration',
+  'duration (min)': 'duration',
+  'comment': 'comment',
+  'comentario': 'comment',
+  'comentário': 'comment',
+  'notes': 'comment',
+};
+
 const MACHINE_PATTERN = /machine\s*[:]/i;
 
 function extractLineName(cellValue: string): string {
@@ -55,6 +81,15 @@ function detectColumns(headers: string[]): Record<number, keyof Omit<ParsedRow, 
   headers.forEach((h, i) => {
     const key = h.trim().toLowerCase();
     if (HEADER_MAP[key]) map[i] = HEADER_MAP[key];
+  });
+  return map;
+}
+
+function detectDowntimeColumns(headers: string[]): Record<number, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> {
+  const map: Record<number, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> = {};
+  headers.forEach((h, i) => {
+    const key = h.trim().toLowerCase();
+    if (DOWNTIME_HEADER_MAP[key]) map[i] = DOWNTIME_HEADER_MAP[key];
   });
   return map;
 }
@@ -80,12 +115,12 @@ function isHeaderRow(row: ExcelJS.Row, colMap: Record<number, string>): boolean 
   return matches >= 2;
 }
 
-async function parseXlsx(file: File): Promise<ParsedRow[]> {
+async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: ParsedDowntime[] }> {
   const buffer = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
   const ws = wb.worksheets[0];
-  if (!ws || ws.rowCount < 2) return [];
+  if (!ws || ws.rowCount < 2) return { rows: [], downtimes: [] };
 
   // First pass: find the header row (could be row 1 or later)
   let headerRowIdx = -1;
@@ -105,7 +140,7 @@ async function parseXlsx(file: File): Promise<ParsedRow[]> {
     }
   }
 
-  if (headerRowIdx < 0) return [];
+  if (headerRowIdx < 0) return { rows: [], downtimes: [] };
 
   // Second pass: iterate rows, track current line via Machine: markers
   let currentLine = 'Unknown Line';
@@ -149,11 +184,68 @@ async function parseXlsx(file: File): Promise<ParsedRow[]> {
       error: !parsed.sku ? 'Missing Part Code' : parsed.quantity! <= 0 ? 'Quantity must be > 0' : undefined,
     });
   }
-  return rows;
+
+  // Parse downtimes from second worksheet or downtime-labeled sheet
+  const downtimes: ParsedDowntime[] = [];
+  const dtSheet = wb.worksheets.find(s => /downtime|parad/i.test(s.name)) || (wb.worksheets.length > 1 ? wb.worksheets[1] : null);
+  
+  if (dtSheet && dtSheet.rowCount >= 2) {
+    let dtHeaderIdx = -1;
+    let dtColMap: Record<number, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> = {};
+
+    for (let r = 1; r <= Math.min(dtSheet.rowCount, 20); r++) {
+      const row = dtSheet.getRow(r);
+      const headers: string[] = [];
+      row.eachCell({ includeEmpty: true }, (cell, col) => {
+        headers[col - 1] = String(cell.value ?? '');
+      });
+      const candidate = detectDowntimeColumns(headers);
+      if (Object.values(candidate).includes('category') || Object.values(candidate).includes('reason')) {
+        dtColMap = candidate;
+        dtHeaderIdx = r;
+        break;
+      }
+    }
+
+    if (dtHeaderIdx >= 0) {
+      let dtCurrentLine = 'Unknown Line';
+      for (let r = 1; r < dtHeaderIdx; r++) {
+        const machineName = isMachineRow(dtSheet.getRow(r));
+        if (machineName) dtCurrentLine = machineName;
+      }
+
+      for (let r = dtHeaderIdx + 1; r <= dtSheet.rowCount; r++) {
+        const row = dtSheet.getRow(r);
+        const machineName = isMachineRow(row);
+        if (machineName) { dtCurrentLine = machineName; continue; }
+
+        const parsed: Partial<ParsedDowntime> = { line: dtCurrentLine, category: '', reason: '', duration: 0, comment: '' };
+        Object.entries(dtColMap).forEach(([colIdx, field]) => {
+          const val = row.getCell(Number(colIdx) + 1).value;
+          if (field === 'duration') {
+            parsed.duration = typeof val === 'number' ? val : parseInt(String(val ?? '0')) || 0;
+          } else {
+            (parsed as any)[field] = String(val ?? '').trim();
+          }
+        });
+
+        if (!parsed.category && !parsed.reason) continue;
+        const valid = !!(parsed.category || parsed.reason) && parsed.duration! > 0;
+        downtimes.push({
+          ...parsed as ParsedDowntime,
+          valid,
+          error: parsed.duration! <= 0 ? 'Duration must be > 0' : !parsed.category ? 'Missing category' : undefined,
+        });
+      }
+    }
+  }
+
+  return { rows, downtimes };
 }
 
 export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
   const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [parsedDowntimes, setParsedDowntimes] = useState<ParsedDowntime[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -169,10 +261,11 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
     setLoading(true);
     try {
       const parsed = await parseXlsx(file);
-      if (parsed.length === 0) {
+      if (parsed.rows.length === 0) {
         setError('No valid data found. Ensure the file has "Part Code" and "Order Quantity" columns.');
       }
-      setRows(parsed);
+      setRows(parsed.rows);
+      setParsedDowntimes(parsed.downtimes);
     } catch {
       setError('Failed to parse file. Please check the format.');
     } finally {
@@ -204,22 +297,45 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
 
   const allLinesHaveLeader = grouped.length > 0 && grouped.every(([line]) => lineLeaders[line]?.trim());
 
+  // Group downtimes by line
+  const downtimesByLine = useMemo(() => {
+    const map = new Map<string, ParsedDowntime[]>();
+    parsedDowntimes.forEach(d => {
+      const arr = map.get(d.line) || [];
+      arr.push(d);
+      map.set(d.line, arr);
+    });
+    return map;
+  }, [parsedDowntimes]);
+
+  const validDowntimeCount = parsedDowntimes.filter(d => d.valid).length;
+
   const handleConfirm = async () => {
     if (!allLinesHaveLeader) return;
-    const groups: LineGroup[] = grouped.map(([line, lineRows]) => ({
-      line,
-      lineLeader: lineLeaders[line]?.trim() || '',
-      rows: lineRows.filter(r => r.valid).map(r => ({
-        sku: r.sku,
-        product: r.product,
-        quantityTarget: r.quantity,
-      })),
-    })).filter(g => g.rows.length > 0);
+    const groups: LineGroup[] = grouped.map(([line, lineRows]) => {
+      const lineDts = downtimesByLine.get(line) || [];
+      return {
+        line,
+        lineLeader: lineLeaders[line]?.trim() || '',
+        rows: lineRows.filter(r => r.valid).map(r => ({
+          sku: r.sku,
+          product: r.product,
+          quantityTarget: r.quantity,
+        })),
+        downtimes: lineDts.filter(d => d.valid).map(d => ({
+          category: d.category,
+          reason: d.reason,
+          duration: d.duration,
+          comment: d.comment || undefined,
+        })),
+      };
+    }).filter(g => g.rows.length > 0);
 
     setSubmitting(true);
     try {
       await onImport(groups, date, shift);
       setRows([]);
+      setParsedDowntimes([]);
       setDate(new Date().toISOString().split('T')[0]);
       setShift('DAY');
       setLineLeaders({});
@@ -230,6 +346,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
 
   const handleClose = () => {
     setRows([]);
+    setParsedDowntimes([]);
     setError('');
     setLineLeaders({});
     onClose();
@@ -296,6 +413,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                   {grouped.map(([line, lineRows]) => {
                     const collapsed = collapsedLines.has(line);
                     const lineValid = lineRows.filter(r => r.valid).length;
+                    const lineDtCount = (downtimesByLine.get(line) || []).filter(d => d.valid).length;
                     return (
                       <Fragment key={line}>
                         <TableRow
@@ -308,6 +426,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
                               <span className="text-primary">{line}</span>
                               <span className="text-muted-foreground font-normal">
                                 — {lineValid} product{lineValid !== 1 ? 's' : ''}
+                                {lineDtCount > 0 && `, ${lineDtCount} downtime${lineDtCount !== 1 ? 's' : ''}`}
                               </span>
                               <div className="ml-auto flex items-center gap-1" onClick={e => e.stopPropagation()}>
                                 <Label className="text-xs text-muted-foreground font-normal">Leader:</Label>
@@ -346,6 +465,7 @@ export function IntouchImport({ open, onClose, onImport }: IntouchImportProps) {
 
             <div className="text-sm text-muted-foreground pt-2">
               {validCount} valid product{validCount !== 1 ? 's' : ''} across {lineCount} line{lineCount !== 1 ? 's' : ''}
+              {validDowntimeCount > 0 && ` · ${validDowntimeCount} downtime${validDowntimeCount !== 1 ? 's' : ''} detected`}
             </div>
           </>
         )}
