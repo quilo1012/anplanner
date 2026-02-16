@@ -1,86 +1,75 @@
 
 
-# Import iTouching Downtime no Modulo Downtime
+# Upgrade: Dashboard Preditivo + Planner Inteligente
 
-## Objetivo
+## Resumo
 
-Adicionar um botao "Import iTouching" na pagina Downtime que permite importar apenas os dados de downtime de um relatorio iTouching (.xlsx) e associa-los automaticamente as sessoes de producao existentes (linhas ativas do turno).
-
----
-
-## O que muda
-
-### 1. Novo componente: `src/components/DowntimeImport.tsx`
-
-Componente modal dedicado para importar downtimes, diferente do IntouchImport existente (que importa producao + downtimes juntos). Este foca exclusivamente em downtimes:
-
-- Upload de arquivo .xlsx
-- Parser reutiliza a logica existente de detecao de colunas de downtime (Category, Reason, Duration, Comment) e separadores "Machine:"
-- Preview mostra downtimes agrupados por linha com contagens e validacao
-- Selecao de Data e Turno para localizar as sessoes existentes
-- O sistema cruza cada linha do arquivo com sessoes existentes (mesma linha + data + turno)
-- Se nao encontrar sessao existente para uma linha, mostra alerta amarelo
-- Ao confirmar, salva os downtimes nas sessoes correspondentes via `saveDowntimesBatch`
-- Mostra resumo final: X downtimes importados, Y linhas atualizadas
-
-### 2. Modificar: `src/pages/Downtime.tsx`
-
-- Importar o novo componente `DowntimeImport`
-- Adicionar estado `showImport` para controlar o modal
-- Adicionar botao "Import iTouching" ao lado do botao Export, visivel apenas para supervisores e admins
-- Icone: `FileSpreadsheet` (consistente com o importador existente)
-- Ao fechar o modal apos importacao bem-sucedida, os dados ja aparecem na tabela (via `refreshSessions` chamado internamente)
+Ajustes nos pesos do score, filtros de turno/periodo no dashboard, auto-selecao de linha no Planner com alertas, e exportacao CSV.
 
 ---
 
-## Fluxo do Usuario
+## 1. Atualizar Pesos do Score
 
-```text
-1. Shift termina
-2. Usuario vai a pagina Downtime
-3. Clica "Import iTouching"
-4. Seleciona data, turno e arquivo .xlsx
-5. Sistema parseia e mostra preview dos downtimes por linha
-6. Sistema indica quais linhas tem sessao existente (verde) e quais nao (amarelo)
-7. Usuario confirma
-8. Downtimes sao salvos nas sessoes correspondentes
-9. Dashboard e metricas atualizam automaticamente
+**Arquivo:** `src/utils/calcProductLineMetrics.ts`
+
+Alterar a formula de:
+```
+score = 0.6 * performance + 0.2 * stability + 0.2 * downtimeScore
+```
+Para:
+```
+score = 0.5 * performance + 0.3 * downtimeScore + 0.2 * stability
 ```
 
 ---
 
-## Detalhes Tecnicos
+## 2. Filtros de Turno e Periodo no Dashboard
 
-### Parser de Downtimes
+**Arquivo:** `src/pages/ProductPerformance.tsx`
 
-Reutiliza a mesma logica do `IntouchImport.tsx`:
-- Procura aba "downtime" ou "parad" ou segunda aba do workbook
-- Detecta colunas via `DOWNTIME_HEADER_MAP` (category, reason, duration, comment)
-- Agrupa por linha usando separadores "Machine:"
-- Normaliza nomes de linha com `normalizeLineName`
+- Adicionar filtros: Data Inicio, Data Fim, Turno (DAY/NIGHT/All)
+- Filtrar sessoes antes de passar para o hook `useProductLineRecommendations`
+- O hook precisa aceitar sessoes filtradas em vez de usar todas do contexto
 
-### Associacao com Sessoes
+**Arquivo:** `src/hooks/useProductLineRecommendations.ts`
 
-- Busca sessoes existentes filtrando por `date` + `shift` + `production_line`
-- Para cada linha do arquivo com downtimes validos, encontra a sessao correspondente
-- Chama `saveDowntimesBatch(sessionId, downtimes)` para cada sessao
-- Se a sessao ja tem downtimes, os novos sao adicionados (merge)
-
-### Verificacao de Duplicidade
-
-Antes de salvar, compara downtimes existentes na sessao com os novos (mesma category + reason + duration) para evitar duplicatas.
+- Aceitar parametro opcional `filteredSessions` para override das sessoes do contexto
+- Quando fornecido, calcular metricas apenas com essas sessoes
 
 ---
 
-## Arquivos a Criar (1)
+## 3. Planner Inteligente
 
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/components/DowntimeImport.tsx` | Modal de importacao de downtimes do iTouching |
+**Arquivo:** `src/pages/Planner.tsx`
 
-## Arquivos a Modificar (1)
+- Quando o usuario seleciona um SKU e a linha esta vazia, auto-preencher com a linha recomendada
+- Se o usuario escolher uma linha com score < 50, mostrar toast de alerta (nao bloqueante)
+- Adicionar tooltip ao lado do campo Production Line mostrando score/performance/downtime quando ha recomendacao
+
+---
+
+## 4. Export CSV no Dashboard
+
+**Arquivo:** `src/pages/ProductPerformance.tsx`
+
+- Botao "Export CSV" que exporta a matriz completa (SKU, Linha, Score, Performance, Stability, DowntimeScore, Sessions, Downtime)
+- Usa o mesmo padrao BOM do exportador existente
+
+---
+
+## Arquivos a Modificar (4)
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/pages/Downtime.tsx` | Botao "Import iTouching" + estado do modal |
+| `src/utils/calcProductLineMetrics.ts` | Pesos 0.5/0.3/0.2 |
+| `src/hooks/useProductLineRecommendations.ts` | Aceitar sessoes filtradas |
+| `src/pages/ProductPerformance.tsx` | Filtros turno/periodo + export CSV |
+| `src/pages/Planner.tsx` | Auto-select linha + alerta score < 50 |
+
+## Notas Tecnicas
+
+- Nenhuma mudanca de schema no banco
+- O DowntimeImport.tsx na pagina Downtime ja existe e funciona -- nao precisa de alteracao
+- O heatmap e ranking ja existem e continuam iguais, apenas recebem dados filtrados
+- Natural sort continua aplicado nas listagens de linhas
 
