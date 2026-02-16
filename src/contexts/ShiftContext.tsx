@@ -319,7 +319,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         if (uploaded) photoUrl = uploaded;
       }
 
-      // Update session
+      // Step 1: Update session record
       const { error: sessionError } = await withTimeout(
         supabase
           .from('production_sessions')
@@ -343,68 +343,86 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         return { success: false, error: sessionError.message };
       }
 
-      // Replace items
-      const { error: deleteItemsError } = await withTimeout(
-        supabase.from('production_items').delete().eq('session_id', id),
+      // Step 2: Delete old items and downtimes in PARALLEL
+      const [deleteItemsRes, deleteDowntimesRes] = await withTimeout(
+        Promise.all([
+          supabase.from('production_items').delete().eq('session_id', id),
+          supabase.from('structured_downtimes').delete().eq('session_id', id),
+        ]),
         10000
       );
-      if (deleteItemsError) {
-        console.error('Error deleting old items:', deleteItemsError);
-        return { success: false, error: deleteItemsError.message };
+
+      if (deleteItemsRes.error) {
+        console.error('Error deleting old items:', deleteItemsRes.error);
+        return { success: false, error: deleteItemsRes.error.message };
+      }
+      if (deleteDowntimesRes.error) {
+        console.error('Error deleting old downtimes:', deleteDowntimesRes.error);
+        return { success: false, error: deleteDowntimesRes.error.message };
       }
 
-      if (data.items.length > 0) {
-        const itemsToInsert = data.items
-          .filter(i => i.sku.trim())
-          .map(i => ({
-            session_id: id,
-            sku: i.sku,
-            product_name: i.productName || '',
-            quantity_target: i.quantityTarget || 0,
-            quantity_actual: i.quantityActual || 0,
-          }));
+      // Step 3: Insert new items and downtimes in PARALLEL
+      const itemsToInsert = data.items
+        .filter(i => i.sku.trim())
+        .map(i => ({
+          session_id: id,
+          sku: i.sku,
+          product_name: i.productName || '',
+          quantity_target: i.quantityTarget || 0,
+          quantity_actual: i.quantityActual || 0,
+        }));
 
-        if (itemsToInsert.length > 0) {
-          const { error: insertItemsError } = await withTimeout(
-            supabase.from('production_items').insert(itemsToInsert),
-            10000
-          );
-          if (insertItemsError) {
-            console.error('Error inserting items:', insertItemsError);
-            return { success: false, error: insertItemsError.message };
+      const downtimesToInsert = (data.structuredDowntimes || []).map(d => ({
+        session_id: id,
+        category: d.category,
+        reason: d.reason,
+        duration: d.duration,
+        comment: d.comment || null,
+      }));
+
+      const insertPromises = [];
+      if (itemsToInsert.length > 0) {
+        insertPromises.push(Promise.resolve(supabase.from('production_items').insert(itemsToInsert).select()));
+      }
+      if (downtimesToInsert.length > 0) {
+        insertPromises.push(Promise.resolve(supabase.from('structured_downtimes').insert(downtimesToInsert).select()));
+      }
+
+      if (insertPromises.length > 0) {
+        const insertResults = await withTimeout(Promise.all(insertPromises), 10000);
+        for (const res of insertResults) {
+          if (res.error) {
+            console.error('Error inserting data:', res.error);
+            return { success: false, error: res.error.message };
           }
         }
       }
 
-      // Replace downtimes
-      const { error: deleteDowntimesError } = await withTimeout(
-        supabase.from('structured_downtimes').delete().eq('session_id', id),
-        10000
-      );
-      if (deleteDowntimesError) {
-        console.error('Error deleting old downtimes:', deleteDowntimesError);
-        return { success: false, error: deleteDowntimesError.message };
-      }
+      // Step 4: Optimistic local state update
+      const totalProduction = data.items.reduce((sum, i) => sum + i.quantityActual, 0);
+      const totalDowntime = (data.structuredDowntimes || []).reduce((sum, d) => sum + d.duration, 0);
+      const performance = data.plannedQuantity > 0 ? (totalProduction / data.plannedQuantity) * 100 : 0;
 
-      if (data.structuredDowntimes && data.structuredDowntimes.length > 0) {
-        const downtimesToInsert = data.structuredDowntimes.map(d => ({
-          session_id: id,
-          category: d.category,
-          reason: d.reason,
-          duration: d.duration,
-          comment: d.comment || null,
-        }));
-        const { error: insertDowntimesError } = await withTimeout(
-          supabase.from('structured_downtimes').insert(downtimesToInsert),
-          10000
-        );
-        if (insertDowntimesError) {
-          console.error('Error inserting downtimes:', insertDowntimesError);
-          return { success: false, error: insertDowntimesError.message };
-        }
-      }
+      setSessions(prev => prev.map(s => s.id === id ? {
+        ...s,
+        productionLine: data.productionLine.trim(),
+        date: data.date,
+        shift: data.shift,
+        lineLeader: data.lineLeader.trim(),
+        staffPlanned: data.staffPlanned || 0,
+        staffActual: data.staffActual || 0,
+        plannedQuantity: data.plannedQuantity,
+        comments: data.comments || '',
+        ...(photoUrl && { monitoringPhoto: photoUrl }),
+        items: data.items.map((i, idx) => ({ id: `temp-${idx}`, ...i })),
+        structuredDowntimes: data.structuredDowntimes || [],
+        totalProduction,
+        totalDowntime,
+        performance,
+      } : s));
 
       timer.end();
+      // Background refresh to sync server-generated IDs
       refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true };
     } catch (error) {
