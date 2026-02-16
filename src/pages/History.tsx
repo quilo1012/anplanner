@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Header } from '@/components/Header';
-import { PrintReport } from '@/components/PrintReport';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
 import { SecureImage } from '@/components/SecureImage';
@@ -18,7 +17,7 @@ export function History() {
   const { sessions, refreshSessions } = useShifts();
   const { hasRole, user } = useAuth();
   const isOperator = user?.role === 'operator';
-  const printRef = useRef<HTMLDivElement>(null);
+  
   
   const today = new Date().toISOString().split('T')[0];
   const [filterFromDate, setFilterFromDate] = useState(today);
@@ -29,7 +28,6 @@ export function History() {
   const [filterSku, setFilterSku] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
@@ -89,8 +87,93 @@ export function History() {
 
   const handlePrint = () => {
     if (filteredSessions.length === 0) return;
-    setShowPrintPreview(true);
-    setTimeout(() => { window.print(); setShowPrintPreview(false); }, 100);
+    const sorted = [...filteredSessions].sort((a, b) => naturalLineSort(a.productionLine, b.productionLine));
+    const totalProduction = sorted.reduce((sum, s) => sum + s.totalProduction, 0);
+    const totalPlanned = sorted.reduce((sum, s) => sum + s.plannedQuantity, 0);
+    const totalDowntime = sorted.reduce((sum, s) => sum + s.totalDowntime, 0);
+    const totalStaffPlanned = sorted.reduce((sum, s) => sum + s.staffPlanned, 0);
+    const totalStaffActual = sorted.reduce((sum, s) => sum + s.staffActual, 0);
+    const overallPerf = totalPlanned > 0 ? ((totalProduction / totalPlanned) * 100).toFixed(1) : '0';
+
+    const lineRows = sorted.map((s, i) => `<tr class="${i % 2 === 1 ? 'zebra' : ''}">
+      <td class="font-medium">${s.productionLine}</td><td>${s.lineLeader}</td>
+      <td>${s.items.map(it => it.sku).join(', ')}</td>
+      <td class="text-right">${s.plannedQuantity.toLocaleString()}</td>
+      <td class="text-right">${s.totalProduction.toLocaleString()}</td>
+      <td class="text-right ${s.performance >= 90 ? 'perf-green' : s.performance >= 75 ? 'perf-yellow' : 'perf-red'}">${s.performance.toFixed(1)}%</td>
+      <td class="text-right">${formatDuration(s.totalDowntime)}</td>
+      <td class="text-center">${s.staffActual}/${s.staffPlanned}</td></tr>`).join('');
+
+    const itemRows = sorted.flatMap(s => s.items.map((item, j) => `<tr class="${j % 2 === 1 ? 'zebra' : ''}">
+      <td class="font-medium">${s.productionLine}</td><td class="font-mono">${item.sku}</td><td>${item.productName}</td>
+      <td class="text-right">${item.quantityTarget.toLocaleString()}</td><td class="text-right">${item.quantityActual.toLocaleString()}</td>
+      <td class="text-right">${item.quantityTarget > 0 ? ((item.quantityActual / item.quantityTarget) * 100).toFixed(1) + '%' : '-'}</td></tr>`)).join('');
+
+    const dtRows = sorted.flatMap(s => (s.structuredDowntimes || []).map((dt, j) => `<tr class="${j % 2 === 1 ? 'zebra' : ''}">
+      <td class="font-medium">${s.productionLine}</td><td>${dt.category}</td><td>${dt.reason}</td>
+      <td class="text-right">${formatDuration(dt.duration)}</td><td class="comment">${dt.comment || '-'}</td></tr>`)).join('');
+
+    const pDate = filterFromDate || new Date().toISOString().split('T')[0];
+    const pShift = filterShift || 'ALL';
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Production Report</title>
+      <style>
+        body { font-family: 'Inter', system-ui, sans-serif; margin: 2rem; color: #1a1a1a; font-size: 0.8rem; }
+        h1 { font-size: 1.25rem; margin-bottom: 0; }
+        h2 { font-size: 1rem; border-bottom: 2px solid #333; padding-bottom: 4px; margin-top: 1.5rem; }
+        .meta { font-size: 0.75rem; color: #666; margin-bottom: 1rem; }
+        .header { display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid #333; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        .header img { height: 60px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+        th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; font-weight: 600; color: #555; font-size: 0.75rem; }
+        td { padding: 4px 8px; border-bottom: 1px solid #ddd; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .font-medium { font-weight: 600; }
+        .font-mono { font-family: monospace; }
+        .font-bold { font-weight: 700; }
+        .zebra { background: #f9f9f9; }
+        .perf-green { color: #2d8a4e; font-weight: 600; }
+        .perf-yellow { color: #b8860b; font-weight: 600; }
+        .perf-red { color: #d32f2f; font-weight: 600; }
+        .comment { font-style: italic; font-size: 0.7rem; }
+        tfoot td { border-top: 2px solid #333; font-weight: 700; }
+        .footer { margin-top: 2rem; font-size: 0.65rem; text-align: center; color: #999; border-top: 1px solid #ddd; padding-top: 0.5rem; }
+        .summary td { padding: 3px 0; }
+        @media print { body { margin: 1cm; } }
+      </style></head><body>
+      <div class="header">
+        <img src="${window.location.origin}/lovable-uploads/64131b92-9113-4e13-88d8-667e720cb54f.png" alt="Applied Nutrition" onerror="this.style.display='none'" />
+        <div><h1>PRODUCTION REPORT</h1>
+        <div class="meta">Date: ${new Date(pDate).toLocaleDateString()} | Shift: ${pShift} | Generated: ${new Date().toLocaleString()}</div></div>
+      </div>
+
+      <h2>Summary</h2>
+      <table class="summary"><tbody>
+        <tr><td><strong>Total Production:</strong></td><td>${totalProduction.toLocaleString()} units</td><td><strong>Planned:</strong></td><td>${totalPlanned.toLocaleString()} units</td></tr>
+        <tr class="zebra"><td><strong>Performance:</strong></td><td>${overallPerf}%</td><td><strong>Total Downtime:</strong></td><td>${formatDuration(totalDowntime)}</td></tr>
+        <tr><td><strong>Staff Planned:</strong></td><td>${totalStaffPlanned}</td><td><strong>Staff Actual:</strong></td><td>${totalStaffActual}</td></tr>
+      </tbody></table>
+
+      <h2>Production by Line</h2>
+      <table><thead><tr><th>Line</th><th>Leader</th><th>SKUs</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Perf.</th><th class="text-right">Downtime</th><th class="text-center">Staff</th></tr></thead>
+      <tbody>${lineRows}</tbody>
+      <tfoot><tr><td colspan="3">TOTALS</td><td class="text-right">${totalPlanned.toLocaleString()}</td><td class="text-right">${totalProduction.toLocaleString()}</td><td class="text-right">${overallPerf}%</td><td class="text-right">${formatDuration(totalDowntime)}</td><td class="text-center">${totalStaffActual}/${totalStaffPlanned}</td></tr></tfoot></table>
+
+      <h2>Production Items Detail</h2>
+      <table><thead><tr><th>Line</th><th>SKU</th><th>Product</th><th class="text-right">Target</th><th class="text-right">Actual</th><th class="text-right">Perf.</th></tr></thead>
+      <tbody>${itemRows}</tbody></table>
+
+      ${dtRows ? `<h2>Downtime Detail</h2>
+      <table><thead><tr><th>Line</th><th>Category</th><th>Reason</th><th class="text-right">Duration</th><th>Comment</th></tr></thead>
+      <tbody>${dtRows}</tbody></table>` : ''}
+
+      <div class="footer">Applied Nutrition Shift Report System — Confidential</div>
+      </body></html>`);
+    win.document.close();
+    win.print();
   };
 
   const getPerformanceClass = (performance: number) => {
@@ -105,8 +188,6 @@ export function History() {
   };
 
   const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader || filterSku || searchQuery;
-  const printDate = filterFromDate || new Date().toISOString().split('T')[0];
-  const printShift = filterShift || 'DAY';
 
   const handleDialogSuccess = () => { /* updateSession already triggers refreshSessions internally */ };
 
@@ -352,12 +433,6 @@ export function History() {
           </div>
         )}
 
-        {/* Print Preview */}
-        {showPrintPreview && (
-          <div ref={printRef} className="hidden print:block">
-            <PrintReport sessions={filteredSessions} date={printDate} shift={printShift as ShiftType} />
-          </div>
-        )}
 
         {/* Edit Dialog */}
         <EditShiftDialog

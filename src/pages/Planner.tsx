@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProductLineRecommendations } from '@/hooks/useProductLineRecommendations';
 import { ShiftType, SHIFT_TYPES } from '@/types/production';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
-import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock, Sparkles } from 'lucide-react';
+import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { naturalLineSort } from '@/utils/naturalLineSort';
@@ -64,23 +64,7 @@ export function Planner() {
   const [showProductUpload, setShowProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
 
-  // Recommendation: find best line for the first SKU entered
-  const recommendation = useMemo(() => {
-    const firstSku = formState.skuRows.find(r => r.sku.trim())?.sku.trim();
-    if (!firstSku) return null;
-    const top = getTopLinesForProduct(firstSku, 1);
-    return top.length > 0 ? top[0] : null;
-  }, [formState.skuRows, getTopLinesForProduct]);
-
-  // Auto-fill recommended line when SKU is entered and line is empty
-  useEffect(() => {
-    if (recommendation && !formState.productionLine.trim() && !editId) {
-      setFormState(prev => ({ ...prev, productionLine: recommendation.line }));
-      toast.info(`✨ Auto-selected ${recommendation.line} (score: ${recommendation.score.toFixed(0)})`);
-    }
-  }, [recommendation]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Alert when user picks a low-score line
+  // Alert when user picks a low-score line for a product
   const prevLineRef = useRef('');
   useEffect(() => {
     const line = formState.productionLine.trim();
@@ -91,7 +75,7 @@ export function Planner() {
     const top = getTopLinesForProduct(firstSku, 100);
     const match = top.find(m => m.line.toLowerCase() === line.toLowerCase());
     if (match && match.score < 50) {
-      toast.warning(`⚠️ ${line} has a low score (${match.score.toFixed(0)}) for ${firstSku}. Consider using a recommended line.`);
+      toast.warning(`⚠️ Atenção: ${firstSku} tem histórico de baixa performance em ${line} (score: ${match.score.toFixed(0)}). Verifique downtimes recentes.`);
     }
   }, [formState.productionLine, formState.skuRows, getTopLinesForProduct]);
 
@@ -352,16 +336,6 @@ export function Planner() {
                     {uniqueLines.map(l => <option key={l} value={l} />)}
                   </datalist>
                   {errors.productionLine && <p className="text-sm text-destructive mt-1">{errors.productionLine}</p>}
-                  {recommendation && !formState.productionLine.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => setFormState(prev => ({ ...prev, productionLine: recommendation.line }))}
-                      className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
-                    >
-                      <Sparkles size={12} />
-                      Recommended: {recommendation.line} (score: {recommendation.score.toFixed(0)})
-                    </button>
-                  )}
                 </div>
                 <div>
                   <label htmlFor="lineLeader" className="label">Line Leader <span className="text-destructive">*</span></label>
