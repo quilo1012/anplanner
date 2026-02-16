@@ -68,7 +68,7 @@ export function ProductRanking({ sku, topLines }: ProductRankingProps) {
             <span className="inline-flex items-center gap-1">
               <Clock size={12} /> {metric.totalDowntimeMinutes}min
             </span>
-            <span>{metric.totalSessions} sessions</span>
+            <span>{metric.finalizedSessions}/{metric.totalSessions} finalized</span>
           </div>
         </div>
       ))}
