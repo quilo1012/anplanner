@@ -1,55 +1,65 @@
 
 
-# Upgrade: Performance Calculation Only for Finalized Production
+# Fix: History Save Freezing + Performance Only for Complete Sessions
 
-## Problem
+## Problem 1: History Save Freezing
 
-Currently, `calcProductLineMetrics` includes ALL sessions in the score calculation -- even sessions where `quantityActual = 0` (production not yet finished). This skews performance scores downward because a planned-but-incomplete session counts as 0% performance.
+The `updateSession` function in `ShiftContext.tsx` executes 5-7 sequential network calls, each with a 10-second timeout. While these run, the UI shows "Saving..." and blocks all interaction. Even though the data volume is small (37 sessions, 90 items), the sequential nature of the calls creates noticeable delays:
 
-Since production can span shift changes and may not finish on the same day, only sessions with actual production data should contribute to the performance metric.
+1. Upload photo
+2. Update session record
+3. Delete old items
+4. Insert new items
+5. Delete old downtimes
+6. Insert new downtimes
+7. Full data refresh (fetches everything again)
 
-## Solution
+**Fix**: Parallelize independent operations and make the final refresh non-blocking with an optimistic local state update.
 
-### Modify: `src/utils/calcProductLineMetrics.ts`
+## Problem 2: Performance Only for Fully Complete Sessions
 
-Filter out "incomplete" items when calculating performance:
+Currently, `calcProductLineMetrics` marks an individual item as "finalized" when `quantityActual > 0`. But during shift changes, a session may have SOME items with production data and others still at 0. The user wants performance to only count when the entire session is complete -- meaning ALL items in the session have `quantityActual > 0`.
 
-- An item is considered **finalized** when `quantityActual > 0`
-- Only finalized items contribute to `totalActual` and `totalTarget` in the performance calculation
-- Session counts and downtime metrics still include all sessions (to maintain stability and downtime accuracy)
-- Add a new field `finalizedSessions` to track how many sessions had actual production data
+**Fix**: Change the finalization check from per-item to per-session. A session contributes to performance metrics only when every single item in it has actual production data.
 
-This ensures:
-- A session planned today but not yet produced does NOT drag down the score
-- Once production data is entered (even across shift changes), it contributes correctly
-- Stability and downtime scores remain accurate since they relate to the session itself, not production completion
+---
 
-### Modify: `src/components/charts/ProductHeatmap.tsx`
+## Technical Changes
 
-Show the `finalizedSessions` count in the tooltip so users can see how many sessions have complete data vs total sessions.
+### 1. `src/contexts/ShiftContext.tsx` -- Optimize updateSession
 
-### Modify: `src/components/charts/ProductRanking.tsx`
+- After updating the session record, run delete-items and delete-downtimes in **parallel** (they are independent)
+- Then run insert-items and insert-downtimes in **parallel**
+- After DB writes succeed, apply an **optimistic local state update** immediately (update the session in the local `sessions` array without waiting for a full refresh)
+- Run `refreshSessions()` in the background (non-blocking) to sync any server-side changes
 
-Display "X of Y sessions finalized" in the ranking detail to provide transparency.
+### 2. `src/utils/calcProductLineMetrics.ts` -- Session-level finalization
 
-## Technical Details
+Current logic:
+```
+// Per-item check
+const isFinalized = item.quantityActual > 0;
+```
 
-Changes in `calcProductLineMetrics.ts`:
-- In the accumulator loop, track `finalizedActual`, `finalizedTarget`, and `finalizedCount` separately from total session counts
-- Performance = `finalizedTarget > 0 ? (finalizedActual / finalizedTarget) * 100 : 0`
-- Stability and downtime continue using ALL sessions
-- Add `finalizedSessions: number` to the `ProductLineMetric` interface
+New logic:
+```
+// Pre-compute: is the entire session finalized?
+// A session is finalized when ALL its items have quantityActual > 0
+const isSessionFinalized = session.items.length > 0 && 
+  session.items.every(item => item.quantityActual > 0);
+```
 
-## Files to Modify (3)
+- Only add to `finalizedActual` / `finalizedTarget` / `finalizedCount` when the session is fully finalized
+- Stability and downtime metrics continue using all sessions
+
+This ensures that a half-completed shift (some items at 0) does NOT contribute to performance scores, preventing misleading metrics during shift transitions.
+
+---
+
+## Files to Modify (2)
 
 | File | Change |
 |------|--------|
-| `src/utils/calcProductLineMetrics.ts` | Filter incomplete items from performance calc, add `finalizedSessions` |
-| `src/components/charts/ProductHeatmap.tsx` | Show finalized count in tooltip |
-| `src/components/charts/ProductRanking.tsx` | Show "X of Y finalized" label |
+| `src/contexts/ShiftContext.tsx` | Parallelize delete+insert operations; add optimistic local update after save |
+| `src/utils/calcProductLineMetrics.ts` | Change finalization from per-item to per-session (all items must have actual > 0) |
 
-## Notes
-
-- No database changes required
-- The auto-fill and low-score alert in the Planner are already working correctly
-- This change makes scores more accurate by excluding sessions still in progress
