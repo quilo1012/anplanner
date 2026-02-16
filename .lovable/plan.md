@@ -1,65 +1,86 @@
 
 
-# Fix: History Save Freezing + Performance Only for Complete Sessions
+# Mudanca: Alertas de Produto Problematico por Linha + Melhoria na Impressao
 
-## Problem 1: History Save Freezing
+## 1. Mudar conceito do Product Performance
 
-The `updateSession` function in `ShiftContext.tsx` executes 5-7 sequential network calls, each with a 10-second timeout. While these run, the UI shows "Saving..." and blocks all interaction. Even though the data volume is small (37 sessions, 90 items), the sequential nature of the calls creates noticeable delays:
+O dashboard atual foca em "recomendar a melhor linha para um produto". O novo conceito muda para **alertas de produtos com problemas em linhas especificas** -- ou seja, o foco passa a ser identificar combinacoes produto x linha que apresentam baixa performance, alto downtime ou instabilidade.
 
-1. Upload photo
-2. Update session record
-3. Delete old items
-4. Insert new items
-5. Delete old downtimes
-6. Insert new downtimes
-7. Full data refresh (fetches everything again)
+### Mudancas no `src/pages/ProductPerformance.tsx`:
+- Renomear titulo para "Product Alerts" ou "Alertas de Produto"
+- Manter o Heatmap (funciona bem para visualizacao)
+- Substituir o painel "Top Lines for SKU" (ranking) por um painel **"Product Alerts"** que lista combinacoes produto x linha com score abaixo de 50, agrupadas por produto
+- Cada alerta mostra: produto, linha, score, performance, downtime total, e numero de sessoes
+- Ordenar por score ascendente (piores primeiro)
 
-**Fix**: Parallelize independent operations and make the final refresh non-blocking with an optimistic local state update.
+### Mudancas no `src/pages/Planner.tsx`:
+- Remover o auto-fill de linha recomendada (linhas 68-81)
+- Manter alerta quando usuario seleciona uma linha com score baixo para o produto (linhas 84-96), mas reformular a mensagem para focar no **problema** em vez de "recomendar outra linha"
+- Mensagem: "Atencao: {produto} tem historico de baixa performance em {linha} (score: X). Verifique downtimes recentes."
 
-## Problem 2: Performance Only for Fully Complete Sessions
+## 2. Melhorar formato de impressao das sessoes
 
-Currently, `calcProductLineMetrics` marks an individual item as "finalized" when `quantityActual > 0`. But during shift changes, a session may have SOME items with production data and others still at 0. The user wants performance to only count when the entire session is complete -- meaning ALL items in the session have `quantityActual > 0`.
+### Mudancas no `src/components/PrintReport.tsx`:
+- Adicionar secao **"Production Items Detail"** que lista cada SKU por linha com Target, Actual e Performance individual
+- Adicionar secao **"Downtime Detail"** com categoria, razao, duracao e comentario de cada downtime (nao apenas o resumo por categoria)
+- Melhorar layout da tabela "Production by Line" adicionando colunas Staff Planned/Actual
+- Adicionar totais gerais no footer da tabela principal
+- Melhorar espacamento e legibilidade para impressao A4
 
-**Fix**: Change the finalization check from per-item to per-session. A session contributes to performance metrics only when every single item in it has actual production data.
+### Mudancas no `src/pages/History.tsx`:
+- Melhorar a funcao `handlePrint` para abrir em nova janela (como o DailySummaryTable faz) em vez de usar `window.print()` que imprime a pagina inteira
+- Incluir CSS profissional de impressao com margens, fontes e zebra-striping
 
----
+## Arquivos a Modificar (4)
 
-## Technical Changes
+| Arquivo | Mudanca |
+|---------|--------|
+| `src/pages/ProductPerformance.tsx` | Mudar conceito para alertas de produto problematico |
+| `src/pages/Planner.tsx` | Remover auto-fill, manter alerta reformulado |
+| `src/components/PrintReport.tsx` | Adicionar detalhes de items/downtimes, staff, totais |
+| `src/pages/History.tsx` | Usar window.open para impressao profissional |
 
-### 1. `src/contexts/ShiftContext.tsx` -- Optimize updateSession
+## Detalhes Tecnicos
 
-- After updating the session record, run delete-items and delete-downtimes in **parallel** (they are independent)
-- Then run insert-items and insert-downtimes in **parallel**
-- After DB writes succeed, apply an **optimistic local state update** immediately (update the session in the local `sessions` array without waiting for a full refresh)
-- Run `refreshSessions()` in the background (non-blocking) to sync any server-side changes
+### ProductPerformance - Painel de Alertas
 
-### 2. `src/utils/calcProductLineMetrics.ts` -- Session-level finalization
+O painel "Problematic Lines" existente ja faz algo similar. Ele sera movido para posicao de destaque e expandido:
+- Threshold mantido em score < 50
+- Cada item mostra: SKU, nome do produto, linha, score, performance%, downtime total, sessoes finalizadas/total
+- Agrupamento por produto para facilitar leitura
+- Icone de alerta vermelho para scores criticos (< 30) e amarelo para moderados (30-50)
 
-Current logic:
+### PrintReport - Secoes Adicionais
+
+```text
++----------------------------------------------+
+| APPLIED NUTRITION - PRODUCTION REPORT        |
+| Date: ... | Shift: ... | Generated: ...      |
++----------------------------------------------+
+| SUMMARY                                      |
+| Total Production | Planned | Performance     |
+| Downtime | Staff Planned/Actual               |
++----------------------------------------------+
+| PRODUCTION BY LINE                           |
+| Line | Leader | SKUs | Plan | Act | Perf | DT|
+|      |        |      |      |     |      |   |
+| TOTALS                                       |
++----------------------------------------------+
+| PRODUCTION ITEMS DETAIL                      |
+| Line | SKU | Product | Target | Actual | %   |
++----------------------------------------------+
+| DOWNTIME DETAIL                              |
+| Line | Category | Reason | Duration | Comment|
++----------------------------------------------+
+| PRODUCTION BY SKU                            |
++----------------------------------------------+
 ```
-// Per-item check
-const isFinalized = item.quantityActual > 0;
-```
 
-New logic:
-```
-// Pre-compute: is the entire session finalized?
-// A session is finalized when ALL its items have quantityActual > 0
-const isSessionFinalized = session.items.length > 0 && 
-  session.items.every(item => item.quantityActual > 0);
-```
+### History Print - Nova Janela
 
-- Only add to `finalizedActual` / `finalizedTarget` / `finalizedCount` when the session is fully finalized
-- Stability and downtime metrics continue using all sessions
-
-This ensures that a half-completed shift (some items at 0) does NOT contribute to performance scores, preventing misleading metrics during shift transitions.
-
----
-
-## Files to Modify (2)
-
-| File | Change |
-|------|--------|
-| `src/contexts/ShiftContext.tsx` | Parallelize delete+insert operations; add optimistic local update after save |
-| `src/utils/calcProductLineMetrics.ts` | Change finalization from per-item to per-session (all items must have actual > 0) |
+Substituir `window.print()` por `window.open()` com HTML completo, incluindo:
+- Logo Applied Nutrition
+- Tabela principal com todas as sessoes filtradas
+- Detalhes de items e downtimes por sessao
+- CSS inline para impressao limpa
 
