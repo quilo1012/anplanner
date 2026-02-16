@@ -84,7 +84,7 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
       ? 100 - (v.totalDowntime / maxDowntime) * 100
       : 100;
 
-    const score = 0.6 * performance + 0.2 * stability + 0.2 * downtimeScore;
+    const score = 0.5 * performance + 0.3 * downtimeScore + 0.2 * stability;
 
     result.set(key, {
       sku: v.sku,

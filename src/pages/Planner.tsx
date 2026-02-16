@@ -72,6 +72,29 @@ export function Planner() {
     return top.length > 0 ? top[0] : null;
   }, [formState.skuRows, getTopLinesForProduct]);
 
+  // Auto-fill recommended line when SKU is entered and line is empty
+  useEffect(() => {
+    if (recommendation && !formState.productionLine.trim() && !editId) {
+      setFormState(prev => ({ ...prev, productionLine: recommendation.line }));
+      toast.info(`✨ Auto-selected ${recommendation.line} (score: ${recommendation.score.toFixed(0)})`);
+    }
+  }, [recommendation]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Alert when user picks a low-score line
+  const prevLineRef = useRef('');
+  useEffect(() => {
+    const line = formState.productionLine.trim();
+    if (!line || line === prevLineRef.current) return;
+    prevLineRef.current = line;
+    const firstSku = formState.skuRows.find(r => r.sku.trim())?.sku.trim();
+    if (!firstSku) return;
+    const top = getTopLinesForProduct(firstSku, 100);
+    const match = top.find(m => m.line.toLowerCase() === line.toLowerCase());
+    if (match && match.score < 50) {
+      toast.warning(`⚠️ ${line} has a low score (${match.score.toFixed(0)}) for ${firstSku}. Consider using a recommended line.`);
+    }
+  }, [formState.productionLine, formState.skuRows, getTopLinesForProduct]);
+
   const isOperator = user?.role === 'operator';
   const canReview = hasRole(['supervisor', 'admin']);
 

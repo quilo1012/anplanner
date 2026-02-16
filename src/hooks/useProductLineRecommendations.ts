@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
 import { useShifts } from '@/contexts/ShiftContext';
 import { calcProductLineMetrics, ProductLineMetric } from '@/utils/calcProductLineMetrics';
+import { ProductionSession } from '@/types/production';
 
-export function useProductLineRecommendations() {
+export function useProductLineRecommendations(filteredSessions?: ProductionSession[]) {
   const { sessions } = useShifts();
 
-  const metrics = useMemo(() => calcProductLineMetrics(sessions), [sessions]);
+  const activeSessions = filteredSessions ?? sessions;
+  const metrics = useMemo(() => calcProductLineMetrics(activeSessions), [activeSessions]);
 
   /** Top N lines for a given SKU, sorted by score descending */
   const getTopLinesForProduct = (sku: string, limit = 3): ProductLineMetric[] => {
