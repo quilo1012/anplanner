@@ -38,14 +38,17 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
     const line = normalizeLineName(session.productionLine);
     const sessionHasDowntime = session.totalDowntime > 0;
 
+    // Session-level finalization: ALL items must have quantityActual > 0
+    const isSessionFinalized = session.items.length > 0 &&
+      session.items.every(item => item.quantityActual > 0);
+
     for (const item of session.items) {
       if (!item.sku.trim()) continue;
       const key = `${item.sku}|${line}`;
-      const isFinalized = item.quantityActual > 0;
       const existing = acc.get(key);
 
       if (existing) {
-        if (isFinalized) {
+        if (isSessionFinalized) {
           existing.finalizedActual += item.quantityActual;
           existing.finalizedTarget += item.quantityTarget;
           existing.finalizedCount += 1;
@@ -59,9 +62,9 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
           sku: item.sku,
           productName: item.productName || '',
           line,
-          finalizedActual: isFinalized ? item.quantityActual : 0,
-          finalizedTarget: isFinalized ? item.quantityTarget : 0,
-          finalizedCount: isFinalized ? 1 : 0,
+          finalizedActual: isSessionFinalized ? item.quantityActual : 0,
+          finalizedTarget: isSessionFinalized ? item.quantityTarget : 0,
+          finalizedCount: isSessionFinalized ? 1 : 0,
           totalDowntime: session.totalDowntime,
           totalSessions: 1,
           sessionsWithoutDowntime: sessionHasDowntime ? 0 : 1,
