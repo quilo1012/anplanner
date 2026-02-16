@@ -10,6 +10,7 @@ export interface ProductLineMetric {
   stability: number;
   downtimeScore: number;
   totalSessions: number;
+  finalizedSessions: number;
   totalProduction: number;
   totalTarget: number;
   totalDowntimeMinutes: number;
@@ -25,8 +26,9 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
     sku: string;
     productName: string;
     line: string;
-    totalActual: number;
-    totalTarget: number;
+    finalizedActual: number;
+    finalizedTarget: number;
+    finalizedCount: number;
     totalDowntime: number;
     totalSessions: number;
     sessionsWithoutDowntime: number;
@@ -39,11 +41,15 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
     for (const item of session.items) {
       if (!item.sku.trim()) continue;
       const key = `${item.sku}|${line}`;
+      const isFinalized = item.quantityActual > 0;
       const existing = acc.get(key);
 
       if (existing) {
-        existing.totalActual += item.quantityActual;
-        existing.totalTarget += item.quantityTarget;
+        if (isFinalized) {
+          existing.finalizedActual += item.quantityActual;
+          existing.finalizedTarget += item.quantityTarget;
+          existing.finalizedCount += 1;
+        }
         existing.totalDowntime += session.totalDowntime;
         existing.totalSessions += 1;
         if (!sessionHasDowntime) existing.sessionsWithoutDowntime += 1;
@@ -53,8 +59,9 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
           sku: item.sku,
           productName: item.productName || '',
           line,
-          totalActual: item.quantityActual,
-          totalTarget: item.quantityTarget,
+          finalizedActual: isFinalized ? item.quantityActual : 0,
+          finalizedTarget: isFinalized ? item.quantityTarget : 0,
+          finalizedCount: isFinalized ? 1 : 0,
           totalDowntime: session.totalDowntime,
           totalSessions: 1,
           sessionsWithoutDowntime: sessionHasDowntime ? 0 : 1,
@@ -72,8 +79,8 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
   const result = new Map<string, ProductLineMetric>();
 
   for (const [key, v] of acc.entries()) {
-    const performance = v.totalTarget > 0
-      ? Math.min((v.totalActual / v.totalTarget) * 100, 150) // cap at 150%
+    const performance = v.finalizedTarget > 0
+      ? Math.min((v.finalizedActual / v.finalizedTarget) * 100, 150) // cap at 150%
       : 0;
 
     const stability = v.totalSessions > 0
@@ -95,8 +102,9 @@ export function calcProductLineMetrics(sessions: ProductionSession[]): Map<strin
       stability: Math.round(stability * 10) / 10,
       downtimeScore: Math.round(downtimeScore * 10) / 10,
       totalSessions: v.totalSessions,
-      totalProduction: v.totalActual,
-      totalTarget: v.totalTarget,
+      finalizedSessions: v.finalizedCount,
+      totalProduction: v.finalizedActual,
+      totalTarget: v.finalizedTarget,
       totalDowntimeMinutes: v.totalDowntime,
     });
   }

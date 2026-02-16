@@ -89,7 +89,7 @@ export function ProductHeatmap({ skus, lines, matrix }: ProductHeatmapProps) {
                             <p>Performance: {metric.performance.toFixed(1)}%</p>
                             <p>Stability: {metric.stability.toFixed(1)}%</p>
                             <p>Downtime Score: {metric.downtimeScore.toFixed(1)}</p>
-                            <p>Sessions: {metric.totalSessions}</p>
+                            <p>Sessions: {metric.finalizedSessions} of {metric.totalSessions} finalized</p>
                             <p>Total Downtime: {metric.totalDowntimeMinutes} min</p>
                           </TooltipContent>
                         </Tooltip>
