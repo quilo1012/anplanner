@@ -1,75 +1,55 @@
 
 
-# Upgrade: Dashboard Preditivo + Planner Inteligente
+# Upgrade: Performance Calculation Only for Finalized Production
 
-## Resumo
+## Problem
 
-Ajustes nos pesos do score, filtros de turno/periodo no dashboard, auto-selecao de linha no Planner com alertas, e exportacao CSV.
+Currently, `calcProductLineMetrics` includes ALL sessions in the score calculation -- even sessions where `quantityActual = 0` (production not yet finished). This skews performance scores downward because a planned-but-incomplete session counts as 0% performance.
 
----
+Since production can span shift changes and may not finish on the same day, only sessions with actual production data should contribute to the performance metric.
 
-## 1. Atualizar Pesos do Score
+## Solution
 
-**Arquivo:** `src/utils/calcProductLineMetrics.ts`
+### Modify: `src/utils/calcProductLineMetrics.ts`
 
-Alterar a formula de:
-```
-score = 0.6 * performance + 0.2 * stability + 0.2 * downtimeScore
-```
-Para:
-```
-score = 0.5 * performance + 0.3 * downtimeScore + 0.2 * stability
-```
+Filter out "incomplete" items when calculating performance:
 
----
+- An item is considered **finalized** when `quantityActual > 0`
+- Only finalized items contribute to `totalActual` and `totalTarget` in the performance calculation
+- Session counts and downtime metrics still include all sessions (to maintain stability and downtime accuracy)
+- Add a new field `finalizedSessions` to track how many sessions had actual production data
 
-## 2. Filtros de Turno e Periodo no Dashboard
+This ensures:
+- A session planned today but not yet produced does NOT drag down the score
+- Once production data is entered (even across shift changes), it contributes correctly
+- Stability and downtime scores remain accurate since they relate to the session itself, not production completion
 
-**Arquivo:** `src/pages/ProductPerformance.tsx`
+### Modify: `src/components/charts/ProductHeatmap.tsx`
 
-- Adicionar filtros: Data Inicio, Data Fim, Turno (DAY/NIGHT/All)
-- Filtrar sessoes antes de passar para o hook `useProductLineRecommendations`
-- O hook precisa aceitar sessoes filtradas em vez de usar todas do contexto
+Show the `finalizedSessions` count in the tooltip so users can see how many sessions have complete data vs total sessions.
 
-**Arquivo:** `src/hooks/useProductLineRecommendations.ts`
+### Modify: `src/components/charts/ProductRanking.tsx`
 
-- Aceitar parametro opcional `filteredSessions` para override das sessoes do contexto
-- Quando fornecido, calcular metricas apenas com essas sessoes
+Display "X of Y sessions finalized" in the ranking detail to provide transparency.
 
----
+## Technical Details
 
-## 3. Planner Inteligente
+Changes in `calcProductLineMetrics.ts`:
+- In the accumulator loop, track `finalizedActual`, `finalizedTarget`, and `finalizedCount` separately from total session counts
+- Performance = `finalizedTarget > 0 ? (finalizedActual / finalizedTarget) * 100 : 0`
+- Stability and downtime continue using ALL sessions
+- Add `finalizedSessions: number` to the `ProductLineMetric` interface
 
-**Arquivo:** `src/pages/Planner.tsx`
+## Files to Modify (3)
 
-- Quando o usuario seleciona um SKU e a linha esta vazia, auto-preencher com a linha recomendada
-- Se o usuario escolher uma linha com score < 50, mostrar toast de alerta (nao bloqueante)
-- Adicionar tooltip ao lado do campo Production Line mostrando score/performance/downtime quando ha recomendacao
+| File | Change |
+|------|--------|
+| `src/utils/calcProductLineMetrics.ts` | Filter incomplete items from performance calc, add `finalizedSessions` |
+| `src/components/charts/ProductHeatmap.tsx` | Show finalized count in tooltip |
+| `src/components/charts/ProductRanking.tsx` | Show "X of Y finalized" label |
 
----
+## Notes
 
-## 4. Export CSV no Dashboard
-
-**Arquivo:** `src/pages/ProductPerformance.tsx`
-
-- Botao "Export CSV" que exporta a matriz completa (SKU, Linha, Score, Performance, Stability, DowntimeScore, Sessions, Downtime)
-- Usa o mesmo padrao BOM do exportador existente
-
----
-
-## Arquivos a Modificar (4)
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/utils/calcProductLineMetrics.ts` | Pesos 0.5/0.3/0.2 |
-| `src/hooks/useProductLineRecommendations.ts` | Aceitar sessoes filtradas |
-| `src/pages/ProductPerformance.tsx` | Filtros turno/periodo + export CSV |
-| `src/pages/Planner.tsx` | Auto-select linha + alerta score < 50 |
-
-## Notas Tecnicas
-
-- Nenhuma mudanca de schema no banco
-- O DowntimeImport.tsx na pagina Downtime ja existe e funciona -- nao precisa de alteracao
-- O heatmap e ranking ja existem e continuam iguais, apenas recebem dados filtrados
-- Natural sort continua aplicado nas listagens de linhas
-
+- No database changes required
+- The auto-fill and low-score alert in the Planner are already working correctly
+- This change makes scores more accurate by excluding sessions still in progress
