@@ -1,86 +1,62 @@
 
 
-# Mudanca: Alertas de Produto Problematico por Linha + Melhoria na Impressao
+# Fix: User Deletion and Name Update Issues
 
-## 1. Mudar conceito do Product Performance
+## Problem 1: Deleted users still have access
 
-O dashboard atual foca em "recomendar a melhor linha para um produto". O novo conceito muda para **alertas de produtos com problemas em linhas especificas** -- ou seja, o foco passa a ser identificar combinacoes produto x linha que apresentam baixa performance, alto downtime ou instabilidade.
+The `deleteUser` function only deletes the user's row from the `profiles` table. It does NOT delete the user from the authentication system (`auth.users`). Since the auth session remains valid, the deleted user can continue using the app normally.
 
-### Mudancas no `src/pages/ProductPerformance.tsx`:
-- Renomear titulo para "Product Alerts" ou "Alertas de Produto"
-- Manter o Heatmap (funciona bem para visualizacao)
-- Substituir o painel "Top Lines for SKU" (ranking) por um painel **"Product Alerts"** que lista combinacoes produto x linha com score abaixo de 50, agrupadas por produto
-- Cada alerta mostra: produto, linha, score, performance, downtime total, e numero de sessoes
-- Ordenar por score ascendente (piores primeiro)
+**Root cause:** Deleting from `auth.users` requires the `service_role` key, which cannot be used from the frontend. A backend function is needed.
 
-### Mudancas no `src/pages/Planner.tsx`:
-- Remover o auto-fill de linha recomendada (linhas 68-81)
-- Manter alerta quando usuario seleciona uma linha com score baixo para o produto (linhas 84-96), mas reformular a mensagem para focar no **problema** em vez de "recomendar outra linha"
-- Mensagem: "Atencao: {produto} tem historico de baixa performance em {linha} (score: X). Verifique downtimes recentes."
+**Fix:** Create a new backend function `delete-user` that uses the admin API to fully remove the user from the authentication system. This will cascade-delete the profile and role automatically.
 
-## 2. Melhorar formato de impressao das sessoes
+## Problem 2: Name edits not updating
 
-### Mudancas no `src/components/PrintReport.tsx`:
-- Adicionar secao **"Production Items Detail"** que lista cada SKU por linha com Target, Actual e Performance individual
-- Adicionar secao **"Downtime Detail"** com categoria, razao, duracao e comentario de cada downtime (nao apenas o resumo por categoria)
-- Melhorar layout da tabela "Production by Line" adicionando colunas Staff Planned/Actual
-- Adicionar totais gerais no footer da tabela principal
-- Melhorar espacamento e legibilidade para impressao A4
+The `updateUser` function updates the `profiles` table but only refreshes the `users` list. If editing another user, the list refreshes correctly. However, there are two issues:
+- The function silently swallows errors without feedback to the UI
+- The admin RLS policy for profiles only allows users to update their OWN profile (`id = auth.uid()`), so an admin editing another user's name will fail silently
 
-### Mudancas no `src/pages/History.tsx`:
-- Melhorar a funcao `handlePrint` para abrir em nova janela (como o DailySummaryTable faz) em vez de usar `window.print()` que imprime a pagina inteira
-- Incluir CSS profissional de impressao com margens, fontes e zebra-striping
+**Fix:** Add an RLS policy allowing admins to update any profile. Also return success/error from `updateUser` so the Admin page can show feedback.
 
-## Arquivos a Modificar (4)
+---
 
-| Arquivo | Mudanca |
-|---------|--------|
-| `src/pages/ProductPerformance.tsx` | Mudar conceito para alertas de produto problematico |
-| `src/pages/Planner.tsx` | Remover auto-fill, manter alerta reformulado |
-| `src/components/PrintReport.tsx` | Adicionar detalhes de items/downtimes, staff, totais |
-| `src/pages/History.tsx` | Usar window.open para impressao profissional |
+## Technical Changes
 
-## Detalhes Tecnicos
+### 1. New backend function: `supabase/functions/delete-user/index.ts`
 
-### ProductPerformance - Painel de Alertas
+- Accepts `{ userId: string }` in POST body
+- Verifies the caller is an admin using `get_user_role`
+- Prevents self-deletion
+- Calls `supabase.auth.admin.deleteUser(userId)` which cascades to profiles and user_roles
+- Returns success/error response
 
-O painel "Problematic Lines" existente ja faz algo similar. Ele sera movido para posicao de destaque e expandido:
-- Threshold mantido em score < 50
-- Cada item mostra: SKU, nome do produto, linha, score, performance%, downtime total, sessoes finalizadas/total
-- Agrupamento por produto para facilitar leitura
-- Icone de alerta vermelho para scores criticos (< 30) e amarelo para moderados (30-50)
+### 2. Database migration: Allow admins to update any profile
 
-### PrintReport - Secoes Adicionais
-
-```text
-+----------------------------------------------+
-| APPLIED NUTRITION - PRODUCTION REPORT        |
-| Date: ... | Shift: ... | Generated: ...      |
-+----------------------------------------------+
-| SUMMARY                                      |
-| Total Production | Planned | Performance     |
-| Downtime | Staff Planned/Actual               |
-+----------------------------------------------+
-| PRODUCTION BY LINE                           |
-| Line | Leader | SKUs | Plan | Act | Perf | DT|
-|      |        |      |      |     |      |   |
-| TOTALS                                       |
-+----------------------------------------------+
-| PRODUCTION ITEMS DETAIL                      |
-| Line | SKU | Product | Target | Actual | %   |
-+----------------------------------------------+
-| DOWNTIME DETAIL                              |
-| Line | Category | Reason | Duration | Comment|
-+----------------------------------------------+
-| PRODUCTION BY SKU                            |
-+----------------------------------------------+
+```sql
+CREATE POLICY "Admins can update any profile"
+ON public.profiles
+FOR UPDATE
+TO authenticated
+USING (has_role(auth.uid(), 'admin'::app_role))
+WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 ```
 
-### History Print - Nova Janela
+### 3. Update `src/contexts/AuthContext.tsx`
 
-Substituir `window.print()` por `window.open()` com HTML completo, incluindo:
-- Logo Applied Nutrition
-- Tabela principal com todas as sessoes filtradas
-- Detalhes de items e downtimes por sessao
-- CSS inline para impressao limpa
+- `deleteUser`: Call the new backend function instead of deleting from profiles directly
+- `updateUser`: Return `{ success, error }` for UI feedback
+
+### 4. Update `src/pages/Admin.tsx`
+
+- Show toast/error when delete or update fails
+- Show success feedback on operations
+
+## Files to Create/Modify (4)
+
+| File | Change |
+|------|--------|
+| `supabase/functions/delete-user/index.ts` | New backend function to delete user from auth system |
+| Database migration | Add admin UPDATE policy on profiles |
+| `src/contexts/AuthContext.tsx` | Use backend function for delete; return errors from updateUser |
+| `src/pages/Admin.tsx` | Show error/success feedback on user operations |
 
