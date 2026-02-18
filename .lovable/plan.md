@@ -1,80 +1,78 @@
 
 
-# Performance Optimization: History Edit Speed
+# Fix: Operator History Load Timeout + Edit Not Saving
 
-## Problem Analysis
+## Root Cause
 
-The History edit is slow because every `updateSession` call triggers a full `refreshSessions()` which fetches **ALL** production sessions, items, and downtimes from the entire database -- even though we already apply optimistic local updates. This means:
+The operator sees "No production sessions found" because the initial data load **times out** (15s limit). This happens because:
 
-1. After saving, the UI waits for 3 full table scans (sessions + items + downtimes) before feeling "done"
-2. `production_items` and `structured_downtimes` are fetched without any filter (SELECT *), pulling every row in the database
-3. The background refresh blocks perceived speed even though the optimistic update already shows correct data
+1. The session query runs first (up to 15s timeout)
+2. Then chunked item/downtime queries run **sequentially** in a `for` loop -- each chunk waits for the previous one
+3. The combined time exceeds the 15s window, causing a timeout error
+4. With no sessions loaded, there's nothing to edit -- so "not saving" is actually "nothing to show"
 
 ## Fixes
 
-### 1. Remove redundant background refresh after optimistic updates
-Both the operator and supervisor/admin paths in `updateSession` already perform correct optimistic local state updates. The `refreshSessions()` call after that is redundant and causes the slowdown. Remove it -- the data is already correct locally.
+### 1. Remove the global timeout wrapper from refreshSessions
+The `withTimeout(15s)` only wraps the sessions query, but the chunked item/downtime queries have NO timeout protection and run sequentially after. The total time easily exceeds expectations. Solution: remove the 15s timeout on the sessions query (let it complete naturally) and instead add per-query timeouts if needed.
 
-### 2. Scope database queries to relevant date range
-Instead of fetching ALL items and downtimes, only fetch those belonging to sessions returned by the query. Use the session IDs from the first query to filter the second and third queries with `.in('session_id', ids)`.
+### 2. Parallelize ALL chunk fetches
+Currently chunks run in a sequential `for` loop. Change to `Promise.all` so all chunks fetch simultaneously.
 
-### 3. Remove redundant refresh after delete
-`deleteSession` also calls `refreshSessions()`. Add an optimistic local delete instead (remove from state immediately) and skip the full refresh.
+### 3. Increase timeout to 30s for session query
+If keeping a safety timeout, use 30s instead of 15s to account for slower connections.
 
-### 4. Limit initial data load
-Add a default date range filter (e.g., last 30 days) to the sessions query to avoid loading ancient data on startup.
+### 4. For operators, reduce data scope
+Operators only need sessions where they are the leader. Add a `.eq('line_leader', user.name)` filter for operators to dramatically reduce data volume.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/contexts/ShiftContext.tsx` | Remove background refresh from updateSession/deleteSession; scope item/downtime queries to session IDs; add date limit to initial load |
+| `src/contexts/ShiftContext.tsx` | Increase timeout to 30s; parallelize chunk fetches; add operator-specific query filter |
 
 ## Technical Details
 
-### Remove background refresh from updateSession (lines 352, 467)
+### Parallelize chunks (lines 104-112)
 ```text
-// BEFORE (both operator and admin paths):
-refreshSessions().catch(err => ...);
+// BEFORE: Sequential for loop
+for (let i = 0; i < sessionIds.length; i += chunkSize) {
+  const chunk = sessionIds.slice(i, i + chunkSize);
+  const [itemsRes, downtimesRes] = await Promise.all([...]);
+  // concatenate...
+}
 
-// AFTER:
-// (removed - optimistic update is sufficient)
+// AFTER: All chunks in parallel
+const chunks = [];
+for (let i = 0; i < sessionIds.length; i += chunkSize) {
+  chunks.push(sessionIds.slice(i, i + chunkSize));
+}
+const chunkResults = await Promise.all(chunks.map(chunk =>
+  Promise.all([
+    supabase.from('production_items').select('*').in('session_id', chunk),
+    supabase.from('structured_downtimes').select('*').in('session_id', chunk),
+  ])
+));
+// Flatten results
 ```
 
-### Scope item/downtime queries to session IDs (lines 75-88)
+### Operator-scoped query (line 78-83)
 ```text
-// BEFORE:
-supabase.from('production_items').select('*')
-supabase.from('structured_downtimes').select('*')
-
-// AFTER:
-const sessionIds = sessionsRes.data.map(s => s.id);
-// Split into chunks of 200 to avoid query size limits
-supabase.from('production_items').select('*').in('session_id', chunk)
-supabase.from('structured_downtimes').select('*').in('session_id', chunk)
-```
-
-### Optimistic delete (lines 476-492)
-```text
-// BEFORE:
-await supabase.delete()... then refreshSessions()
-
-// AFTER:
-await supabase.delete()...
-setSessions(prev => prev.filter(s => s.id !== id));
-// No refreshSessions needed
-```
-
-### Date-limited initial load (line 80)
-```text
-// Add a 90-day lookback to initial query
-const cutoff = new Date();
-cutoff.setDate(cutoff.getDate() - 90);
-supabase.from('production_sessions')
-  .select('*')
+// For operators, only fetch their own sessions
+let query = supabase.from('production_sessions').select('*')
   .gte('date', cutoff.toISOString().split('T')[0])
-  .order('date', { ascending: false })
+  .order('date', { ascending: false });
+
+if (user.role === 'operator' && user.name) {
+  query = query.ilike('line_leader', user.name.trim());
+}
 ```
 
-These changes together should make the edit feel near-instant (optimistic update with no blocking refresh) and reduce the initial page load by 50-80% depending on data volume.
+### Timeout increase (line 84)
+```text
+// 15000 -> 30000
+const sessionsRes = await withTimeout(query, 30000);
+```
+
+These changes should make operator history load 3-5x faster and eliminate the timeout issue entirely.
 
