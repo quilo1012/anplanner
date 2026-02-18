@@ -108,16 +108,30 @@ Deno.serve(async (req: Request) => {
       const newUser = createResult.data;
 
       // Wait for handle_new_user trigger to create default role
-      if (role && role !== "operator" && newUser?.user) {
+      if (newUser?.user) {
         await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const { error: roleError } = await supabaseAdmin
-          .from("user_roles")
-          .update({ role })
-          .eq("user_id", newUser.user.id);
 
-        if (roleError) {
-          console.error("Error updating role:", roleError);
+        // Verify profile was created by trigger, create if missing
+        const { data: existingProfile } = await supabaseAdmin
+          .from("profiles").select("id").eq("id", newUser.user.id).maybeSingle();
+        if (!existingProfile) {
+          console.log(`Profile missing after trigger, creating manually for ${email}`);
+          await supabaseAdmin.from("profiles").insert({
+            id: newUser.user.id,
+            email,
+            name: name.trim().substring(0, 100),
+          });
+        }
+
+        if (role && role !== "operator") {
+          const { error: roleError } = await supabaseAdmin
+            .from("user_roles")
+            .update({ role })
+            .eq("user_id", newUser.user.id);
+
+          if (roleError) {
+            console.error("Error updating role:", roleError);
+          }
         }
       }
 
