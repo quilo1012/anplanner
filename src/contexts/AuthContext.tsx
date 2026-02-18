@@ -77,11 +77,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // Fallback: create user from Supabase Auth data when profile doesn't exist yet
+      // Self-healing: auto-create missing profile so RLS policies work
+      const name = (supabaseUser.user_metadata?.name || 
+        supabaseUser.email?.split('@')[0] || 'User').trim();
+      console.warn('Profile missing for user, auto-creating:', supabaseUser.id);
+      await supabase.from('profiles').upsert({
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        name: name,
+      }, { onConflict: 'id' });
+
       return {
         id: supabaseUser.id,
         email: supabaseUser.email || '',
-        name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+        name: name,
         role: (roleData?.role as UserRole) || 'operator',
         createdAt: supabaseUser.created_at || new Date().toISOString(),
       };

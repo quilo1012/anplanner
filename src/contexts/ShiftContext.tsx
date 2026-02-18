@@ -345,16 +345,26 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
               .update({ quantity_actual: item.quantityActual || 0 })
               .eq('id', (item as any).id)
               .eq('session_id', id)
+              .select('id')
           );
 
         if (updatePromises.length > 0) {
           const results = await withTimeout(Promise.all(updatePromises), 10000);
+          let failedCount = 0;
           for (const res of results) {
             if (res.error) {
               console.error('Error updating item:', res.error);
               timer.end();
               return { success: false, error: res.error.message };
             }
+            if (!res.data || res.data.length === 0) {
+              failedCount++;
+            }
+          }
+          if (failedCount > 0) {
+            console.error(`${failedCount} item(s) not updated — RLS policy likely blocked the operation`);
+            timer.end();
+            return { success: false, error: 'Não foi possível salvar. Seu perfil pode estar incompleto — tente sair e entrar novamente.' };
           }
         }
 
