@@ -33,11 +33,16 @@ export function Admin() {
 
     try {
       if (editingId) {
-        await updateUser(editingId, {
+        const result = await updateUser(editingId, {
           name: formData.name,
           email: formData.email,
           role: formData.role,
         });
+        if (!result.success) {
+          setSubmitError(result.error || 'Failed to update user');
+          setIsSubmitting(false);
+          return;
+        }
       } else {
         const result = await addUser({
           name: formData.name,
@@ -71,12 +76,19 @@ export function Admin() {
     setSubmitError('');
   };
 
+  const [deleteError, setDeleteError] = useState('');
+
   const handleDelete = async (id: string) => {
     if (confirmDelete === id) {
-      await deleteUser(id);
+      setDeleteError('');
+      const result = await deleteUser(id);
+      if (!result.success) {
+        setDeleteError(result.error || 'Failed to delete user');
+      }
       setConfirmDelete(null);
     } else {
       setConfirmDelete(id);
+      setDeleteError('');
     }
   };
 
@@ -113,6 +125,12 @@ export function Admin() {
                 </button>
               )}
             </div>
+
+            {deleteError && (
+              <div className="mb-4 p-3 bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 rounded text-sm text-[hsl(var(--destructive))]">
+                {deleteError}
+              </div>
+            )}
 
             {/* Add/Edit Form */}
             {(isAdding || editingId) && (

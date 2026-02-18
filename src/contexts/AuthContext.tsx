@@ -28,8 +28,8 @@ interface AuthContextType {
   hasRole: (roles: UserRole | UserRole[]) => boolean;
   canEdit: (createdByRole?: UserRole) => boolean;
   addUser: (userData: { name: string; email: string; password: string; role: UserRole }) => Promise<{ success: boolean; error?: string }>;
-  updateUser: (id: string, data: Partial<{ name: string; email: string; role: UserRole }>) => Promise<void>;
-  deleteUser: (id: string) => Promise<void>;
+  updateUser: (id: string, data: Partial<{ name: string; email: string; role: UserRole }>) => Promise<{ success: boolean; error?: string }>;
+  deleteUser: (id: string) => Promise<{ success: boolean; error?: string }>;
   refreshUsers: () => Promise<void>;
 }
 
@@ -338,7 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateUser = async (id: string, data: Partial<{ name: string; email: string; role: UserRole }>) => {
+  const updateUser = async (id: string, data: Partial<{ name: string; email: string; role: UserRole }>): Promise<{ success: boolean; error?: string }> => {
     try {
       // Update profile
       if (data.name || data.email) {
@@ -352,6 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (profileError) {
           console.error('Error updating profile:', profileError);
+          return { success: false, error: profileError.message };
         }
       }
 
@@ -364,6 +365,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (roleError) {
           console.error('Error updating role:', roleError);
+          return { success: false, error: roleError.message };
         }
       }
 
@@ -377,28 +379,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(userData);
         }
       }
-    } catch (error) {
+
+      return { success: true };
+    } catch (error: any) {
       console.error('Update user error:', error);
+      return { success: false, error: error.message || 'An unexpected error occurred' };
     }
   };
 
-  const deleteUser = async (id: string) => {
-    if (id === user?.id) return;
+  const deleteUser = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    if (id === user?.id) return { success: false, error: 'Cannot delete yourself' };
 
     try {
-      // Delete from profiles (will cascade to user_roles via auth.users)
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', id);
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: id },
+      });
 
       if (error) {
         console.error('Error deleting user:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (data?.error) {
+        return { success: false, error: data.error };
       }
 
       await refreshUsers();
-    } catch (error) {
+      return { success: true };
+    } catch (error: any) {
       console.error('Delete user error:', error);
+      return { success: false, error: error.message || 'An unexpected error occurred' };
     }
   };
 
