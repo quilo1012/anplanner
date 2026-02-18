@@ -55,7 +55,7 @@ export function History() {
   const filteredSessions = useMemo(() => {
     return sessions.filter(session => {
       // Operator filter: only show sessions where lineLeader matches user name
-      if (isOperator && user?.name && session.lineLeader.toLowerCase() !== user.name.toLowerCase()) return false;
+      if (isOperator && user?.name && session.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()) return false;
       if (filterFromDate && session.date < filterFromDate) return false;
       if (filterToDate && session.date > filterToDate) return false;
       if (filterShift && session.shift !== filterShift) return false;
