@@ -71,20 +71,15 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Parallel fetch with 15s timeout
-      const [sessionsRes, itemsRes, downtimesRes] = await withTimeout(
-        Promise.all([
-          supabase
-            .from('production_sessions')
-            .select('*')
-            .order('date', { ascending: false }),
-          supabase
-            .from('production_items')
-            .select('*'),
-          supabase
-            .from('structured_downtimes')
-            .select('*'),
-        ]),
+      // Step 1: Fetch sessions with 90-day lookback
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 90);
+      const sessionsRes = await withTimeout(
+        supabase
+          .from('production_sessions')
+          .select('*')
+          .gte('date', cutoff.toISOString().split('T')[0])
+          .order('date', { ascending: false }),
         15000
       );
 
@@ -95,8 +90,26 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const itemsData = itemsRes.data || [];
-      const downtimesData = downtimesRes.data || [];
+      if (!sessionsRes.data || sessionsRes.data.length === 0) {
+        setSessions([]);
+        return;
+      }
+
+      // Step 2: Fetch items & downtimes scoped to session IDs (chunked)
+      const sessionIds = sessionsRes.data.map(s => s.id);
+      const chunkSize = 200;
+      let itemsData: any[] = [];
+      let downtimesData: any[] = [];
+
+      for (let i = 0; i < sessionIds.length; i += chunkSize) {
+        const chunk = sessionIds.slice(i, i + chunkSize);
+        const [itemsRes, downtimesRes] = await Promise.all([
+          supabase.from('production_items').select('*').in('session_id', chunk),
+          supabase.from('structured_downtimes').select('*').in('session_id', chunk),
+        ]);
+        if (itemsRes.data) itemsData = itemsData.concat(itemsRes.data);
+        if (downtimesRes.data) downtimesData = downtimesData.concat(downtimesRes.data);
+      }
 
       // Group items and downtimes by session_id
       const itemsBySession: Record<string, ProductionItem[]> = {};
@@ -349,7 +362,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         }));
 
         timer.end();
-        refreshSessions().catch(err => console.error('Background refresh failed:', err));
         return { success: true };
       }
 
@@ -463,8 +475,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       } : s));
 
       timer.end();
-      // Background refresh to sync server-generated IDs
-      refreshSessions().catch(err => console.error('Background refresh failed:', err));
       return { success: true };
     } catch (error) {
       console.error('Error updating session:', error);
@@ -483,7 +493,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         console.error('Error deleting session:', error);
         return { success: false, error: error.message };
       }
-      refreshSessions().catch(err => console.error('Background refresh failed:', err));
+      setSessions(prev => prev.filter(s => s.id !== id));
       return { success: true };
     } catch (error) {
       console.error('Error deleting session:', error);
