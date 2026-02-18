@@ -177,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
         isInitializing.current = false;
       }
-    }, 5000);
+    }, 3000);
 
     initializeAuth().finally(() => {
       isInitializing.current = false;
