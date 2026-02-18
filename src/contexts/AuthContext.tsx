@@ -298,40 +298,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const addUser = async (userData: { name: string; email: string; password: string; role: UserRole }): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Create user via Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            name: userData.name,
-          },
-        },
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { action: 'create', email: userData.email, password: userData.password, name: userData.name, role: userData.role },
       });
 
       if (error) {
+        console.error('Error creating user:', error);
         return { success: false, error: error.message };
       }
 
-      if (data.user) {
-        // Update role if not operator (default)
-        if (userData.role !== 'operator') {
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .update({ role: userData.role })
-            .eq('user_id', data.user.id);
-
-          if (roleError) {
-            console.error('Error updating role:', roleError);
-          }
-        }
-
-        await refreshUsers();
-        return { success: true };
+      if (data?.error) {
+        return { success: false, error: data.error };
       }
 
-      return { success: false, error: 'Failed to create user' };
+      await refreshUsers();
+      return { success: true };
     } catch (error) {
       console.error('Add user error:', error);
       return { success: false, error: 'An unexpected error occurred' };
