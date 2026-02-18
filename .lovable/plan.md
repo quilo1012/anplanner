@@ -1,69 +1,67 @@
 
+# Fix: Zombie Users + Leader History Visibility
 
-# Fix: User Management + Operator Edit History
+## Issues Found
 
-## Root Cause Analysis
+### 1. Create user fails with "email_exists"
+The edge function logs confirm the exact error: users that were previously "deleted" (before the edge function was deployed) still have auth records. When admin tries to re-create them, it fails with `email_exists`.
 
-### Issue 1: User create/delete not working
-The `delete-user` edge function was **not deployed** to Lovable Cloud. The code is correct but was never actually running. I've already deployed it just now during investigation, so this should be fixed.
+**Affected emails (from logs):** Any previously deleted user email.
 
-### Issue 2: Operator cannot edit their history
-The `updateSession` function uses a **delete-then-reinsert** strategy for production items. It deletes all old items and inserts new ones. However, operators only have **UPDATE** permission on `production_items` -- they cannot DELETE or INSERT. This causes the operation to fail silently.
-
-**Current flow (broken for operators):**
-1. Update production_sessions (works -- operator has UPDATE policy)
-2. DELETE all production_items for session (FAILS -- operator has no DELETE policy)
-3. INSERT new production_items (FAILS -- operator has no INSERT policy)
-
-**Required flow for operators:**
-1. Update production_sessions (works)
-2. UPDATE only `quantity_actual` on existing production_items (works -- operator has UPDATE policy)
+### 2. Leader cannot see their sessions in History
+In `src/pages/History.tsx` line 58, the operator filter compares names using `.toLowerCase()` but does NOT trim whitespace. However, the database RLS policy uses `lower(TRIM(BOTH FROM ...))`. If the leader name was entered with trailing/leading spaces, the comparison fails silently and shows zero results.
 
 ## Fixes
 
-### 1. Edge Function -- Already Fixed
-Deployed the `delete-user` function. No code changes needed -- just wasn't deployed.
+### Fix 1: Edge function - Handle zombie users automatically
+Update `supabase/functions/delete-user/index.ts`:
 
-### 2. Operator-Specific Update Logic in ShiftContext
-Modify `updateSession` in `src/contexts/ShiftContext.tsx` to detect if the current user is an operator. If so:
-- Only update `quantity_actual` on existing items (using individual UPDATE calls per item)
-- Skip delete/re-insert of items entirely
-- Skip downtime modifications (operators don't manage downtimes)
-- Skip session header fields that operators shouldn't change (leader, date, shift, staff, etc.)
+- On CREATE action: if `createUser` fails with error code `email_exists`, automatically:
+  1. Find the zombie auth user by email via `listUsers`
+  2. Delete the zombie auth record, profile, and role
+  3. Retry `createUser`
+- On DELETE action: also delete profile and role records (not just auth) to prevent orphans
 
-### 3. EditShiftDialog -- Ensure operator only submits quantity_actual
-The dialog already hides most fields with `isOperator` prop. But the submit handler sends ALL fields to `updateSession`. For operators, it should only send the updated item quantities.
+### Fix 2: Leader name comparison - add trim()
+Update `src/pages/History.tsx` line 58:
+
+```
+// BEFORE:
+session.lineLeader.toLowerCase() !== user.name.toLowerCase()
+
+// AFTER:
+session.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()
+```
+
+### Fix 3: Add small delay before role update on create
+After `createUser`, the `handle_new_user` trigger needs a moment to fire and create the role record. Add a 500ms delay before attempting to update the role from "operator" to the desired role.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/contexts/ShiftContext.tsx` | Add operator-aware update logic that only updates quantity_actual per item |
-| `src/components/history/EditShiftDialog.tsx` | For operators, only submit item quantity changes |
+| `supabase/functions/delete-user/index.ts` | Handle zombie users on create; clean up profile+role on delete |
+| `src/pages/History.tsx` | Add `.trim()` to leader name comparison |
 
 ## Technical Details
 
-### ShiftContext - New operator update path
-
-```typescript
-// For operators: only update quantity_actual on each item
-if (user.role === 'operator') {
-  for (const item of data.items) {
-    if (item.id) {
-      await supabase
-        .from('production_items')
-        .update({ quantity_actual: item.quantityActual || 0 })
-        .eq('id', item.id)
-        .eq('session_id', id);
-    }
-  }
-  // Skip session header update, downtimes, photo, etc.
-  await refreshSessions();
-  return { success: true };
-}
+### Edge Function - Zombie User Flow
+```text
+1. Admin calls CREATE with email/password/name/role
+2. Try supabaseAdmin.auth.admin.createUser(...)
+3. If error.code === "email_exists":
+   a. List all auth users, find by email
+   b. Delete zombie: auth record + profiles row + user_roles row
+   c. Retry createUser
+4. Wait 500ms for trigger to create default role
+5. Update role if needed
+6. Return success
 ```
 
-### EditShiftDialog - Operator submit changes
-
-When `isOperator=true`, the form should only send item IDs and quantity_actual values. The existing `skuRows` already contain the `id` from the original session items, so they can be used for targeted updates.
-
+### Edge Function - Delete Flow
+```text
+1. Delete from profiles where id = userId
+2. Delete from user_roles where user_id = userId
+3. Delete auth record via admin.deleteUser(userId)
+4. Return success
+```
