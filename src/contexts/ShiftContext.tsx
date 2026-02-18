@@ -74,14 +74,18 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // Step 1: Fetch sessions with 90-day lookback
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 90);
-      const sessionsRes = await withTimeout(
-        supabase
+      let query = supabase
           .from('production_sessions')
           .select('*')
           .gte('date', cutoff.toISOString().split('T')[0])
-          .order('date', { ascending: false }),
-        15000
-      );
+          .order('date', { ascending: false });
+
+      // Operators only need their own sessions
+      if (user.role === 'operator' && user.name) {
+        query = query.ilike('line_leader', user.name.trim());
+      }
+
+      const sessionsRes = await withTimeout(query, 30000);
 
       if (sessionsRes.error) {
         console.error('Error fetching sessions:', sessionsRes.error);
@@ -101,12 +105,17 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       let itemsData: any[] = [];
       let downtimesData: any[] = [];
 
+      const chunks: string[][] = [];
       for (let i = 0; i < sessionIds.length; i += chunkSize) {
-        const chunk = sessionIds.slice(i, i + chunkSize);
-        const [itemsRes, downtimesRes] = await Promise.all([
+        chunks.push(sessionIds.slice(i, i + chunkSize));
+      }
+      const chunkResults = await Promise.all(chunks.map(chunk =>
+        Promise.all([
           supabase.from('production_items').select('*').in('session_id', chunk),
           supabase.from('structured_downtimes').select('*').in('session_id', chunk),
-        ]);
+        ])
+      ));
+      for (const [itemsRes, downtimesRes] of chunkResults) {
         if (itemsRes.data) itemsData = itemsData.concat(itemsRes.data);
         if (downtimesRes.data) downtimesData = downtimesData.concat(downtimesRes.data);
       }
