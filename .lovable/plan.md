@@ -1,62 +1,60 @@
 
 
-# Fix: User Deletion and Name Update Issues
+# Fix: User Deletion and Creation Issues
 
-## Problem 1: Deleted users still have access
+## Root Cause Analysis
 
-The `deleteUser` function only deletes the user's row from the `profiles` table. It does NOT delete the user from the authentication system (`auth.users`). Since the auth session remains valid, the deleted user can continue using the app normally.
+### Problem 1: Deleted users can still login
+The `delete-user` edge function uses `supabaseCaller.auth.getClaims(token)` which is **not a valid method** in the Supabase JS v2 SDK. This causes the function to throw an error and return 401, so the user is never actually deleted from `auth.users`. The profile row gets removed from the `users` list in the UI, but the auth record remains intact.
 
-**Root cause:** Deleting from `auth.users` requires the `service_role` key, which cannot be used from the frontend. A backend function is needed.
+### Problem 2: Created users don't appear in panel
+The `addUser` function uses `supabase.auth.signUp()` from the frontend. In Supabase, calling `signUp` while already logged in can interfere with the current admin's session. More importantly, the new user's profile may not appear until the trigger `handle_new_user` fires and the admin refreshes. If email confirmation is required, the profile might not be created at all until the user confirms.
 
-**Fix:** Create a new backend function `delete-user` that uses the admin API to fully remove the user from the authentication system. This will cascade-delete the profile and role automatically.
+### Problem 3: Name updates not working
+Already fixed with the RLS policy added previously -- but needs verification.
 
-## Problem 2: Name edits not updating
+## Fixes
 
-The `updateUser` function updates the `profiles` table but only refreshes the `users` list. If editing another user, the list refreshes correctly. However, there are two issues:
-- The function silently swallows errors without feedback to the UI
-- The admin RLS policy for profiles only allows users to update their OWN profile (`id = auth.uid()`), so an admin editing another user's name will fail silently
+### 1. Fix `delete-user` edge function
+Replace the broken `getClaims` call with `supabaseAdmin.auth.getUser(token)` using the service role client, which reliably extracts the caller's identity.
 
-**Fix:** Add an RLS policy allowing admins to update any profile. Also return success/error from `updateUser` so the Admin page can show feedback.
+```typescript
+// BEFORE (broken):
+const { data: claimsData, error: claimsError } = await supabaseCaller.auth.getClaims(token);
+const callerId = claimsData.claims.sub;
 
----
-
-## Technical Changes
-
-### 1. New backend function: `supabase/functions/delete-user/index.ts`
-
-- Accepts `{ userId: string }` in POST body
-- Verifies the caller is an admin using `get_user_role`
-- Prevents self-deletion
-- Calls `supabase.auth.admin.deleteUser(userId)` which cascades to profiles and user_roles
-- Returns success/error response
-
-### 2. Database migration: Allow admins to update any profile
-
-```sql
-CREATE POLICY "Admins can update any profile"
-ON public.profiles
-FOR UPDATE
-TO authenticated
-USING (has_role(auth.uid(), 'admin'::app_role))
-WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+// AFTER (working):
+const { data: { user: callerUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
+const callerId = callerUser.id;
 ```
 
-### 3. Update `src/contexts/AuthContext.tsx`
+### 2. Move `addUser` to an edge function
+Create a new `manage-user` edge function (or extend `delete-user`) that uses the admin API to create users without affecting the admin's session. This uses `supabaseAdmin.auth.admin.createUser()` which:
+- Does not trigger a session change for the admin
+- Creates the user immediately (no email confirmation needed for admin-created users)
+- The `handle_new_user` trigger will create the profile and role automatically
 
-- `deleteUser`: Call the new backend function instead of deleting from profiles directly
-- `updateUser`: Return `{ success, error }` for UI feedback
+### 3. Update `AuthContext.tsx`
+- `deleteUser`: Already calls edge function correctly via `supabase.functions.invoke`
+- `addUser`: Change to call the new edge function instead of `signUp`
 
-### 4. Update `src/pages/Admin.tsx`
-
-- Show toast/error when delete or update fails
-- Show success feedback on operations
-
-## Files to Create/Modify (4)
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/delete-user/index.ts` | New backend function to delete user from auth system |
-| Database migration | Add admin UPDATE policy on profiles |
-| `src/contexts/AuthContext.tsx` | Use backend function for delete; return errors from updateUser |
-| `src/pages/Admin.tsx` | Show error/success feedback on user operations |
+| `supabase/functions/delete-user/index.ts` | Fix auth verification; add "create" action to support both create and delete |
+| `src/contexts/AuthContext.tsx` | Update `addUser` to use the edge function |
+
+## Technical Details
+
+### Edge Function Changes (`delete-user/index.ts`)
+- Accept `action: "create" | "delete"` in the body
+- For auth verification: use `supabaseAdmin.auth.getUser(token)` instead of `getClaims`
+- For create: use `supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name } })`
+- For delete: keep existing `supabaseAdmin.auth.admin.deleteUser(userId)` logic
+- Both actions verify the caller is an admin
+
+### AuthContext Changes
+- `addUser`: Call `supabase.functions.invoke('delete-user', { body: { action: 'create', email, password, name, role } })` instead of `signUp`
+- After successful create, update role if not operator, then refresh users list
 
