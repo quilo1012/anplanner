@@ -313,6 +313,47 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     const timer = createPerfTimer('updateSession');
 
     try {
+      // === OPERATOR PATH: only update quantity_actual on existing items ===
+      if (user.role === 'operator') {
+        const updatePromises = (data.items || [])
+          .filter(item => (item as any).id)
+          .map(item =>
+            supabase
+              .from('production_items')
+              .update({ quantity_actual: item.quantityActual || 0 })
+              .eq('id', (item as any).id)
+              .eq('session_id', id)
+          );
+
+        if (updatePromises.length > 0) {
+          const results = await withTimeout(Promise.all(updatePromises), 10000);
+          for (const res of results) {
+            if (res.error) {
+              console.error('Error updating item:', res.error);
+              timer.end();
+              return { success: false, error: res.error.message };
+            }
+          }
+        }
+
+        // Optimistic local update for operator
+        setSessions(prev => prev.map(s => {
+          if (s.id !== id) return s;
+          const updatedItems = s.items.map(existingItem => {
+            const match = data.items.find(i => (i as any).id === existingItem.id);
+            return match ? { ...existingItem, quantityActual: match.quantityActual } : existingItem;
+          });
+          const totalProduction = updatedItems.reduce((sum, i) => sum + i.quantityActual, 0);
+          const performance = s.plannedQuantity > 0 ? (totalProduction / s.plannedQuantity) * 100 : 0;
+          return { ...s, items: updatedItems, totalProduction, performance };
+        }));
+
+        timer.end();
+        refreshSessions().catch(err => console.error('Background refresh failed:', err));
+        return { success: true };
+      }
+
+      // === SUPERVISOR/ADMIN PATH: full update ===
       let photoUrl: string | undefined = undefined;
       if (data.monitoringPhoto && data.monitoringPhoto.startsWith('data:')) {
         const uploaded = await uploadPhoto(data.monitoringPhoto, data.photoFilename || 'photo.jpg');

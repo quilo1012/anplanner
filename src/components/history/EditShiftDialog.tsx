@@ -78,10 +78,42 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
 
     const validRows = skuRows.filter(row => row.sku.trim());
     if (validRows.length === 0) { toast.error('At least one SKU is required'); return; }
-    if (lineTarget <= 0) { toast.error('Line Production Target is required'); return; }
+    if (!isOperator && lineTarget <= 0) { toast.error('Line Production Target is required'); return; }
 
     setIsSubmitting(true);
     try {
+      // Operator path: only send item IDs + quantity_actual
+      if (isOperator) {
+        const result = await updateSession(session.id, {
+          date: session.date,
+          shift: session.shift,
+          productionLine: session.productionLine,
+          lineLeader: session.lineLeader,
+          plannedQuantity: session.plannedQuantity,
+          items: validRows.map(row => ({
+            id: row.id,
+            sku: row.sku,
+            productName: row.product,
+            quantityTarget: row.productionTarget || 0,
+            quantityActual: row.realProduction || 0,
+          } as any)),
+          comments: session.comments,
+          staffPlanned: session.staffPlanned,
+          staffActual: session.staffActual,
+        });
+
+        if (!result.success) {
+          toast.error(`Failed to update: ${result.error}`);
+          return;
+        }
+
+        toast.success('Production updated successfully');
+        onOpenChange(false);
+        onSuccess?.();
+        return;
+      }
+
+      // Supervisor/Admin path: full update
       // Batch save new products to catalog
       const newProductRows = skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
       if (newProductRows.length > 0) {
