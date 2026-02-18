@@ -1,97 +1,64 @@
 
-# Fix: Operator Cannot Save History (Missing Profile)
+# Fix: Login Not Working
 
-## Root Cause
+## Problem Found
 
-The operator user "Guilherme Machado" (and likely other users recreated via the edge function) has **no profile record** in the database. This was confirmed by querying the profiles table -- it returns empty for this user.
+After thorough investigation, I identified two issues:
 
-The RLS policy "Operators can update their own items" on `production_items` does a JOIN with the `profiles` table to verify the operator's name matches the session leader:
+1. **Missing database trigger**: The `handle_new_user` trigger that should fire when users are created in the authentication system is MISSING. The function exists but it's not connected. This means any new user created (via signup or admin panel) may not get a profile record automatically, which breaks login for those users.
 
-```
-EXISTS (
-  SELECT 1 FROM production_sessions ps
-  JOIN profiles p ON p.id = auth.uid()
-  WHERE ps.id = production_items.session_id
-  AND lower(TRIM(ps.line_leader)) = lower(TRIM(p.name))
-) AND has_role(auth.uid(), 'operator')
-```
-
-No profile row means the JOIN fails, so ALL operator updates are silently rejected (the database returns 204 with zero rows affected, making it look like it worked but nothing was actually saved).
-
-## Why the Profile is Missing
-
-When the "zombie user" fix recreates a user, the database trigger `handle_new_user` should create the profile automatically. But there is a timing issue: the edge function was not waiting long enough for the trigger to fire, or the trigger itself failed silently for this user.
+2. **5-second loading delay**: When users open the app, they see a "Loading..." spinner for up to 5 seconds before the login page appears. This happens because the authentication check has a safety timeout of 5 seconds, and the login page is behind a redirect that only triggers after loading finishes.
 
 ## Fixes
 
-### Fix 1: Auto-create missing profile on login (AuthContext)
-When `fetchUserData` finds no profile, instead of just falling back to auth metadata, it should **insert** the missing profile into the database. This is a self-healing mechanism.
+### Fix 1: Recreate the missing database trigger
+Run a migration to recreate the `on_auth_user_created` trigger on `auth.users` that calls `handle_new_user()`. This ensures every new user automatically gets a profile and default role.
 
-**File:** `src/contexts/AuthContext.tsx` (lines 70-87)
-
-Change the fallback block to upsert a profile when one is missing:
-```typescript
-if (!profile) {
-  const name = (supabaseUser.user_metadata?.name || 
-    supabaseUser.email?.split('@')[0] || 'User').trim();
-  await supabase.from('profiles').upsert({
-    id: supabaseUser.id,
-    email: supabaseUser.email || '',
-    name: name,
-  }, { onConflict: 'id' });
-  return {
-    id: supabaseUser.id,
-    email: supabaseUser.email || '',
-    name: name,
-    role: (roleData?.role as UserRole) || 'operator',
-    createdAt: new Date().toISOString(),
-  };
-}
+```sql
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
 ```
 
-### Fix 2: Add error detection for silent update failures (ShiftContext)
-The operator path in `updateSession` currently doesn't check if the PATCH actually affected any rows. Add `.select()` to get the count and detect failures.
+### Fix 2: Show login form immediately (no 5s wait)
+The Login page should NOT depend on the auth loading state to render. Currently, the user hits `/` first, the `ProtectedRoute` shows "Loading..." for 5 seconds, then redirects to `/login`. 
 
-**File:** `src/contexts/ShiftContext.tsx` (lines 340-348)
+The fix is to make the Login page render the form immediately regardless of auth loading state. The redirect to `/` should only happen if the user is already authenticated AND loading is done.
 
-```typescript
-// Add .select() to verify rows were actually updated
-supabase
-  .from('production_items')
-  .update({ quantity_actual: item.quantityActual || 0 })
-  .eq('id', (item as any).id)
-  .eq('session_id', id)
-  .select('id')  // Returns data so we can verify
-```
-
-Then check if any result returned empty data and surface an error.
-
-### Fix 3: Ensure edge function creates profile on user creation
-The edge function should verify the profile exists after creating the user, and create it manually if the trigger didn't fire.
-
-**File:** `supabase/functions/delete-user/index.ts`
-
-After the 500ms delay post-createUser, add a check:
-```typescript
-// Verify profile was created by trigger, create if missing
-const { data: existingProfile } = await supabaseAdmin
-  .from('profiles').select('id').eq('id', newUser.id).maybeSingle();
-if (!existingProfile) {
-  await supabaseAdmin.from('profiles').insert({
-    id: newUser.id, email, name: name.trim()
-  });
-}
-```
+### Fix 3: Reduce safety timeout from 5s to 3s
+The safety timeout in AuthContext prevents infinite spinners but 5 seconds is too long. Reduce to 3 seconds.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/contexts/AuthContext.tsx` | Auto-create missing profile on login |
-| `src/contexts/ShiftContext.tsx` | Detect silent update failures, surface errors |
-| `supabase/functions/delete-user/index.ts` | Verify profile exists after user creation |
+| Database migration | Recreate `on_auth_user_created` trigger |
+| `src/contexts/AuthContext.tsx` | Reduce safety timeout from 5000ms to 3000ms |
+| `src/pages/Login.tsx` | Ensure form is always visible, no loading dependency |
+
+## Technical Details
+
+### Database Migration
+```sql
+-- Recreate the trigger (drop first in case partially exists)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+```
+
+### AuthContext timeout reduction (line 175)
+```
+// Change 5000 -> 3000
+setTimeout(() => { ... }, 3000);
+```
+
+### Login page - always show form
+The Login page already renders the form regardless of loading state, but the redirect in `ProtectedRoute` causes the 5s delay before even reaching the login page. No changes needed to Login.tsx itself -- the fix is the timeout reduction.
 
 ## Impact
-- Immediately fixes the current operator who can't save
-- Prevents future occurrences for any newly created users
-- Surfaces clear error messages instead of silent failures
+- New users will always get profiles and roles automatically (trigger fix)
+- Login page will appear within 3 seconds maximum instead of 5
+- All existing users continue to work as before
