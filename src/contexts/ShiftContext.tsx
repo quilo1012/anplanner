@@ -58,8 +58,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const refreshSessions = useCallback(async () => {
-    if (authLoading || !user) return;
+  const refreshSessions = useCallback(async (retryCount = 0) => {
+    if (authLoading || !user?.id) return;
     if (!isAuthenticated) {
       setSessions([]);
       setIsLoading(false);
@@ -85,7 +85,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         query = query.ilike('line_leader', user.name.trim());
       }
 
-      const sessionsRes = await withTimeout(query, 30000);
+      const sessionsRes = await query;
 
       if (sessionsRes.error) {
         console.error('Error fetching sessions:', sessionsRes.error);
@@ -178,12 +178,17 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       setSessions(mapped);
     } catch (err) {
       console.error('Error refreshing sessions:', err);
+      if (retryCount < 1) {
+        console.log('Retrying session load...');
+        setTimeout(() => refreshSessions(retryCount + 1), 1000);
+        return;
+      }
       setError('An unexpected error occurred.');
       setSessions([]);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, authLoading, user]);
+  }, [isAuthenticated, authLoading, user?.id, user?.role, user?.name]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -349,7 +354,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           );
 
         if (updatePromises.length > 0) {
-          const results = await withTimeout(Promise.all(updatePromises), 10000);
+          const results = await Promise.all(updatePromises);
           let failedCount = 0;
           for (const res of results) {
             if (res.error) {
