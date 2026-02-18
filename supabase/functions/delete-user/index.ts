@@ -65,23 +65,52 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      let createResult = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
         user_metadata: { name: name.trim().substring(0, 100) },
       });
 
-      if (createError) {
-        console.error("Error creating user:", createError);
+      // Handle zombie user: if email already exists, delete the old record and retry
+      if (createResult.error && (createResult.error as any).code === "email_exists") {
+        console.log(`Zombie user detected for ${email}, cleaning up...`);
+        
+        // Find zombie auth user by email
+        const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        const zombieUser = listData?.users?.find(u => u.email === email);
+        
+        if (zombieUser) {
+          // Clean up orphaned records
+          await supabaseAdmin.from("profiles").delete().eq("id", zombieUser.id);
+          await supabaseAdmin.from("user_roles").delete().eq("user_id", zombieUser.id);
+          await supabaseAdmin.auth.admin.deleteUser(zombieUser.id);
+          console.log(`Zombie user ${email} (${zombieUser.id}) cleaned up`);
+        }
+
+        // Retry creation
+        createResult = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { name: name.trim().substring(0, 100) },
+        });
+      }
+
+      if (createResult.error) {
+        console.error("Error creating user:", createResult.error);
         return new Response(
-          JSON.stringify({ error: createError.message }),
+          JSON.stringify({ error: createResult.error.message }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Update role if not operator (trigger creates default 'operator')
+      const newUser = createResult.data;
+
+      // Wait for handle_new_user trigger to create default role
       if (role && role !== "operator" && newUser?.user) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const { error: roleError } = await supabaseAdmin
           .from("user_roles")
           .update({ role })
@@ -113,6 +142,10 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Clean up profile and role before deleting auth record
+    await supabaseAdmin.from("profiles").delete().eq("id", userId);
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
 
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
