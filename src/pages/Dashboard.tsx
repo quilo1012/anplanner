@@ -104,12 +104,13 @@ export function Dashboard() {
     const totalProduction = filteredSessions.reduce((sum, s) => sum + s.totalProduction, 0);
     const totalPlannedStaff = filteredSessions.reduce((sum, s) => sum + (s.staffPlanned || 0), 0);
     const totalActualStaff = filteredSessions.reduce((sum, s) => sum + (s.staffActual || 0), 0);
+    const totalPlanned = filteredSessions.reduce((sum, s) => sum + (s.plannedQuantity || 0), 0);
     const availability = totalSessions > 0 ? Math.min(100, 100 - (totalDowntime / (totalSessions * 8 * 60)) * 100) : 0;
     const quality = 98;
 
     return {
       totalSessions, avgPerformance, totalDowntime, totalProduction,
-      totalPlannedStaff, totalActualStaff,
+      totalPlannedStaff, totalActualStaff, totalPlanned,
       availability: Math.max(0, availability), quality,
       oee: (avgPerformance / 100) * (Math.max(0, availability) / 100) * (quality / 100) * 100,
     };
@@ -334,7 +335,7 @@ export function Dashboard() {
             </div>
 
             <div className="hidden lg:flex flex-col gap-2 w-56 shrink-0">
-              <OEEPanel performance={stats.avgPerformance} availability={stats.availability} oee={stats.oee} shiftType={selectedShift} totalProduction={stats.totalProduction} />
+              <OEEPanel performance={stats.avgPerformance} availability={stats.availability} oee={stats.oee} shiftType={selectedShift} totalProduction={stats.totalProduction} totalPlanned={stats.totalPlanned} />
             </div>
           </div>
         </div>
