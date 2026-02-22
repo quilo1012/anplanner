@@ -1,91 +1,64 @@
 
 
-# Performance and Save Optimization
+# Dynamic Shift OEE Panel
 
-## Current Issues Found
+## What Changes
 
-1. **saveSession triggers full data reload** -- After saving a new session, `refreshSessions()` is called (line 328), reloading all 90 days of data. This freezes the UI.
-2. **withTimeout wrappers causing false failures** -- The supervisor update path still wraps 3 operations in `withTimeout(10s)` (lines 400, 424, 469). On slow factory networks these timeout before completing.
-3. **Operator cannot add downtimes** -- RLS policies block operators from INSERT/DELETE on `structured_downtimes`. The UI hides the downtime form from operators. The operator code path in `updateSession` ignores downtime data.
-4. **No database indexes** -- Missing indexes on frequently queried columns.
-5. **saveDowntimesBatch uses withTimeout** -- Can also cause false failures.
+The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
 
-## Fixes
+## Updated Panel Layout
 
-### 1. Remove global refresh from saveSession
-Replace the `refreshSessions()` call with an optimistic local state update that adds the new session to `sessions` without reloading.
+```text
++---------------------------+
+|  SHIFT OEE                |
+|  DAY Shift                |
+|                           |
+|      [  106.9%  ]         |
+|      World Class          |
+|                           |
+|  Produced:  22,248 units  |
+|  Planned:   20,800 units  |
+|  Performance: 106.9%      |
++---------------------------+
+```
 
-### 2. Remove all remaining withTimeout wrappers from update paths
-Let database operations complete naturally. The `withTimeout` utility will remain available but won't wrap update/delete/insert operations.
+## Status Color Rules (updated)
 
-### 3. Enable operator downtime (3 changes)
-- **Database**: Add RLS policies for operators to INSERT and DELETE downtimes on sessions they lead
-- **UI**: Show `StructuredDowntimeForm` for operators in EditShiftDialog
-- **Code**: Add downtime handling to operator path in `updateSession`, and pass `structuredDowntimes` from EditShiftDialog operator submit
+| Performance | Color  | Label           |
+|-------------|--------|-----------------|
+| >= 100%     | Green  | World Class     |
+| 90-99%      | Yellow | On Target       |
+| < 90%       | Red    | Below Target    |
+| No data     | Gray   | -- (dash)       |
 
-### 4. Add database indexes
-Create indexes on `production_sessions(production_line, date)`, `production_items(session_id)`, `structured_downtimes(session_id)`, and `products(product_code)`.
+## Empty State
 
-### 5. Remove withTimeout from saveDowntimesBatch
-Let the batch complete naturally.
+When no data exists for the selected filters, the panel shows:
+> "No production data for selected period"
+
+Instead of a blank or zero-filled panel.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/contexts/ShiftContext.tsx` | Remove refreshSessions from saveSession, add optimistic insert, remove withTimeout from update paths, add operator downtime logic |
-| `src/components/history/EditShiftDialog.tsx` | Show downtime form for operators, pass downtimes in operator submit |
-| Database migration | Add RLS policies for operator downtimes + performance indexes |
+| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
+| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
 
 ## Technical Details
 
-### ShiftContext changes
-- **saveSession** (line 327-329): Replace `refreshSessions()` with optimistic `setSessions(prev => [...])` that prepends the new session
-- **updateSession supervisor path** (lines 400, 424, 469): Remove `withTimeout` wrappers, use `await` directly
-- **updateSession operator path** (after line 389): Add downtime delete+insert logic when `data.structuredDowntimes` is provided
-- **saveDowntimesBatch** (lines 534, 548): Remove `withTimeout` wrappers
+### OEEPanel.tsx
+- Add `totalPlanned` prop to interface
+- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
+- Show "Produced" and "Planned" rows with formatted numbers
+- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
+- Performance displays as `--` when `totalPlanned === 0`
 
-### EditShiftDialog changes
-- Move `StructuredDowntimeForm` outside the `{!isOperator}` block (line 227-243)
-- In operator submit path (line 86-113): Include `structuredDowntimes` in the update call
+### Dashboard.tsx (line 337)
+- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
+- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
+- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
 
-### Database migration
-```sql
--- Operator downtime RLS policies
-CREATE POLICY "Operators can insert downtimes on own sessions"
-ON public.structured_downtimes FOR INSERT TO authenticated
-WITH CHECK (
-  has_role(auth.uid(), 'operator'::app_role)
-  AND EXISTS (
-    SELECT 1 FROM production_sessions ps
-    JOIN profiles p ON p.id = auth.uid()
-    WHERE ps.id = structured_downtimes.session_id
-    AND lower(TRIM(BOTH FROM ps.line_leader)) = lower(TRIM(BOTH FROM p.name))
-  )
-);
-
-CREATE POLICY "Operators can delete downtimes on own sessions"
-ON public.structured_downtimes FOR DELETE TO authenticated
-USING (
-  has_role(auth.uid(), 'operator'::app_role)
-  AND EXISTS (
-    SELECT 1 FROM production_sessions ps
-    JOIN profiles p ON p.id = auth.uid()
-    WHERE ps.id = structured_downtimes.session_id
-    AND lower(TRIM(BOTH FROM ps.line_leader)) = lower(TRIM(BOTH FROM p.name))
-  )
-);
-
--- Performance indexes
-CREATE INDEX IF NOT EXISTS idx_sessions_line_date ON production_sessions(production_line, date);
-CREATE INDEX IF NOT EXISTS idx_items_session ON production_items(session_id);
-CREATE INDEX IF NOT EXISTS idx_downtimes_session ON structured_downtimes(session_id);
-CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code);
-```
-
-## Expected Result
-- Saves complete instantly with no page reload
-- Operators can add downtimes to their sessions
-- No more timeout errors on slow connections
-- Database queries run faster with proper indexes
+### Performance Note
+No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
 
