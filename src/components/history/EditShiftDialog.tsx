@@ -100,6 +100,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
           comments: session.comments,
           staffPlanned: session.staffPlanned,
           staffActual: session.staffActual,
+          structuredDowntimes,
         });
 
         if (!result.success) {
@@ -236,11 +237,12 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             <PhotoUpload photo={monitoringPhoto} filename={photoFilename} onChange={handlePhotoChange} />
           </div>
 
+          </>
+          )}
+
           <div className="space-y-2 border-t pt-4">
             <StructuredDowntimeForm downtimes={structuredDowntimes} onChange={setStructuredDowntimes} downtimeThreshold={60} />
           </div>
-          </>
-          )}
 
           <DialogFooter className="pt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
