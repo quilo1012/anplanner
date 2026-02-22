@@ -324,8 +324,32 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       timer.end();
+      // Optimistic local insert instead of full refresh
       if (!options?.skipRefresh) {
-        refreshSessions().catch(err => console.error('Background refresh failed:', err));
+        setSessions(prev => {
+          const newSession: ProductionSession = {
+            id: sessionId,
+            productionLine: data.productionLine.trim(),
+            date: data.date,
+            shift: data.shift,
+            lineLeader: data.lineLeader.trim(),
+            staffPlanned: data.staffPlanned || 0,
+            staffActual: data.staffActual || 0,
+            plannedQuantity: data.plannedQuantity,
+            comments: data.comments || '',
+            monitoringPhoto: photoUrl || undefined,
+            photoFilename: data.photoFilename,
+            items: data.items.map((i, idx) => ({ id: `temp-${idx}`, ...i })),
+            structuredDowntimes: data.structuredDowntimes || [],
+            totalProduction,
+            totalDowntime: (data.structuredDowntimes || []).reduce((sum, d) => sum + d.duration, 0),
+            performance,
+            isArchived: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          return [newSession, ...prev.filter(s => s.id !== sessionId)];
+        });
       }
       return { success: true, sessionId };
     } catch (error) {
@@ -373,7 +397,24 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        // Handle downtimes for operator
+        if (data.structuredDowntimes) {
+          await supabase.from('structured_downtimes').delete().eq('session_id', id);
+          if (data.structuredDowntimes.length > 0) {
+            await supabase.from('structured_downtimes').insert(
+              data.structuredDowntimes.map(dt => ({
+                session_id: id,
+                category: dt.category,
+                reason: dt.reason,
+                duration: dt.duration,
+                comment: dt.comment || null,
+              }))
+            );
+          }
+        }
+
         // Optimistic local update for operator
+        const updatedDowntimes = data.structuredDowntimes || [];
         setSessions(prev => prev.map(s => {
           if (s.id !== id) return s;
           const updatedItems = s.items.map(existingItem => {
@@ -381,8 +422,9 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
             return match ? { ...existingItem, quantityActual: match.quantityActual } : existingItem;
           });
           const totalProduction = updatedItems.reduce((sum, i) => sum + i.quantityActual, 0);
+          const totalDowntime = updatedDowntimes.reduce((sum, d) => sum + d.duration, 0);
           const performance = s.plannedQuantity > 0 ? (totalProduction / s.plannedQuantity) * 100 : 0;
-          return { ...s, items: updatedItems, totalProduction, performance };
+          return { ...s, items: updatedItems, structuredDowntimes: updatedDowntimes, totalProduction, totalDowntime, performance };
         }));
 
         timer.end();
@@ -397,23 +439,20 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       // Step 1: Update session record
-      const { error: sessionError } = await withTimeout(
-        supabase
-          .from('production_sessions')
-           .update({
-            production_line: data.productionLine.trim(),
-            date: data.date,
-            shift_type: mapShiftTypeToDb(data.shift),
-            line_leader: data.lineLeader.trim(),
-            staff_planned: data.staffPlanned || 0,
-            staff_actual: data.staffActual || 0,
-            planned_quantity: data.plannedQuantity,
-            comments: data.comments || null,
-            ...(photoUrl && { monitoring_photo_url: photoUrl }),
-          })
-          .eq('id', id),
-        10000
-      );
+      const { error: sessionError } = await supabase
+        .from('production_sessions')
+        .update({
+          production_line: data.productionLine.trim(),
+          date: data.date,
+          shift_type: mapShiftTypeToDb(data.shift),
+          line_leader: data.lineLeader.trim(),
+          staff_planned: data.staffPlanned || 0,
+          staff_actual: data.staffActual || 0,
+          planned_quantity: data.plannedQuantity,
+          comments: data.comments || null,
+          ...(photoUrl && { monitoring_photo_url: photoUrl }),
+        })
+        .eq('id', id);
 
       if (sessionError) {
         console.error('Error updating session:', sessionError);
@@ -421,13 +460,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       // Step 2: Delete old items and downtimes in PARALLEL
-      const [deleteItemsRes, deleteDowntimesRes] = await withTimeout(
-        Promise.all([
-          supabase.from('production_items').delete().eq('session_id', id),
-          supabase.from('structured_downtimes').delete().eq('session_id', id),
-        ]),
-        10000
-      );
+      const [deleteItemsRes, deleteDowntimesRes] = await Promise.all([
+        supabase.from('production_items').delete().eq('session_id', id),
+        supabase.from('structured_downtimes').delete().eq('session_id', id),
+      ]);
 
       if (deleteItemsRes.error) {
         console.error('Error deleting old items:', deleteItemsRes.error);
@@ -466,7 +502,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       if (insertPromises.length > 0) {
-        const insertResults = await withTimeout(Promise.all(insertPromises), 10000);
+        const insertResults = await Promise.all(insertPromises);
         for (const res of insertResults) {
           if (res.error) {
             console.error('Error inserting data:', res.error);
@@ -509,10 +545,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
   const deleteSession = async (id: string): Promise<OperationResult> => {
     try {
-      const { error } = await withTimeout(
-        supabase.from('production_sessions').delete().eq('id', id),
-        10000
-      );
+      const { error } = await supabase.from('production_sessions').delete().eq('id', id);
       if (error) {
         console.error('Error deleting session:', error);
         return { success: false, error: error.message };
@@ -531,10 +564,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   ): Promise<OperationResult> => {
     const timer = createPerfTimer('saveDowntimesBatch');
     try {
-      await withTimeout(
-        supabase.from('structured_downtimes').delete().eq('session_id', sessionId),
-        5000
-      );
+      await supabase.from('structured_downtimes').delete().eq('session_id', sessionId);
 
       if (downtimes.length > 0) {
         const toInsert = downtimes.map(d => ({
@@ -545,10 +575,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           comment: d.comment || null,
         }));
 
-        const { error: insertError } = await withTimeout(
-          supabase.from('structured_downtimes').insert(toInsert),
-          5000
-        );
+        const { error: insertError } = await supabase.from('structured_downtimes').insert(toInsert);
 
         if (insertError) {
           console.error('Error inserting downtimes:', insertError);
