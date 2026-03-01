@@ -57,118 +57,50 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Search products - cache first, fallback to DB
+  // Search products - pure in-memory, no DB fallback
   useEffect(() => {
-    const searchProductsHandler = async () => {
-      if (query.length < 2) {
-        setResults([]);
-        setSkuNotFound(false);
-        setHasSearched(false);
-        return;
-      }
+    if (query.length < 2) {
+      setResults([]);
+      setSkuNotFound(false);
+      setHasSearched(false);
+      setIsLoading(false);
+      return;
+    }
 
-      const timer = createPerfTimer('ProductSearch');
+    if (!cacheLoaded) {
       setIsLoading(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const timer = setTimeout(() => {
       setHasSearched(true);
-      
-      try {
-        // CACHE FIRST: Try local cache (O(1) lookup)
-        if (cacheLoaded) {
-          const cachedResults = searchProducts(query);
-          
-          if (cachedResults.length > 0) {
-            // Map to component format
-            const formattedResults = cachedResults.map(p => ({
-              product_code: p.sku,
-              product_description: p.name,
-            }));
-            
-            setResults(formattedResults);
-            
-            // Check for exact match
-            const exactMatch = cachedResults.find(
-              p => p.sku.toLowerCase() === query.toLowerCase()
-            );
-            const isFound = !!exactMatch;
-            setSkuNotFound(!isFound);
-            onFoundStatusChange?.(isFound);
-            
-            if (exactMatch && !selectedProduct) {
-              setSelectedProduct({
-                product_code: exactMatch.sku,
-                product_description: exactMatch.name,
-              });
-              onChange(exactMatch.sku, { 
-                sku: exactMatch.sku, 
-                name: exactMatch.name,
-              });
-            }
-            
-            timer.end();
-            setIsLoading(false);
-            return;
-          }
-          
-          // Cache miss but cache loaded - check if exact SKU exists
-          if (hasProduct(query)) {
-            const product = getProduct(query);
-            if (product) {
-              setResults([{
-                product_code: product.sku,
-                product_description: product.name,
-              }]);
-              setSkuNotFound(false);
-              onFoundStatusChange?.(true);
-              timer.end();
-              setIsLoading(false);
-              return;
-            }
-          }
-        }
+      const cachedResults = searchProducts(query);
+      const formattedResults = cachedResults.map(p => ({
+        product_code: p.sku,
+        product_description: p.name,
+      }));
+      setResults(formattedResults);
 
-        // FALLBACK: Query database for new/unknown SKUs
-        const { data, error } = await supabase
-          .from('products')
-          .select('product_code, product_description')
-          .or(`product_code.ilike.%${query}%,product_description.ilike.%${query}%`)
-          .order('product_code')
-          .limit(10);
+      const exactMatch = cachedResults.find(
+        p => p.sku.toLowerCase() === query.toLowerCase()
+      );
+      setSkuNotFound(!exactMatch);
+      onFoundStatusChange?.(!!exactMatch);
 
-        if (error) {
-          console.error('Error searching products:', error);
-          timer.end();
-          return;
-        }
-
-        setResults(data || []);
-        
-        // Check if exact SKU match exists
-        const exactMatch = data?.find(p => p.product_code.toLowerCase() === query.toLowerCase());
-        const isFound = !!exactMatch;
-        setSkuNotFound(!isFound && query.length >= 2);
-        
-        onFoundStatusChange?.(isFound);
-        
-        if (exactMatch && !selectedProduct) {
-          setSelectedProduct(exactMatch);
-          onChange(exactMatch.product_code, { 
-            sku: exactMatch.product_code, 
-            name: exactMatch.product_description,
-          });
-        }
-        
-        timer.end();
-      } catch (error) {
-        console.error('Error searching products:', error);
-      } finally {
-        setIsLoading(false);
+      if (exactMatch && !selectedProduct) {
+        setSelectedProduct({
+          product_code: exactMatch.sku,
+          product_description: exactMatch.name,
+        });
+        onChange(exactMatch.sku, { sku: exactMatch.sku, name: exactMatch.name });
       }
-    };
+      setIsLoading(false);
+    }, 150);
 
-    // Reduced debounce from 500ms to 300ms since cache is fast
-    const debounce = setTimeout(searchProductsHandler, 300);
-    return () => clearTimeout(debounce);
-  }, [query, cacheLoaded, searchProducts, hasProduct, getProduct]);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, cacheLoaded]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
