@@ -67,6 +67,56 @@ export type Database = {
           },
         ]
       }
+      operation_time: {
+        Row: {
+          created_at: string
+          date: string
+          downtime_minutes: number
+          end_time: string | null
+          id: string
+          line: string
+          notes: string | null
+          session_id: string | null
+          shift_type: string
+          start_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          downtime_minutes?: number
+          end_time?: string | null
+          id?: string
+          line: string
+          notes?: string | null
+          session_id?: string | null
+          shift_type: string
+          start_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          downtime_minutes?: number
+          end_time?: string | null
+          id?: string
+          line?: string
+          notes?: string | null
+          session_id?: string | null
+          shift_type?: string
+          start_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operation_time_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "production_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_items: {
         Row: {
           created_at: string
