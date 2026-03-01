@@ -30,12 +30,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   // Use product cache for O(1) lookups
   const { searchProducts, hasProduct, getProduct, isLoaded: cacheLoaded, loadProducts } = useProductCache();
 
-  // Load cache on mount if not loaded
-  useEffect(() => {
-    if (!cacheLoaded) {
-      loadProducts();
-    }
-  }, [cacheLoaded, loadProducts]);
+  // Cache loading is handled at the Planner page level
 
   // Sync external value
   useEffect(() => {
