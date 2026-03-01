@@ -59,19 +59,30 @@ export function useProductCache() {
 
     loadPromise = (async () => {
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('product_code, product_description')
-          .order('product_code');
+        const PAGE_SIZE = 1000;
+        let allData: { product_code: string; product_description: string }[] = [];
+        let from = 0;
+        let hasMore = true;
 
-        if (error) {
-          console.error('[ProductCache] Error loading products:', error);
-          return;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('products')
+            .select('product_code, product_description')
+            .order('product_code')
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) {
+            console.error('[ProductCache] Error loading products:', error);
+            break;
+          }
+          allData = allData.concat(data || []);
+          hasMore = (data?.length || 0) === PAGE_SIZE;
+          from += PAGE_SIZE;
         }
 
         // Build the Map for O(1) lookup
         globalProductCache = new Map();
-        (data || []).forEach(p => {
+        allData.forEach(p => {
           globalProductCache.set(p.product_code.toLowerCase(), {
             sku: p.product_code,
             name: p.product_description,

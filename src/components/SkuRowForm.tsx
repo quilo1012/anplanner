@@ -232,7 +232,13 @@ export function SkuRowForm({
     onChange(
       skuRows.map(row =>
         row.id === rowId
-          ? { ...row, sku, product: product?.name || row.product }
+          ? {
+              ...row,
+              sku,
+              product: product?.name || row.product,
+              isFoundInDb: !!product,
+              isNewProduct: false,
+            }
           : row
       )
     );
