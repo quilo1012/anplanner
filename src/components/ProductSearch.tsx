@@ -26,11 +26,14 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   const [hasSearched, setHasSearched] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
-  // Use product cache for O(1) lookups
-  const { searchProducts, hasProduct, getProduct, isLoaded: cacheLoaded, loadProducts } = useProductCache();
 
-  // Cache loading is handled at the Planner page level
+  // Stable refs to avoid stale closures in debounced effect
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const onFoundStatusChangeRef = useRef(onFoundStatusChange);
+  onFoundStatusChangeRef.current = onFoundStatusChange;
+  
+  const { searchProducts, hasProduct, getProduct, isLoaded: cacheLoaded, loadProducts } = useProductCache();
 
   // Sync external value
   useEffect(() => {
@@ -79,14 +82,14 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         p => p.sku.toLowerCase() === query.toLowerCase()
       );
       setSkuNotFound(!exactMatch);
-      onFoundStatusChange?.(!!exactMatch);
+      onFoundStatusChangeRef.current?.(!!exactMatch);
 
       if (exactMatch && !selectedProduct) {
         setSelectedProduct({
           product_code: exactMatch.sku,
           product_description: exactMatch.name,
         });
-        onChange(exactMatch.sku, { sku: exactMatch.sku, name: exactMatch.name });
+        onChangeRef.current(exactMatch.sku, { sku: exactMatch.sku, name: exactMatch.name });
       }
       setIsLoading(false);
     }, 150);
@@ -101,8 +104,8 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     setIsOpen(true);
     setSelectedProduct(null);
     setSkuNotFound(false);
-    onFoundStatusChange?.(false);
-    onChange(newValue);
+    onFoundStatusChangeRef.current?.(false);
+    onChangeRef.current(newValue);
   };
 
   const handleSelectProduct = (product: Product) => {
@@ -110,8 +113,8 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     setSelectedProduct(product);
     setSkuNotFound(false);
     setIsOpen(false);
-    onFoundStatusChange?.(true);
-    onChange(product.product_code, { 
+    onFoundStatusChangeRef.current?.(true);
+    onChangeRef.current(product.product_code, { 
       sku: product.product_code, 
       name: product.product_description,
     });
