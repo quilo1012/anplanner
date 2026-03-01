@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Package, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useProductCache } from '@/hooks/useProductCache';
-import { createPerfTimer } from '@/utils/performanceLogger';
 
 interface Product {
   product_code: string;
