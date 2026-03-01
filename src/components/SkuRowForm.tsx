@@ -1,8 +1,12 @@
-import React, { useCallback } from 'react';
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock } from 'lucide-react';
+import React, { useCallback, useRef, useState } from 'react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
+import { useProductCache } from '@/hooks/useProductCache';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { Textarea } from './ui/textarea';
+import { toast } from 'sonner';
 
 /* ─── Memoized single-row component ─── */
 
@@ -201,13 +205,22 @@ export function SkuRowForm({
   errors = {},
   showTarget = true,
 }: SkuRowFormProps) {
+  const [showBatchPaste, setShowBatchPaste] = useState(false);
+  const [batchText, setBatchText] = useState('');
+
+  // Stable ref for skuRows so callbacks don't depend on the array
+  const skuRowsRef = useRef(skuRows);
+  skuRowsRef.current = skuRows;
+
+  const { getProduct } = useProductCache();
+
   const addSkuRow = useCallback(() => {
-    onChange([...skuRows, createEmptySkuRow()]);
-  }, [skuRows, onChange]);
+    onChange([...skuRowsRef.current, createEmptySkuRow()]);
+  }, [onChange]);
 
   const handleRemove = useCallback((id: string) => {
-    onChange(skuRows.filter(row => row.id !== id));
-  }, [skuRows, onChange]);
+    onChange(skuRowsRef.current.filter(row => row.id !== id));
+  }, [onChange]);
 
   const handleUpdate = useCallback((
     id: string,
@@ -215,7 +228,7 @@ export function SkuRowForm({
     value: string | number
   ) => {
     onChange(
-      skuRows.map(row => {
+      skuRowsRef.current.map(row => {
         if (row.id === id) {
           const updated = { ...row, [field]: value };
           if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
@@ -226,11 +239,11 @@ export function SkuRowForm({
         return row;
       })
     );
-  }, [skuRows, onChange]);
+  }, [onChange]);
 
   const handleProductSelect = useCallback((rowId: string, sku: string, product?: { sku: string; name: string }) => {
     onChange(
-      skuRows.map(row =>
+      skuRowsRef.current.map(row =>
         row.id === rowId
           ? {
               ...row,
@@ -242,11 +255,11 @@ export function SkuRowForm({
           : row
       )
     );
-  }, [skuRows, onChange]);
+  }, [onChange]);
 
   const handleFoundStatusChange = useCallback((rowId: string, found: boolean) => {
     onChange(
-      skuRows.map(row => {
+      skuRowsRef.current.map(row => {
         if (row.id === rowId) {
           return {
             ...row,
@@ -257,17 +270,41 @@ export function SkuRowForm({
         return row;
       })
     );
-  }, [skuRows, onChange]);
+  }, [onChange]);
 
   const handleSaveToggle = useCallback((rowId: string, checked: boolean) => {
     onChange(
-      skuRows.map(row =>
+      skuRowsRef.current.map(row =>
         row.id === rowId
           ? { ...row, isNewProduct: checked }
           : row
       )
     );
-  }, [skuRows, onChange]);
+  }, [onChange]);
+
+  const handleBatchPaste = useCallback(() => {
+    const skus = batchText.split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
+    const unique = [...new Set(skus)];
+    if (unique.length === 0) return;
+
+    let foundCount = 0;
+    const newRows = unique.map(sku => {
+      const product = getProduct(sku);
+      if (product) foundCount++;
+      return {
+        ...createEmptySkuRow(),
+        sku: product?.sku || sku,
+        product: product?.name || '',
+        isFoundInDb: !!product,
+        isNewProduct: false,
+      };
+    });
+
+    onChange([...skuRowsRef.current, ...newRows]);
+    setShowBatchPaste(false);
+    setBatchText('');
+    toast.success(`Added ${unique.length} SKU(s) (${foundCount} found in catalog, ${unique.length - foundCount} manual)`);
+  }, [batchText, onChange, getProduct]);
 
   return (
     <div>
@@ -282,6 +319,14 @@ export function SkuRowForm({
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowBatchPaste(true)}
+            className="btn-secondary text-sm flex items-center gap-1"
+          >
+            <ClipboardPaste size={16} />
+            Paste SKUs
+          </button>
           <button
             type="button"
             onClick={addSkuRow}
@@ -323,6 +368,45 @@ export function SkuRowForm({
         <p className="font-medium text-foreground mb-1">Production Tracking</p>
         <p>Enter the target quantity and actual production for each SKU. Performance is calculated automatically.</p>
       </div>
+
+      {/* Batch Paste Dialog */}
+      <Dialog open={showBatchPaste} onOpenChange={setShowBatchPaste}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardPaste size={18} className="text-primary" />
+              Paste Multiple SKUs
+            </DialogTitle>
+            <DialogDescription>
+              Enter SKU codes separated by commas, semicolons, or one per line. Products found in the catalog will be auto-filled.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={batchText}
+            onChange={e => setBatchText(e.target.value)}
+            placeholder={"SKU001\nSKU002\nSKU003\n\nor: SKU001, SKU002, SKU003"}
+            rows={6}
+          />
+          <DialogFooter>
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              onClick={() => { setShowBatchPaste(false); setBatchText(''); }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary text-sm"
+              onClick={handleBatchPaste}
+              disabled={!batchText.trim()}
+            >
+              <Plus size={16} />
+              Add SKUs
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
