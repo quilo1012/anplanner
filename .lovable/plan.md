@@ -1,77 +1,64 @@
 
 
-# Fix: SKU Product Auto-Loading
+# Dynamic Shift OEE Panel
 
-## Problems Found
+## What Changes
 
-1. **Only 1000 of 2123 products are cached** -- The database query has a default 1000-row limit. Over half the products are missing from the cache, so typing their SKU shows "not found."
+The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
 
-2. **Product selection doesn't mark row as "found in DB"** -- When you select a product from the dropdown, the `isFoundInDb` flag is not set to `true`. This means the product name field doesn't show as "auto-filled" and stays editable, and the "Save to catalog" checkbox appears incorrectly.
-
-## Fixes
-
-### Fix 1: Load ALL products with pagination (useProductCache.ts)
-
-Replace the single query with a paginated loop that fetches all products in batches of 1000.
+## Updated Panel Layout
 
 ```text
-Before: 1 query -> 1000 products (missing 1123)
-After:  3 queries -> 2123 products (all loaded)
++---------------------------+
+|  SHIFT OEE                |
+|  DAY Shift                |
+|                           |
+|      [  106.9%  ]         |
+|      World Class          |
+|                           |
+|  Produced:  22,248 units  |
+|  Planned:   20,800 units  |
+|  Performance: 106.9%      |
++---------------------------+
 ```
 
-### Fix 2: Set isFoundInDb on product selection (SkuRowForm.tsx)
+## Status Color Rules (updated)
 
-Update `handleProductSelect` to include `isFoundInDb: true` when a product object is provided, and `isNewProduct: false`.
+| Performance | Color  | Label           |
+|-------------|--------|-----------------|
+| >= 100%     | Green  | World Class     |
+| 90-99%      | Yellow | On Target       |
+| < 90%       | Red    | Below Target    |
+| No data     | Gray   | -- (dash)       |
+
+## Empty State
+
+When no data exists for the selected filters, the panel shows:
+> "No production data for selected period"
+
+Instead of a blank or zero-filled panel.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/hooks/useProductCache.ts` | Paginated fetch loop to load all products beyond 1000-row limit |
-| `src/components/SkuRowForm.tsx` | Set `isFoundInDb: true` and `isNewProduct: false` in `handleProductSelect` when product is found |
+| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
+| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
 
 ## Technical Details
 
-### useProductCache.ts - Paginated loading
+### OEEPanel.tsx
+- Add `totalPlanned` prop to interface
+- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
+- Show "Produced" and "Planned" rows with formatted numbers
+- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
+- Performance displays as `--` when `totalPlanned === 0`
 
-```typescript
-// Replace single query with pagination loop
-const PAGE_SIZE = 1000;
-let allData: any[] = [];
-let from = 0;
-let hasMore = true;
+### Dashboard.tsx (line 337)
+- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
+- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
+- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
 
-while (hasMore) {
-  const { data, error } = await supabase
-    .from('products')
-    .select('product_code, product_description')
-    .order('product_code')
-    .range(from, from + PAGE_SIZE - 1);
+### Performance Note
+No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
 
-  if (error) { /* handle */ break; }
-  allData = allData.concat(data || []);
-  hasMore = (data?.length || 0) === PAGE_SIZE;
-  from += PAGE_SIZE;
-}
-// Build cache from allData
-```
-
-### SkuRowForm.tsx - handleProductSelect fix
-
-```typescript
-const handleProductSelect = useCallback((rowId, sku, product) => {
-  onChange(
-    skuRows.map(row =>
-      row.id === rowId
-        ? {
-            ...row,
-            sku,
-            product: product?.name || row.product,
-            isFoundInDb: !!product,       // <-- NEW
-            isNewProduct: false,           // <-- NEW
-          }
-        : row
-    )
-  );
-}, [skuRows, onChange]);
-```
