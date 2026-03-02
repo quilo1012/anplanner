@@ -223,6 +223,16 @@ export function SkuRowForm({
 
   const { getProduct } = useProductCache();
 
+  // Compute duplicate SKU set for visual warnings
+  const duplicateSkus = useMemo(() => {
+    const counts = new Map<string, number>();
+    skuRows.forEach(row => {
+      const key = row.sku.trim().toLowerCase();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return new Set([...counts.entries()].filter(([, c]) => c > 1).map(([k]) => k));
+  }, [skuRows]);
+
   const addSkuRow = useCallback(() => {
     onChange([...skuRowsRef.current, createEmptySkuRow()]);
   }, [onChange]);
@@ -363,6 +373,7 @@ export function SkuRowForm({
               canReview={canReview}
               showTarget={showTarget}
               hasSkuError={!row.sku.trim() && !!errors[`sku_${row.id}`]}
+              hasDuplicateError={duplicateSkus.has(row.sku.trim().toLowerCase())}
               onUpdate={handleUpdate}
               onRemove={handleRemove}
               onProductSelect={handleProductSelect}

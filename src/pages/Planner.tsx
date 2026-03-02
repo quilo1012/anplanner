@@ -174,6 +174,15 @@ export function Planner() {
     if (formState.skuRows.length === 0) {
       newErrors.skuRows = 'At least one product is required';
     } else {
+      const skuCounts = new Map<string, number>();
+      formState.skuRows.forEach(row => {
+        const key = row.sku.trim().toLowerCase();
+        if (key) skuCounts.set(key, (skuCounts.get(key) || 0) + 1);
+      });
+      const duplicates = [...skuCounts.entries()].filter(([, c]) => c > 1).map(([k]) => k);
+      if (duplicates.length > 0) {
+        newErrors.skuRows = `Duplicate SKUs: ${duplicates.join(', ')}. Each SKU can only appear once per session.`;
+      }
       formState.skuRows.forEach(row => {
         if (!row.sku.trim()) newErrors[`sku_${row.id}`] = 'SKU is required';
       });
