@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste, Copy } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
@@ -16,6 +16,7 @@ interface SkuRowItemProps {
   canReview: boolean;
   showTarget: boolean;
   hasSkuError: boolean;
+  hasDuplicateError: boolean;
   onUpdate: (id: string, field: keyof SkuRow, value: string | number) => void;
   onRemove: (id: string) => void;
   onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string }) => void;
@@ -24,7 +25,7 @@ interface SkuRowItemProps {
 }
 
 const MemoizedSkuRow = React.memo(function SkuRowItem({
-  row, index, canReview, showTarget, hasSkuError,
+  row, index, canReview, showTarget, hasSkuError, hasDuplicateError,
   onUpdate, onRemove, onProductSelect, onFoundStatusChange, onSaveToggle,
 }: SkuRowItemProps) {
   const performance = row.productionTarget > 0
@@ -182,6 +183,14 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
         <div className="mt-2 flex items-center gap-1 text-xs text-warning">
           <AlertTriangle size={12} />
           <span>SKU is required</span>
+        </div>
+      )}
+
+      {/* Warning for duplicate SKU */}
+      {hasDuplicateError && (
+        <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
+          <Copy size={12} />
+          <span>Duplicate SKU — each SKU should appear only once per session</span>
         </div>
       )}
     </div>
