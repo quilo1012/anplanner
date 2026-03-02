@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste, Copy } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
@@ -16,6 +16,7 @@ interface SkuRowItemProps {
   canReview: boolean;
   showTarget: boolean;
   hasSkuError: boolean;
+  hasDuplicateError: boolean;
   onUpdate: (id: string, field: keyof SkuRow, value: string | number) => void;
   onRemove: (id: string) => void;
   onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string }) => void;
@@ -24,7 +25,7 @@ interface SkuRowItemProps {
 }
 
 const MemoizedSkuRow = React.memo(function SkuRowItem({
-  row, index, canReview, showTarget, hasSkuError,
+  row, index, canReview, showTarget, hasSkuError, hasDuplicateError,
   onUpdate, onRemove, onProductSelect, onFoundStatusChange, onSaveToggle,
 }: SkuRowItemProps) {
   const performance = row.productionTarget > 0
@@ -184,6 +185,14 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
           <span>SKU is required</span>
         </div>
       )}
+
+      {/* Warning for duplicate SKU */}
+      {hasDuplicateError && (
+        <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
+          <Copy size={12} />
+          <span>Duplicate SKU — each SKU should appear only once per session</span>
+        </div>
+      )}
     </div>
   );
 });
@@ -213,6 +222,16 @@ export function SkuRowForm({
   skuRowsRef.current = skuRows;
 
   const { getProduct } = useProductCache();
+
+  // Compute duplicate SKU set for visual warnings
+  const duplicateSkus = useMemo(() => {
+    const counts = new Map<string, number>();
+    skuRows.forEach(row => {
+      const key = row.sku.trim().toLowerCase();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return new Set([...counts.entries()].filter(([, c]) => c > 1).map(([k]) => k));
+  }, [skuRows]);
 
   const addSkuRow = useCallback(() => {
     onChange([...skuRowsRef.current, createEmptySkuRow()]);
@@ -354,6 +373,7 @@ export function SkuRowForm({
               canReview={canReview}
               showTarget={showTarget}
               hasSkuError={!row.sku.trim() && !!errors[`sku_${row.id}`]}
+              hasDuplicateError={duplicateSkus.has(row.sku.trim().toLowerCase())}
               onUpdate={handleUpdate}
               onRemove={handleRemove}
               onProductSelect={handleProductSelect}

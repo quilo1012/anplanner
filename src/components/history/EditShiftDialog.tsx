@@ -80,6 +80,18 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     if (validRows.length === 0) { toast.error('At least one SKU is required'); return; }
     if (!isOperator && lineTarget <= 0) { toast.error('Line Production Target is required'); return; }
 
+    // Check for duplicate SKUs
+    const skuCounts = new Map<string, number>();
+    validRows.forEach(row => {
+      const key = row.sku.trim().toLowerCase();
+      if (key) skuCounts.set(key, (skuCounts.get(key) || 0) + 1);
+    });
+    const duplicates = [...skuCounts.entries()].filter(([, c]) => c > 1).map(([k]) => k);
+    if (duplicates.length > 0) {
+      toast.error(`Duplicate SKUs: ${duplicates.join(', ')}. Each SKU can only appear once per session.`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Operator path: only send item IDs + quantity_actual
@@ -97,7 +109,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             quantityTarget: row.productionTarget || 0,
             quantityActual: row.realProduction || 0,
           } as any)),
-          comments: session.comments,
+          comments: observations,
           staffPlanned: session.staffPlanned,
           staffActual: session.staffActual,
           structuredDowntimes,
@@ -226,19 +238,16 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
           </div>
 
           {!isOperator && (
-          <>
-          <div className="space-y-1 border-t pt-4">
-            <Label className="text-xs">Comments / Observations</Label>
-            <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
-          </div>
-
           <div className="space-y-2 border-t pt-4">
             <h4 className="font-medium text-sm text-foreground">Monitoring Photo</h4>
             <PhotoUpload photo={monitoringPhoto} filename={photoFilename} onChange={handlePhotoChange} />
           </div>
-
-          </>
           )}
+
+          <div className="space-y-1 border-t pt-4">
+            <Label className="text-xs">Comments / Observations</Label>
+            <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
+          </div>
 
           <div className="space-y-2 border-t pt-4">
             <StructuredDowntimeForm downtimes={structuredDowntimes} onChange={setStructuredDowntimes} downtimeThreshold={60} />
