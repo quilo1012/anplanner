@@ -267,6 +267,7 @@ interface SkuRowFormProps {
   canReview?: boolean;
   errors?: Record<string, string>;
   showTarget?: boolean;
+  productionLine?: string;
 }
 
 export function SkuRowForm({
