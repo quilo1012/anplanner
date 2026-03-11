@@ -159,6 +159,8 @@ export type Database = {
         Row: {
           assembly_number: string | null
           avg_kg_per_worker: number | null
+          batch_number: string | null
+          blender_size: number | null
           comments: string | null
           created_at: string | null
           created_by: string | null
@@ -189,6 +191,8 @@ export type Database = {
         Insert: {
           assembly_number?: string | null
           avg_kg_per_worker?: number | null
+          batch_number?: string | null
+          blender_size?: number | null
           comments?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -219,6 +223,8 @@ export type Database = {
         Update: {
           assembly_number?: string | null
           avg_kg_per_worker?: number | null
+          batch_number?: string | null
+          blender_size?: number | null
           comments?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -305,18 +311,21 @@ export type Database = {
           product_code: string
           product_description: string
           updated_at: string
+          weight_per_unit: number | null
         }
         Insert: {
           created_at?: string
           product_code: string
           product_description: string
           updated_at?: string
+          weight_per_unit?: number | null
         }
         Update: {
           created_at?: string
           product_code?: string
           product_description?: string
           updated_at?: string
+          weight_per_unit?: number | null
         }
         Relationships: []
       }

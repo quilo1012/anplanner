@@ -64,6 +64,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     setSkuRows(session.items.map(item => ({
       id: item.id, sku: item.sku, product: item.productName,
       productionTarget: item.quantityTarget, realProduction: item.quantityActual, isFoundInDb: true,
+      batchNumber: '', blenderSize: 0, weightPerUnit: 0,
     })));
   }, [session?.id]);
 
