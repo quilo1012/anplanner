@@ -266,6 +266,7 @@ export function ProductionImport({ open, onClose }: Props) {
                     .from('production_items')
                     .update({ quantity_actual: agg.actualQty })
                     .eq('id', existingItem.id)
+                    .then()
                 );
               } else {
                 // New SKU → insert
