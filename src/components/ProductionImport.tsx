@@ -236,7 +236,7 @@ export function ProductionImport({ open, onClose }: Props) {
       if (failures.length > 0) {
         toast.error(`Failed to import ${failures.length} session(s)`);
       } else {
-        toast.success(`Imported ${entries.length} session(s) with ${validRows.length} product(s)!`);
+        toast.success(`Registos de produção guardados com sucesso! ${entries.length} sessão(ões) com ${validRows.length} produto(s).`);
       }
 
       await refreshSessions();
