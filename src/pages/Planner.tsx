@@ -8,12 +8,13 @@ import { IntouchImport, LineGroup } from '@/components/IntouchImport';
 import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
+import { ProductionTargets } from '@/components/ProductionTargets';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProductLineRecommendations } from '@/hooks/useProductLineRecommendations';
 import { ShiftType, SHIFT_TYPES } from '@/types/production';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
-import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
+import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { naturalLineSort } from '@/utils/naturalLineSort';
@@ -71,6 +72,7 @@ export function Planner() {
   const [showProductUpload, setShowProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
   const [showPlanImport, setShowPlanImport] = useState(false);
+  const [showTargets, setShowTargets] = useState(false);
 
   // Alert when user picks a low-score line for a product
   const prevLineRef = useRef('');
@@ -311,6 +313,10 @@ export function Planner() {
         <div className="max-w-6xl mx-auto space-y-6">
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
+              <button type="button" onClick={() => setShowTargets(true)} className="btn-secondary">
+                <Target size={18} />
+                <span className="hidden sm:inline">Production Targets</span>
+              </button>
               <PlanTemplateExport />
               <button type="button" onClick={() => setShowPlanImport(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
@@ -382,6 +388,7 @@ export function Planner() {
                 onChange={handleSkuRowsChange}
                 canReview={canReview}
                 errors={errors}
+                productionLine={formState.productionLine.trim()}
               />
               {errors.skuRows && <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>}
             </div>
@@ -503,6 +510,11 @@ export function Planner() {
             open={showPlanImport}
             onClose={() => setShowPlanImport(false)}
             onImported={() => navigate('/history')}
+          />
+          <ProductionTargets
+            open={showTargets}
+            onClose={() => setShowTargets(false)}
+            lines={uniqueLines}
           />
         </div>
       </div>

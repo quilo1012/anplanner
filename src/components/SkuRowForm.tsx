@@ -267,6 +267,7 @@ interface SkuRowFormProps {
   canReview?: boolean;
   errors?: Record<string, string>;
   showTarget?: boolean;
+  productionLine?: string;
 }
 
 export function SkuRowForm({
@@ -275,6 +276,7 @@ export function SkuRowForm({
   canReview = false,
   errors = {},
   showTarget = true,
+  productionLine = '',
 }: SkuRowFormProps) {
   const [showBatchPaste, setShowBatchPaste] = useState(false);
   const [batchText, setBatchText] = useState('');
@@ -342,27 +344,42 @@ export function SkuRowForm({
       weightPerUnit = (data as any)?.weight_per_unit || 0;
     }
 
+    // Try to fetch production target for this SKU + current line
+    let targetData: { weight_per_unit: number; blender_capacity: number; expected_units_per_hour: number } | null = null;
+    if (product && productionLine) {
+      const { data } = await (supabase as any)
+        .from('production_targets')
+        .select('weight_per_unit, blender_capacity, expected_units_per_hour')
+        .eq('product_code', product.sku)
+        .eq('production_line', productionLine)
+        .maybeSingle();
+      targetData = data;
+    }
+
     onChange(
       skuRowsRef.current.map(row => {
         if (row.id === rowId) {
+          const w = targetData?.weight_per_unit || weightPerUnit;
+          const b = targetData?.blender_capacity || 0;
           const updated = {
             ...row,
             sku,
             product: product?.name || row.product,
             isFoundInDb: !!product,
             isNewProduct: false,
-            weightPerUnit,
+            weightPerUnit: w,
+            blenderSize: b || row.blenderSize,
           };
-          // Auto-calculate if blender size already set
-          if (updated.blenderSize > 0 && weightPerUnit > 0) {
-            updated.productionTarget = Math.floor(updated.blenderSize / weightPerUnit);
+          // Auto-calculate if both values present
+          if (updated.blenderSize > 0 && w > 0) {
+            updated.productionTarget = Math.floor(updated.blenderSize / w);
           }
           return updated;
         }
         return row;
       })
     );
-  }, [onChange]);
+  }, [onChange, productionLine]);
 
   const handleFoundStatusChange = useCallback((rowId: string, found: boolean) => {
     onChange(
