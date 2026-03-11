@@ -24,6 +24,32 @@ interface ImportRow {
   plannedQty?: number;
 }
 
+function parseDate(val: unknown): string {
+  if (!val) return '';
+  // ExcelJS Date object
+  if (typeof val === 'object' && val !== null && 'toISOString' in (val as any)) {
+    return (val as Date).toISOString().split('T')[0];
+  }
+  const s = String(val).trim();
+  // Already yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // European format: d/m/yy or dd/mm/yyyy (with / or -)
+  const eurMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (eurMatch) {
+    const day = parseInt(eurMatch[1]);
+    const month = parseInt(eurMatch[2]);
+    let year = parseInt(eurMatch[3]);
+    if (year < 100) year += 2000;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  // Fallback: try native Date
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  return '';
+}
+
 function parseTime(val: unknown): string {
   if (!val) return '';
   const s = String(val).trim();
@@ -77,7 +103,7 @@ export function ProductionImport({ open, onClose }: Props) {
       sheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
         const vals = (row.values as unknown[]).slice(1);
-        const dateVal = String(vals[0] || '').trim();
+        const rawDate = vals[0];
         const assemblyNum = String(vals[1] || '').trim();
         const workCentre = String(vals[2] || '').trim();
         const productCode = String(vals[3] || '').trim();
@@ -88,14 +114,11 @@ export function ProductionImport({ open, onClose }: Props) {
         const finishTime = parseTime(vals[8]);
         const shift = String(vals[9] || '').trim().toUpperCase();
 
-        if (!dateVal && !productCode && !qty) return;
+        if (!String(rawDate || '').trim() && !productCode && !qty) return;
 
         const errors: string[] = [];
-        let dateStr = dateVal;
-        if (typeof vals[0] === 'object' && vals[0] !== null && 'toISOString' in (vals[0] as any)) {
-          dateStr = (vals[0] as Date).toISOString().split('T')[0];
-        }
-        if (!dateStr || isNaN(new Date(dateStr).getTime())) errors.push('Invalid date');
+        const dateStr = parseDate(rawDate);
+        if (!dateStr) errors.push('Invalid date format');
         if (!workCentre) errors.push('Work Centre is required');
         if (!productCode) errors.push('Product Code is required');
         if (!qty || qty <= 0) errors.push('QTY must be positive');
@@ -213,7 +236,7 @@ export function ProductionImport({ open, onClose }: Props) {
       if (failures.length > 0) {
         toast.error(`Failed to import ${failures.length} session(s)`);
       } else {
-        toast.success(`Imported ${entries.length} session(s) with ${validRows.length} product(s)!`);
+        toast.success(`Registos de produção guardados com sucesso! ${entries.length} sessão(ões) com ${validRows.length} produto(s).`);
       }
 
       await refreshSessions();
