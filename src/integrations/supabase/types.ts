@@ -305,6 +305,45 @@ export type Database = {
         }
         Relationships: []
       }
+      production_targets: {
+        Row: {
+          blender_capacity: number
+          created_at: string | null
+          expected_units_per_batch: number | null
+          expected_units_per_hour: number
+          id: string
+          product_code: string
+          product_description: string | null
+          production_line: string
+          updated_at: string | null
+          weight_per_unit: number
+        }
+        Insert: {
+          blender_capacity?: number
+          created_at?: string | null
+          expected_units_per_batch?: number | null
+          expected_units_per_hour?: number
+          id?: string
+          product_code: string
+          product_description?: string | null
+          production_line: string
+          updated_at?: string | null
+          weight_per_unit?: number
+        }
+        Update: {
+          blender_capacity?: number
+          created_at?: string | null
+          expected_units_per_batch?: number | null
+          expected_units_per_hour?: number
+          id?: string
+          product_code?: string
+          product_description?: string | null
+          production_line?: string
+          updated_at?: string | null
+          weight_per_unit?: number
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string
