@@ -72,12 +72,14 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         setSelectedProduct({
           product_code: product.product_code,
           product_description: product.product_description,
+          weight_per_unit: product.weight_per_unit,
         });
         setSkuNotFound(false);
         onFoundStatusChangeRef.current?.(true);
         onChangeRef.current(product.product_code, {
           sku: product.product_code,
           name: product.product_description,
+          weightPerUnit: product.weight_per_unit ?? undefined,
         });
       } else {
         setSkuNotFound(true);
