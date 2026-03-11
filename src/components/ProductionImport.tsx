@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import ExcelJS from 'exceljs';
-import { Upload, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle2, X, Loader2, Link2 } from 'lucide-react';
 import { useShifts } from '@/contexts/ShiftContext';
 import { toast } from 'sonner';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ImportRow {
   rowNum: number;
@@ -20,6 +21,7 @@ interface ImportRow {
   finish_time: string;
   shift_type: string;
   errors: string[];
+  plannedQty?: number;
 }
 
 function parseTime(val: unknown): string {
@@ -56,6 +58,7 @@ export function ProductionImport({ open, onClose }: Props) {
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [planMap, setPlanMap] = useState<Map<string, number>>(new Map());
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -107,7 +110,34 @@ export function ProductionImport({ open, onClose }: Props) {
         });
       });
 
-      if (parsed.length === 0) toast.error('No data rows found');
+      if (parsed.length === 0) { toast.error('No data rows found'); setLoading(false); return; }
+
+      // Fetch matching plans from production_plans
+      const validParsed = parsed.filter(r => r.errors.length === 0);
+      const dates = [...new Set(validParsed.map(r => r.date))];
+      const newPlanMap = new Map<string, number>();
+
+      if (dates.length > 0) {
+        const { data: plans } = await supabase
+          .from('production_plans')
+          .select('date, work_centre, product_code, shift_type, qty')
+          .in('date', dates);
+
+        plans?.forEach(p => {
+          const key = `${p.work_centre}|${p.date}|${p.product_code}|${p.shift_type}`;
+          newPlanMap.set(key, (newPlanMap.get(key) || 0) + p.qty);
+        });
+      }
+
+      // Enrich rows with planned qty
+      for (const row of parsed) {
+        if (row.errors.length === 0) {
+          const key = `${row.work_centre}|${row.date}|${row.product_code}|${row.shift_type}`;
+          row.plannedQty = newPlanMap.get(key);
+        }
+      }
+
+      setPlanMap(newPlanMap);
       setRows(parsed);
     } catch (err: any) {
       toast.error(`Failed to parse file: ${err.message}`);
@@ -118,6 +148,7 @@ export function ProductionImport({ open, onClose }: Props) {
 
   const validRows = rows.filter(r => r.errors.length === 0);
   const errorRows = rows.filter(r => r.errors.length > 0);
+  const matchedRows = validRows.filter(r => r.plannedQty !== undefined);
 
   const handleConfirm = async () => {
     if (validRows.length === 0) { toast.error('No valid rows to import'); return; }
@@ -136,19 +167,41 @@ export function ProductionImport({ open, onClose }: Props) {
       const results = await Promise.allSettled(
         entries.map(([, groupRows]) => {
           const first = groupRows[0];
-          const totalPlanned = groupRows.reduce((sum, r) => sum + r.qty, 0);
+
+          // Aggregate same-SKU rows within this group
+          const skuAgg = new Map<string, { productName: string; actualQty: number; targetQty: number }>();
+          for (const r of groupRows) {
+            const existing = skuAgg.get(r.product_code);
+            const planKey = `${r.work_centre}|${r.date}|${r.product_code}|${r.shift_type}`;
+            const plannedQty = planMap.get(planKey);
+            if (existing) {
+              existing.actualQty += r.qty;
+              existing.targetQty += plannedQty ?? r.qty;
+            } else {
+              skuAgg.set(r.product_code, {
+                productName: r.product_description || r.product_code,
+                actualQty: r.qty,
+                targetQty: plannedQty ?? r.qty,
+              });
+            }
+          }
+
+          const items = [...skuAgg.entries()].map(([sku, agg]) => ({
+            sku,
+            productName: agg.productName,
+            quantityTarget: agg.targetQty,
+            quantityActual: agg.actualQty,
+          }));
+
+          const totalPlanned = items.reduce((s, i) => s + i.quantityTarget, 0);
+
           return saveSession({
             date: first.date,
             shift: first.shift_type as 'DAY' | 'NIGHT',
             productionLine: first.work_centre,
             lineLeader: 'Imported',
             plannedQuantity: totalPlanned,
-            items: groupRows.map(r => ({
-              sku: r.product_code,
-              productName: r.product_description || r.product_code,
-              quantityTarget: r.qty,
-              quantityActual: r.qty,
-            })),
+            items,
             comments: '',
             staffPlanned: 0,
             staffActual: 0,
@@ -166,6 +219,7 @@ export function ProductionImport({ open, onClose }: Props) {
       await refreshSessions();
       onClose();
       setRows([]);
+      setPlanMap(new Map());
       navigate('/history');
     } catch (err: any) {
       toast.error(`Import failed: ${err.message}`);
@@ -176,12 +230,18 @@ export function ProductionImport({ open, onClose }: Props) {
 
   if (!open) return null;
 
+  const getPerfColor = (perf: number) => {
+    if (perf >= 100) return 'text-green-600 dark:text-green-400';
+    if (perf >= 90) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-destructive';
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-background rounded-xl shadow-2xl w-[95vw] max-w-5xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Import Production Data</h2>
-          <button onClick={() => { onClose(); setRows([]); }} className="p-2 hover:bg-muted rounded-lg">
+          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); }} className="p-2 hover:bg-muted rounded-lg">
             <X size={20} />
           </button>
         </div>
@@ -194,7 +254,7 @@ export function ProductionImport({ open, onClose }: Props) {
                 Upload Excel with columns: Date, Assembly Number, Work Centre, Product Code, Description, Weight, QTY, Start Time, Finish Time, Shift
               </p>
               <p className="text-xs text-muted-foreground">
-                Rows are grouped by Work Centre + Date + Shift to create production sessions
+                Rows are grouped by Work Centre + Date + Shift. Planned QTY is auto-matched from existing plans.
               </p>
               <label className="btn-primary cursor-pointer inline-flex items-center gap-2">
                 <Upload size={18} /> Select File
@@ -218,6 +278,10 @@ export function ProductionImport({ open, onClose }: Props) {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   → {new Set(validRows.map(r => `${r.work_centre}|${r.date}|${r.shift_type}`)).size} session(s) will be created
                 </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Link2 size={16} className="text-primary" />
+                  <span className="text-foreground">{matchedRows.length} of {validRows.length} rows matched to plans</span>
+                </div>
               </div>
 
               <div className="border border-border rounded-lg overflow-auto max-h-[55vh]">
@@ -228,8 +292,9 @@ export function ProductionImport({ open, onClose }: Props) {
                       <TableHead>Date</TableHead>
                       <TableHead>Work Centre</TableHead>
                       <TableHead>Product Code</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">QTY</TableHead>
+                      <TableHead className="text-right">Actual</TableHead>
+                      <TableHead className="text-right">Planned</TableHead>
+                      <TableHead className="text-right">Perf %</TableHead>
                       <TableHead>Shift</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -237,14 +302,20 @@ export function ProductionImport({ open, onClose }: Props) {
                   <TableBody>
                     {rows.map((row, i) => {
                       const hasErr = row.errors.length > 0;
+                      const perf = row.plannedQty ? (row.qty / row.plannedQty) * 100 : undefined;
                       return (
                         <TableRow key={i} className={hasErr ? 'bg-destructive/10' : 'bg-green-500/5'}>
                           <TableCell className="font-mono text-xs">{row.rowNum}</TableCell>
                           <TableCell className="text-xs">{row.date}</TableCell>
                           <TableCell className="text-xs">{row.work_centre}</TableCell>
                           <TableCell className="text-xs font-medium">{row.product_code}</TableCell>
-                          <TableCell className="text-xs max-w-[200px] truncate">{row.product_description}</TableCell>
                           <TableCell className="text-right text-xs">{row.qty.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs">
+                            {row.plannedQty !== undefined ? row.plannedQty.toLocaleString() : '—'}
+                          </TableCell>
+                          <TableCell className={`text-right text-xs font-semibold ${perf !== undefined ? getPerfColor(perf) : 'text-muted-foreground'}`}>
+                            {perf !== undefined ? `${perf.toFixed(1)}%` : '—'}
+                          </TableCell>
                           <TableCell className="text-xs">{row.shift_type}</TableCell>
                           <TableCell>
                             {hasErr ? (
@@ -268,9 +339,9 @@ export function ProductionImport({ open, onClose }: Props) {
 
         {rows.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
-            <Button variant="outline" onClick={() => setRows([])}>Choose Different File</Button>
+            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); }}>Choose Different File</Button>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { onClose(); setRows([]); }}>Cancel</Button>
+              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); }}>Cancel</Button>
               <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving}>
                 {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
               </Button>
