@@ -1,0 +1,1 @@
+ALTER TABLE public.production_plans ADD COLUMN IF NOT EXISTS product_description text;

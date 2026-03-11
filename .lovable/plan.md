@@ -1,42 +1,64 @@
 
 
-# Simplified Excel Import Template for Planner
+# Dynamic Shift OEE Panel
 
 ## What Changes
 
-The current template has 13 columns (including Workers, Support Workers, Comments, PCL list). The user wants a simplified 10-column template matching their real workflow, plus a new **Product Description** column.
+The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
 
-### Template Columns (new)
-| # | Column | Validation |
-|---|--------|-----------|
-| 1 | Date | Must be valid date |
-| 2 | Assembly Number | Optional |
-| 3 | Work Centre | Required |
-| 4 | Product Code | Required |
-| 5 | Product Description | Optional (display only) |
-| 6 | Weight (in Kg) | Numeric, defaults to 0 |
-| 7 | QTY | Must be numeric > 0 |
-| 8 | Start Time | Valid time |
-| 9 | Finish Time | Valid time |
-| 10 | Shift | DAY or NIGHT |
+## Updated Panel Layout
 
-### Database Migration
-Add `product_description` column to `production_plans` table:
-```sql
-ALTER TABLE public.production_plans ADD COLUMN product_description text;
+```text
++---------------------------+
+|  SHIFT OEE                |
+|  DAY Shift                |
+|                           |
+|      [  106.9%  ]         |
+|      World Class          |
+|                           |
+|  Produced:  22,248 units  |
+|  Planned:   20,800 units  |
+|  Performance: 106.9%      |
++---------------------------+
 ```
 
-### Files to Modify
+## Status Color Rules (updated)
+
+| Performance | Color  | Label           |
+|-------------|--------|-----------------|
+| >= 100%     | Green  | World Class     |
+| 90-99%      | Yellow | On Target       |
+| < 90%       | Red    | Below Target    |
+| No data     | Gray   | -- (dash)       |
+
+## Empty State
+
+When no data exists for the selected filters, the panel shows:
+> "No production data for selected period"
+
+Instead of a blank or zero-filled panel.
+
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/PlanTemplateExport.tsx` | Replace 13-column template with 10-column template. Update example rows to match user's examples (Tablet/SOLCOLLAGEN, Tablet/COLCOCO, Line 1/ABEENG). Use AM/PM time format. |
-| `src/components/PlanImport.tsx` | Simplify `PlanRow` interface (remove `workers_in_line`, `support_workers`, `comments`, `pcl_list`; add `product_description`). Update column parsing indices (Product Description at index 4, Weight at 5, QTY at 6, etc.). Update validation: add "Work Centre required" check, remove product catalog check (just require non-empty). Simplify preview table to show only the 10 columns + calculated fields. Update insert to include `product_description` and set removed fields to defaults. |
-| Database migration | Add `product_description` text column to `production_plans` |
+| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
+| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
 
-### Key Behavior Changes
-- **Validation**: Work Centre is now required. Product Code must be non-empty (no catalog lookup). QTY must be numeric. Times must be valid.
-- **Preview table**: Simplified to show Date, Assembly #, Work Centre, Product Code, Description, Weight, QTY, Start, Finish, Shift, and Status column.
-- **Export template**: 3 example rows matching user's sample data, with AM/PM time formatting.
-- **Import insert**: `workers_in_line`, `support_workers`, `comments`, `pcl_list` default to 0/null since they're not in the template.
+## Technical Details
+
+### OEEPanel.tsx
+- Add `totalPlanned` prop to interface
+- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
+- Show "Produced" and "Planned" rows with formatted numbers
+- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
+- Performance displays as `--` when `totalPlanned === 0`
+
+### Dashboard.tsx (line 337)
+- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
+- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
+- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
+
+### Performance Note
+No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
 
