@@ -35,7 +35,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
   const performanceColor = performance >= 100 ? 'text-green-600' : performance >= 80 ? 'text-yellow-600' : 'text-red-600';
 
   return (
-    <div className="p-4 bg-card rounded-lg border border-border">
+    <div className="p-4 bg-card rounded-lg border border-border" data-row-id={row.id}>
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-foreground flex items-center gap-2">
           <Package size={14} className="text-primary" />
