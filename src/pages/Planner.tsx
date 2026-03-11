@@ -511,6 +511,11 @@ export function Planner() {
             onClose={() => setShowPlanImport(false)}
             onImported={() => navigate('/history')}
           />
+          <ProductionTargets
+            open={showTargets}
+            onClose={() => setShowTargets(false)}
+            lines={uniqueLines}
+          />
         </div>
       </div>
     </>
