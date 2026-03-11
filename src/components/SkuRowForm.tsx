@@ -4,6 +4,7 @@ import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
 import { useProductCache } from '@/hooks/useProductCache';
+import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
