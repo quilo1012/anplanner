@@ -314,6 +314,14 @@ export function SkuRowForm({
           if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
             updated.isNewProduct = true;
           }
+          // Auto-calculate production target when blenderSize or weightPerUnit changes
+          if (field === 'blenderSize' || field === 'weightPerUnit') {
+            const blender = field === 'blenderSize' ? Number(value) : row.blenderSize;
+            const weight = field === 'weightPerUnit' ? Number(value) : row.weightPerUnit;
+            if (blender > 0 && weight > 0) {
+              updated.productionTarget = Math.floor(blender / weight);
+            }
+          }
           return updated;
         }
         return row;
