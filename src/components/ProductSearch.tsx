@@ -15,6 +15,7 @@ interface ProductSearchProps {
   onFoundStatusChange?: (found: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
+  initialProduct?: { sku: string; name: string; weightPerUnit?: number };
 }
 
 function HighlightMatch({ text, query }: { text: string; query: string }) {
@@ -30,7 +31,7 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
   );
 }
 
-export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, placeholder = "Type SKU to search..." }: ProductSearchProps) {
+export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, placeholder = "Type SKU to search...", initialProduct }: ProductSearchProps) {
   const [query, setQuery] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -59,6 +60,20 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   // Initial exact lookup when mounted with a value (e.g. editing history)
   useEffect(() => {
     if (initialLookupDone) return;
+
+    // If initialProduct is provided, skip the DB lookup entirely
+    if (initialProduct) {
+      setSelectedProduct({
+        product_code: initialProduct.sku,
+        product_description: initialProduct.name,
+        weight_per_unit: initialProduct.weightPerUnit ?? null,
+      });
+      setSkuNotFound(false);
+      setInitialLookupDone(true);
+      onFoundStatusChangeRef.current?.(true);
+      return;
+    }
+
     if (!value || value.trim().length < 1) {
       setInitialLookupDone(true);
       return;

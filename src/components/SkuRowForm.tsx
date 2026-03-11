@@ -68,6 +68,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
               onChange={(sku, product) => onProductSelect(row.id, sku, product)}
               onFoundStatusChange={(found) => onFoundStatusChange(row.id, found)}
               placeholder="Search SKU..."
+              initialProduct={row.isFoundInDb && row.product ? { sku: row.sku, name: row.product, weightPerUnit: row.weightPerUnit } : undefined}
             />
           ) : (
             <input
