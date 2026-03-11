@@ -406,12 +406,11 @@ export function SkuRowForm({
     );
   }, [onChange]);
 
-  const handleBatchPaste = useCallback(() => {
+  const handleBatchPaste = useCallback(async () => {
     const skus = batchText.split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
     const unique = [...new Set(skus)];
     if (unique.length === 0) return;
 
-    // Check which SKUs already exist in current rows
     const existingSkus = new Set(
       skuRowsRef.current.map(r => r.sku.trim().toLowerCase()).filter(Boolean)
     );
@@ -426,9 +425,12 @@ export function SkuRowForm({
       }
     });
 
+    // Batch lookup from server
+    const productMap = await batchLookupProducts(toAdd);
+
     let foundCount = 0;
     const newRows = toAdd.map(sku => {
-      const product = getProduct(sku);
+      const product = productMap.get(sku.toLowerCase());
       if (product) foundCount++;
       return {
         ...createEmptySkuRow(),
@@ -449,7 +451,7 @@ export function SkuRowForm({
     if (toAdd.length > 0) parts.push(`${toAdd.length} added (${foundCount} from catalog)`);
     if (alreadyExist.length > 0) parts.push(`${alreadyExist.length} skipped (already in list: ${alreadyExist.join(', ')})`);
     toast.success(parts.join(' • ') || 'No SKUs to add');
-  }, [batchText, onChange, getProduct]);
+  }, [batchText, onChange]);
 
   return (
     <div>

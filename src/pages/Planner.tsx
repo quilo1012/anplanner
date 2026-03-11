@@ -54,10 +54,6 @@ export function Planner() {
   const { saveSession, updateSession, getSessionById, refreshSessions, sessions } = useShifts();
   const { user, hasRole } = useAuth();
   const { getTopLinesForProduct } = useProductLineRecommendations();
-  const { loadProducts } = useProductCache();
-
-  // Preload product cache once for all SKU rows
-  useEffect(() => { loadProducts(); }, []);
 
   const { uniqueLines, uniqueLeaders } = useMemo(() => {
     const lines = [...new Set(sessions.map(s => s.productionLine.trim()).filter(Boolean))].sort(naturalLineSort);
