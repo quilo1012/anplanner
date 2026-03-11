@@ -27,9 +27,18 @@ interface ImportRow {
 
 function parseDate(val: unknown): string {
   if (!val) return '';
-  // ExcelJS Date object
-  if (typeof val === 'object' && val !== null && 'toISOString' in (val as any)) {
-    return (val as Date).toISOString().split('T')[0];
+  // ExcelJS Date object — swap day/month if ambiguous (European dd/mm preference)
+  if (val instanceof Date || (typeof val === 'object' && val !== null && 'toISOString' in (val as any))) {
+    const d = val as Date;
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1; // 0-indexed
+    const day = d.getDate();
+    // If both day and month are ≤ 12 and different, they're ambiguous — swap for European format
+    if (day <= 12 && month <= 12 && day !== month) {
+      return `${year}-${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}`;
+    }
+    // Unambiguous (e.g. day=15) or same value — use as-is
+    return d.toISOString().split('T')[0];
   }
   const s = String(val).trim();
   // Already yyyy-mm-dd
@@ -266,7 +275,9 @@ export function ProductionImport({ open, onClose }: Props) {
                     .from('production_items')
                     .update({ quantity_actual: agg.actualQty })
                     .eq('id', existingItem.id)
-                    .then()
+                    .then(({ error }) => {
+                      if (error) console.error('Failed to update item:', sku, error);
+                    })
                 );
               } else {
                 // New SKU → insert
@@ -282,7 +293,8 @@ export function ProductionImport({ open, onClose }: Props) {
 
             await Promise.all(updatePromises);
             if (newItems.length > 0) {
-              await supabase.from('production_items').insert(newItems);
+              const { error: insertErr } = await supabase.from('production_items').insert(newItems);
+              if (insertErr) console.error('Failed to insert new items:', insertErr);
             }
 
             // Update planned_quantity on the session
