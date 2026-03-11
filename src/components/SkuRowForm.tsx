@@ -285,7 +285,7 @@ export function SkuRowForm({
   const skuRowsRef = useRef(skuRows);
   skuRowsRef.current = skuRows;
 
-  const { getProduct } = useProductCache();
+  
 
   // Compute duplicate SKU set for visual warnings
   const duplicateSkus = useMemo(() => {
