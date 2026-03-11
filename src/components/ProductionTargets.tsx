@@ -144,6 +144,9 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
           </div>
         </div>
 
+        {/* Bulk Import/Export */}
+        <TargetBulkImport onImportComplete={fetchTargets} targets={targets} />
+
         {/* Add new row */}
         <div className="p-3 bg-muted/50 rounded-lg border border-border space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Add New Target</p>
