@@ -293,7 +293,8 @@ export function ProductionImport({ open, onClose }: Props) {
 
             await Promise.all(updatePromises);
             if (newItems.length > 0) {
-              await supabase.from('production_items').insert(newItems);
+              const { error: insertErr } = await supabase.from('production_items').insert(newItems);
+              if (insertErr) console.error('Failed to insert new items:', insertErr);
             }
 
             // Update planned_quantity on the session
