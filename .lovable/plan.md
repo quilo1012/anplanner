@@ -1,64 +1,36 @@
 
 
-# Dynamic Shift OEE Panel
+# Fix Production Targets, Import/Export, and Export Template
 
-## What Changes
+## Issues Identified
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+1. **Production Targets SKU input**: Uses a plain text `<input>` instead of `ProductSearch` component — no autocomplete, no auto-fill of description/weight
+2. **`(supabase as any)` casts**: All Production Targets and TargetBulkImport DB calls bypass TypeScript types unnecessarily (the `production_targets` table now exists in `types.ts`). This hides errors and can cause silent failures.
+3. **TargetBulkImport buttons**: Import CSV/Excel and Export CSV rely on `(supabase as any)` for the upsert — needs typed call
+4. **PlanTemplateExport**: Button works but has no loading state — user clicks, nothing visible happens until download completes
+5. **HighlightMatch ref warning**: Console warning about function component refs in ProductSearch dropdown
+6. **No UPH field in Add New Target form**: The form has 5 fields but misses Units/Hour input
 
-## Updated Panel Layout
+## Changes
 
-```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
-```
+### `src/components/ProductionTargets.tsx`
+- Replace plain SKU `<input>` with `ProductSearch` component for autocomplete
+- When a product is selected, auto-fill description and weight
+- Remove all `(supabase as any)` casts — use typed `supabase.from('production_targets')`
+- Add UPH input field to the "Add New Target" form
+- Add loading/disabled states to buttons
+- Debounce inline edit `handleUpdate` to avoid excessive DB calls on every keystroke
 
-## Status Color Rules (updated)
+### `src/components/TargetBulkImport.tsx`
+- Remove `(supabase as any)` cast — use typed Supabase call
+- Add loading state to Export CSV button
 
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
+### `src/components/PlanTemplateExport.tsx`
+- Add loading state (`isExporting` flag) with spinner icon while generating
 
-## Empty State
+### `src/components/ProductSearch.tsx`
+- Fix `HighlightMatch` ref warning by not passing ref to it (minor cleanup)
 
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
-
-## Technical Details
-
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
-
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+### `src/components/SkuRowForm.tsx`
+- Remove `(supabase as any)` cast in `handleProductSelect` — use typed call
 
