@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Package, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useProductSearch } from '@/hooks/useProductSearch';
+import { useProductSearch, lookupExactProduct } from '@/hooks/useProductSearch';
 
 interface Product {
   product_code: string;
@@ -36,9 +36,11 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [skuNotFound, setSkuNotFound] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [initialLookupDone, setInitialLookupDone] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const userEditingRef = useRef(false);
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -46,16 +48,49 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   onFoundStatusChangeRef.current = onFoundStatusChange;
 
   // Server-side search with 300ms debounce
-  const { results: searchResults, isLoading } = useProductSearch(query);
+  const { results: searchResults, isLoading } = useProductSearch(userEditingRef.current ? query : '');
 
   const results: Product[] = searchResults.map(p => ({
     product_code: p.product_code,
     product_description: p.product_description,
   }));
 
-  // Sync external value
+  // Initial exact lookup when mounted with a value (e.g. editing history)
   useEffect(() => {
-    if (value !== query) setQuery(value);
+    if (initialLookupDone) return;
+    if (!value || value.trim().length < 1) {
+      setInitialLookupDone(true);
+      return;
+    }
+
+    let cancelled = false;
+    lookupExactProduct(value).then(product => {
+      if (cancelled) return;
+      setInitialLookupDone(true);
+      if (product) {
+        setSelectedProduct({
+          product_code: product.product_code,
+          product_description: product.product_description,
+        });
+        setSkuNotFound(false);
+        onFoundStatusChangeRef.current?.(true);
+        onChangeRef.current(product.product_code, {
+          sku: product.product_code,
+          name: product.product_description,
+        });
+      } else {
+        setSkuNotFound(true);
+        onFoundStatusChangeRef.current?.(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [value, initialLookupDone]);
+
+  // Sync external value changes (only when not user-editing)
+  useEffect(() => {
+    if (!userEditingRef.current && value !== query) {
+      setQuery(value);
+    }
   }, [value]);
 
   // Click outside to close
@@ -69,8 +104,9 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Update found status when results change
+  // Update found status when search results change (only during user editing)
   useEffect(() => {
+    if (!userEditingRef.current) return;
     if (query.length < 1) {
       setSkuNotFound(false);
       return;
@@ -95,6 +131,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    userEditingRef.current = true;
     setQuery(newValue);
     setIsOpen(true);
     setSelectedProduct(null);
@@ -103,7 +140,15 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     onChangeRef.current(newValue);
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text').trim();
+    if (!pasted) return;
+    // Let onChange fire normally, but mark as user editing
+    userEditingRef.current = true;
+  };
+
   const handleSelectProduct = useCallback((product: Product) => {
+    userEditingRef.current = false;
     setQuery(product.product_code);
     setSelectedProduct(product);
     setSkuNotFound(false);
@@ -116,7 +161,17 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   }, []);
 
   const handleFocus = () => {
-    if (query.length >= 1) setIsOpen(true);
+    if (query.length >= 1) {
+      userEditingRef.current = true;
+      setIsOpen(true);
+    }
+  };
+
+  const handleBlur = () => {
+    // Delay to allow click on dropdown items
+    setTimeout(() => {
+      userEditingRef.current = false;
+    }, 200);
   };
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -154,12 +209,15 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
           type="text"
           value={query}
           onChange={handleInputChange}
+          onPaste={handlePaste}
           onFocus={handleFocus}
+          onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder={placeholder}
           className={`input-field pl-9 pr-8 ${skuNotFound && hasSearched && !isOpen ? 'border-warning' : ''}`}
           maxLength={50}
+          data-sku-input
         />
         {isLoading && (
           <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin" />

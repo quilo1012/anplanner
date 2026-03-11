@@ -298,7 +298,17 @@ export function SkuRowForm({
   }, [skuRows]);
 
   const addSkuRow = useCallback(() => {
-    onChange([...skuRowsRef.current, createEmptySkuRow()]);
+    const newRow = createEmptySkuRow();
+    onChange([...skuRowsRef.current, newRow]);
+    // Auto-focus the new SKU input after render
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('[data-sku-input]');
+      const lastInput = inputs[inputs.length - 1] as HTMLInputElement | null;
+      if (lastInput) {
+        lastInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        lastInput.focus();
+      }
+    }, 100);
   }, [onChange]);
 
   const handleRemove = useCallback((id: string) => {
