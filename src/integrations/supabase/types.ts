@@ -155,6 +155,96 @@ export type Database = {
           },
         ]
       }
+      production_plans: {
+        Row: {
+          assembly_number: string | null
+          avg_kg_per_worker: number | null
+          comments: string | null
+          created_at: string | null
+          created_by: string | null
+          ctp_comment: string | null
+          ctp_percent: number | null
+          date: string
+          finish_time: string | null
+          id: string
+          line_revenue: number | null
+          pcl_list: string | null
+          product_code: string
+          production_hours: number | null
+          qty: number
+          revenue_per_hour: number | null
+          shift_type: string
+          start_time: string | null
+          support_workers: number | null
+          total_kg: number | null
+          units_per_min: number | null
+          units_per_min_expected: number | null
+          updated_at: string | null
+          weight_kg: number | null
+          work_centre: string | null
+          worked_hours: number | null
+          workers_in_line: number | null
+        }
+        Insert: {
+          assembly_number?: string | null
+          avg_kg_per_worker?: number | null
+          comments?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          ctp_comment?: string | null
+          ctp_percent?: number | null
+          date: string
+          finish_time?: string | null
+          id?: string
+          line_revenue?: number | null
+          pcl_list?: string | null
+          product_code: string
+          production_hours?: number | null
+          qty?: number
+          revenue_per_hour?: number | null
+          shift_type: string
+          start_time?: string | null
+          support_workers?: number | null
+          total_kg?: number | null
+          units_per_min?: number | null
+          units_per_min_expected?: number | null
+          updated_at?: string | null
+          weight_kg?: number | null
+          work_centre?: string | null
+          worked_hours?: number | null
+          workers_in_line?: number | null
+        }
+        Update: {
+          assembly_number?: string | null
+          avg_kg_per_worker?: number | null
+          comments?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          ctp_comment?: string | null
+          ctp_percent?: number | null
+          date?: string
+          finish_time?: string | null
+          id?: string
+          line_revenue?: number | null
+          pcl_list?: string | null
+          product_code?: string
+          production_hours?: number | null
+          qty?: number
+          revenue_per_hour?: number | null
+          shift_type?: string
+          start_time?: string | null
+          support_workers?: number | null
+          total_kg?: number | null
+          units_per_min?: number | null
+          units_per_min_expected?: number | null
+          updated_at?: string | null
+          weight_kg?: number | null
+          work_centre?: string | null
+          worked_hours?: number | null
+          workers_in_line?: number | null
+        }
+        Relationships: []
+      }
       production_sessions: {
         Row: {
           comments: string | null

@@ -31,7 +31,6 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
       { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-      { path: '/product-performance', label: 'Product Performance', icon: Activity, roles: ['supervisor', 'admin'] },
     ],
   },
   {
