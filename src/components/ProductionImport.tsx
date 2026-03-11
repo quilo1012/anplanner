@@ -395,7 +395,7 @@ export function ProductionImport({ open, onClose }: Props) {
                   </div>
                 )}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  → {new Set(validRows.map(r => `${r.work_centre}|${r.date}|${r.shift_type}`)).size} session(s) will be created
+                  → {new Set(validRows.map(r => `${r.work_centre}|${r.date}|${r.shift_type}`)).size} sessão(ões) a processar
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Link2 size={16} className="text-primary" />
