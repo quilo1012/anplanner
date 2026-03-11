@@ -496,6 +496,11 @@ export function Planner() {
               navigate('/history');
             }}
           />
+          <PlanImport
+            open={showPlanImport}
+            onClose={() => setShowPlanImport(false)}
+            onImported={() => navigate('/history')}
+          />
         </div>
       </div>
     </>
