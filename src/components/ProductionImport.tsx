@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import ExcelJS from 'exceljs';
-import { Upload, AlertCircle, CheckCircle2, X, Loader2, Link2 } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle2, X, Loader2, Link2, RefreshCw } from 'lucide-react';
 import { useShifts } from '@/contexts/ShiftContext';
 import { toast } from 'sonner';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeLineName } from '@/utils/normalizeLineName';
 
 interface ImportRow {
   rowNum: number;
