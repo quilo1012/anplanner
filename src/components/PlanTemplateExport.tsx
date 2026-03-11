@@ -2,6 +2,7 @@ import { useState } from 'react';
 import ExcelJS from 'exceljs';
 import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Button } from './ui/button';
 
 const TEMPLATE_COLUMNS = [
   { header: 'Date', key: 'date', width: 14 },
@@ -86,11 +87,13 @@ export function PlanTemplateExport() {
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const blob = new Blob([new Uint8Array(buffer as ArrayBuffer)], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `production-plan-template.xlsx`;
+      a.download = 'production-plan-template.xlsx';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -105,9 +108,9 @@ export function PlanTemplateExport() {
   };
 
   return (
-    <button type="button" onClick={handleExport} disabled={isExporting} className="btn-secondary disabled:opacity-50">
+    <Button variant="secondary" onClick={handleExport} disabled={isExporting} className="gap-2">
       {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
       {isExporting ? 'Exporting...' : 'Export Template'}
-    </button>
+    </Button>
   );
 }
