@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import ExcelJS from 'exceljs';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TEMPLATE_COLUMNS = [
@@ -55,7 +56,10 @@ const EXAMPLE_ROWS = [
 ];
 
 export function PlanTemplateExport() {
+  const [isExporting, setIsExporting] = useState(false);
+
   const handleExport = async () => {
+    setIsExporting(true);
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Production Plan');
@@ -95,13 +99,15 @@ export function PlanTemplateExport() {
     } catch (err) {
       console.error('Export template failed:', err);
       toast.error('Failed to export template');
+    } finally {
+      setIsExporting(false);
     }
   };
 
   return (
-    <button type="button" onClick={handleExport} className="btn-secondary">
-      <Download size={18} />
-      <span className="hidden sm:inline">Export Template</span>
+    <button type="button" onClick={handleExport} disabled={isExporting} className="btn-secondary disabled:opacity-50">
+      {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+      <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export Template'}</span>
     </button>
   );
 }

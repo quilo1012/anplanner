@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Save, Target, Search, X } from 'lucide-react';
+import { Plus, Trash2, Target, Search, Loader2 } from 'lucide-react';
 import { ProductSearch } from './ProductSearch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { TargetBulkImport } from './TargetBulkImport';
@@ -28,6 +28,7 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
   const [loading, setLoading] = useState(false);
   const [filterLine, setFilterLine] = useState('');
   const [filterSku, setFilterSku] = useState('');
+  const [adding, setAdding] = useState(false);
 
   // New row state
   const [newCode, setNewCode] = useState('');
@@ -37,9 +38,12 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
   const [newBlender, setNewBlender] = useState(0);
   const [newUph, setNewUph] = useState(0);
 
+  // Debounce timer for inline edits
+  const updateTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   const fetchTargets = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('production_targets')
       .select('*')
       .order('product_code');
@@ -56,12 +60,30 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
     if (open) fetchTargets();
   }, [open, fetchTargets]);
 
+  // Cleanup timers
+  useEffect(() => {
+    return () => {
+      Object.values(updateTimers.current).forEach(clearTimeout);
+    };
+  }, []);
+
+  const handleProductSelected = (sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => {
+    setNewCode(sku);
+    if (product) {
+      setNewDesc(product.name);
+      if (product.weightPerUnit && product.weightPerUnit > 0) {
+        setNewWeight(product.weightPerUnit);
+      }
+    }
+  };
+
   const handleAdd = async () => {
     if (!newCode.trim() || !newLine.trim()) {
       toast.error('Product code and production line are required');
       return;
     }
-    const { error } = await (supabase as any).from('production_targets').insert({
+    setAdding(true);
+    const { error } = await supabase.from('production_targets').insert({
       product_code: newCode.trim(),
       production_line: newLine.trim(),
       product_description: newDesc.trim() || null,
@@ -69,6 +91,7 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
       blender_capacity: newBlender,
       expected_units_per_hour: newUph,
     });
+    setAdding(false);
     if (error) {
       if (error.code === '23505') {
         toast.error('Target already exists for this SKU + Line combination');
@@ -83,7 +106,7 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await (supabase as any).from('production_targets').delete().eq('id', id);
+    const { error } = await supabase.from('production_targets').delete().eq('id', id);
     if (error) {
       toast.error('Failed to delete target');
       return;
@@ -92,17 +115,24 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
     toast.success('Target deleted');
   };
 
-  const handleUpdate = async (target: ProductionTarget, field: string, value: number) => {
-    const { error } = await (supabase as any)
-      .from('production_targets')
-      .update({ [field]: value })
-      .eq('id', target.id);
-    if (error) {
-      toast.error('Failed to update');
-      return;
-    }
-    fetchTargets();
-  };
+  const handleUpdate = useCallback((target: ProductionTarget, field: string, value: number) => {
+    // Update local state immediately
+    setTargets(prev => prev.map(t => t.id === target.id ? { ...t, [field]: value } : t));
+
+    // Debounce the DB call
+    const key = `${target.id}-${field}`;
+    if (updateTimers.current[key]) clearTimeout(updateTimers.current[key]);
+    updateTimers.current[key] = setTimeout(async () => {
+      const { error } = await supabase
+        .from('production_targets')
+        .update({ [field]: value })
+        .eq('id', target.id);
+      if (error) {
+        toast.error('Failed to update');
+      }
+      delete updateTimers.current[key];
+    }, 600);
+  }, []);
 
   const filtered = targets.filter(t => {
     if (filterLine && !t.production_line.toLowerCase().includes(filterLine.toLowerCase())) return false;
@@ -150,20 +180,21 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
         {/* Add new row */}
         <div className="p-3 bg-muted/50 rounded-lg border border-border space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Add New Target</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            <input
-              type="text"
-              value={newCode}
-              onChange={e => setNewCode(e.target.value)}
-              placeholder="SKU Code"
-              className="input-field text-sm"
-            />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+            <div className="col-span-2 sm:col-span-1">
+              <ProductSearch
+                value={newCode}
+                onChange={handleProductSelected}
+                placeholder="Search SKU..."
+              />
+            </div>
             <input
               type="text"
               value={newDesc}
               onChange={e => setNewDesc(e.target.value)}
               placeholder="Description"
               className="input-field text-sm"
+              readOnly={!!newDesc && newCode.length > 0}
             />
             <select
               value={newLine}
@@ -183,8 +214,14 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
                 placeholder="Blender" min="0" className="input-field text-sm pr-8" />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
             </div>
-            <button type="button" onClick={handleAdd} className="btn-primary text-sm flex items-center gap-1 justify-center">
-              <Plus size={14} /> Add
+            <div className="relative">
+              <input type="number" value={newUph || ''} onChange={e => setNewUph(parseFloat(e.target.value) || 0)}
+                placeholder="UPH" min="0" className="input-field text-sm pr-12" />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">u/hr</span>
+            </div>
+            <button type="button" onClick={handleAdd} disabled={adding} className="btn-primary text-sm flex items-center gap-1 justify-center disabled:opacity-50">
+              {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              Add
             </button>
           </div>
         </div>
@@ -206,7 +243,9 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="text-center p-6 text-muted-foreground">Loading...</td></tr>
+                <tr><td colSpan={8} className="text-center p-6 text-muted-foreground">
+                  <Loader2 size={20} className="animate-spin inline mr-2" />Loading...
+                </td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="text-center p-6 text-muted-foreground">No production targets yet</td></tr>
               ) : filtered.map(t => (
