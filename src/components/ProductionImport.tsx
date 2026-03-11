@@ -106,7 +106,7 @@ export function ProductionImport({ open, onClose }: Props) {
         const vals = (row.values as unknown[]).slice(1);
         const rawDate = vals[0];
         const assemblyNum = String(vals[1] || '').trim();
-        const workCentre = String(vals[2] || '').trim();
+        const workCentre = normalizeLineName(String(vals[2] || '').trim());
         const productCode = String(vals[3] || '').trim();
         const productDesc = String(vals[4] || '').trim();
         const weightKg = Number(vals[5]) || 0;
