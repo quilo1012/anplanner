@@ -81,7 +81,7 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('production_targets').delete().eq('id', id);
+    const { error } = await (supabase as any).from('production_targets').delete().eq('id', id);
     if (error) {
       toast.error('Failed to delete target');
       return;
