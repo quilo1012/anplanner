@@ -1,64 +1,47 @@
 
 
-# Dynamic Shift OEE Panel
+# Bulk Import for Production Targets via CSV/Excel
 
-## What Changes
+## What to Build
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+Add an "Import Targets" button to the Production Targets dialog that allows uploading a CSV or Excel file with production target data in bulk.
 
-## Updated Panel Layout
+## Changes
+
+### `src/components/ProductionTargets.tsx`
+
+1. Add an "Import Targets" button next to the existing "Add" section
+2. Add a hidden file input (`accept=".csv,.xlsx"`) 
+3. On file select:
+   - Parse CSV (native) or XLSX (via ExcelJS which is already installed)
+   - Expected columns: `Product Code`, `Production Line`, `Product Description`, `Weight (kg)`, `Blender Capacity (kg)`, `Units/Hour`
+   - Show a preview table in a sub-section with row count and validation status
+   - Validate: product_code and production_line required, numeric fields must be valid
+   - Highlight invalid rows in red
+4. "Confirm Import" button upserts all valid rows using `supabase.from('production_targets').upsert(rows, { onConflict: 'product_code,production_line' })`
+5. Add an "Export Targets" button that downloads current targets as CSV for round-trip editing
+
+### Import Flow
 
 ```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
+Click "Import Targets" → File picker opens → Parse file
+  → Show preview with validation
+  → User clicks "Confirm" → Upsert to database
+  → Refresh table → Show success toast with count
 ```
 
-## Status Color Rules (updated)
+### Validation Rules
+- `product_code` — required, non-empty
+- `production_line` — required, non-empty
+- `weight_per_unit` — numeric, >= 0
+- `blender_capacity` — numeric, >= 0
+- `expected_units_per_hour` — numeric, >= 0
+- Skip empty rows silently
 
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
+### Export Targets
+- Downloads all current targets as a CSV file with the same column headers
+- Useful as a starting template for bulk editing
 
-## Empty State
-
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
-
-## Technical Details
-
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
-
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+### Column Mapping
+The importer will be flexible with headers — it will normalize by lowercasing and stripping spaces to match variations like "Product Code", "product_code", "PRODUCT CODE", etc.
 
