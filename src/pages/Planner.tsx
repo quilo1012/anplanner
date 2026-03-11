@@ -509,6 +509,10 @@ export function Planner() {
             onClose={() => setShowPlanImport(false)}
             onImported={() => navigate('/history')}
           />
+          <ProductionImport
+            open={showProductionImport}
+            onClose={() => setShowProductionImport(false)}
+          />
         </div>
       </div>
     </>
