@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Save, Target, Search, X } from 'lucide-react';
 import { ProductSearch } from './ProductSearch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { TargetBulkImport } from './TargetBulkImport';
 
 interface ProductionTarget {
   id: string;
@@ -142,6 +143,9 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
             </select>
           </div>
         </div>
+
+        {/* Bulk Import/Export */}
+        <TargetBulkImport onImportComplete={fetchTargets} targets={targets} />
 
         {/* Add new row */}
         <div className="p-3 bg-muted/50 rounded-lg border border-border space-y-2">
