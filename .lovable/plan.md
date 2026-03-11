@@ -1,64 +1,22 @@
 
 
-# Dynamic Shift OEE Panel
+# Remove Production Targets & Fix Export Template
 
-## What Changes
+## Changes
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+### `src/pages/Planner.tsx`
+- Remove the Production Targets button from the toolbar
+- Remove `showTargets` state and the `<ProductionTargets>` component render
+- Remove the `ProductionTargets` and `TargetBulkImport` imports
+- Remove `Target` from lucide imports
+- Keep `PlanTemplateExport` button as-is (it already works with loading state)
 
-## Updated Panel Layout
+### `src/components/PlanTemplateExport.tsx`
+- The component looks correct — it generates an `.xlsx` file with ExcelJS and downloads it
+- Verify the `btn-secondary` CSS class renders properly (button may appear unstyled or have no visible text on mobile due to `hidden sm:inline`)
+- Fix: always show button text (remove `hidden sm:inline` or add a short label visible on all screens)
+- Ensure the button has proper flex/gap styling for icon + text alignment
 
-```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
-```
-
-## Status Color Rules (updated)
-
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
-
-## Empty State
-
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
-
-## Technical Details
-
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
-
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+### Files to keep (no deletion)
+- `src/components/ProductionTargets.tsx` and `src/components/TargetBulkImport.tsx` will remain in the codebase but simply won't be imported/used from Planner. They can be cleaned up later if desired.
 
