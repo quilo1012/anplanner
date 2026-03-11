@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste, Copy } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste, Copy, FlaskConical, Hash } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
