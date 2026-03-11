@@ -3,7 +3,7 @@ import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, 
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
-import { useProductCache } from '@/hooks/useProductCache';
+import { batchLookupProducts } from '@/hooks/useProductSearch';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Textarea } from './ui/textarea';
