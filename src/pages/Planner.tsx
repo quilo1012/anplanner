@@ -7,6 +7,7 @@ import { ExcelUpload } from '@/components/ExcelUpload';
 import { IntouchImport, LineGroup } from '@/components/IntouchImport';
 import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
+import { ProductionImport } from '@/components/ProductionImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 
 import { useShifts } from '@/contexts/ShiftContext';
@@ -68,6 +69,7 @@ export function Planner() {
   const [showProductUpload, setShowProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
   const [showPlanImport, setShowPlanImport] = useState(false);
+  const [showProductionImport, setShowProductionImport] = useState(false);
   
 
   // Alert when user picks a low-score line for a product
@@ -326,6 +328,10 @@ export function Planner() {
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import iTouching</span>
               </button>
+              <button onClick={() => setShowProductionImport(true)} className="btn-secondary">
+                <FileSpreadsheet size={18} />
+                <span className="hidden sm:inline">Import Production</span>
+              </button>
             </div>
           )}
 
@@ -502,6 +508,10 @@ export function Planner() {
             open={showPlanImport}
             onClose={() => setShowPlanImport(false)}
             onImported={() => navigate('/history')}
+          />
+          <ProductionImport
+            open={showProductionImport}
+            onClose={() => setShowProductionImport(false)}
           />
         </div>
       </div>
