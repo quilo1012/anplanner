@@ -15,7 +15,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m
 const Downtime = lazy(() => import('@/pages/Downtime').then(m => ({ default: m.Downtime })));
 const Admin = lazy(() => import('@/pages/Admin').then(m => ({ default: m.Admin })));
 const WeeklyReport = lazy(() => import('@/pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
-const ProductPerformance = lazy(() => import('@/pages/ProductPerformance').then(m => ({ default: m.ProductPerformance })));
+
 
 function PageLoader() {
   return (
@@ -46,7 +46,7 @@ const App = () => (
             <Route path="downtime" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Downtime /></Suspense></ProtectedRoute>} />
             <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><History /></ProtectedRoute>} />
             <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><WeeklyReport /></Suspense></ProtectedRoute>} />
-            <Route path="product-performance" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><ProductPerformance /></Suspense></ProtectedRoute>} />
+            
             <Route
               path="admin"
               element={

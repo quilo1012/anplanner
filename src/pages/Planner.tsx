@@ -5,6 +5,8 @@ import { SkuRowForm } from '@/components/SkuRowForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { ExcelUpload } from '@/components/ExcelUpload';
 import { IntouchImport, LineGroup } from '@/components/IntouchImport';
+import { PlanTemplateExport } from '@/components/PlanTemplateExport';
+import { PlanImport } from '@/components/PlanImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -68,6 +70,7 @@ export function Planner() {
   const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [showProductUpload, setShowProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
+  const [showPlanImport, setShowPlanImport] = useState(false);
 
   // Alert when user picks a low-score line for a product
   const prevLineRef = useRef('');
@@ -305,13 +308,18 @@ export function Planner() {
         <div className="max-w-6xl mx-auto space-y-6">
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
+              <PlanTemplateExport />
+              <button type="button" onClick={() => setShowPlanImport(true)} className="btn-secondary">
+                <FileSpreadsheet size={18} />
+                <span className="hidden sm:inline">Import Plan</span>
+              </button>
               <button type="button" onClick={() => setShowProductUpload(true)} className="btn-secondary">
                 <Package size={18} />
                 <span className="hidden sm:inline">Import Products</span>
               </button>
               <button onClick={() => setShowExcelUpload(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
-                <span className="hidden sm:inline">Import Plan</span>
+                <span className="hidden sm:inline">Import Sessions</span>
               </button>
               <button onClick={() => setShowIntouchImport(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
@@ -487,6 +495,11 @@ export function Planner() {
               setShowIntouchImport(false);
               navigate('/history');
             }}
+          />
+          <PlanImport
+            open={showPlanImport}
+            onClose={() => setShowPlanImport(false)}
+            onImported={() => navigate('/history')}
           />
         </div>
       </div>
