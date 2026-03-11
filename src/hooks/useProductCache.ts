@@ -116,26 +116,30 @@ export function useProductCache() {
     return globalProductCache.get(sku.toLowerCase());
   }, []);
 
-  // Search products locally (filter on cached Map)
+  // Search products locally (filter on cached Map) — prefix-first sorting
   const searchProducts = useCallback((query: string): Product[] => {
-    if (!query || query.length < 2) return [];
+    if (!query || query.length < 1) return [];
     
     const lowerQuery = query.toLowerCase();
-    const results: Product[] = [];
+    const prefixMatches: Product[] = [];
+    const substringMatches: Product[] = [];
     
     globalProductCache.forEach((product) => {
-      if (
-        product.sku.toLowerCase().includes(lowerQuery) ||
-        product.name.toLowerCase().includes(lowerQuery)
-      ) {
-        results.push(product);
+      const skuLower = product.sku.toLowerCase();
+      const nameLower = product.name.toLowerCase();
+      
+      if (skuLower.startsWith(lowerQuery) || nameLower.startsWith(lowerQuery)) {
+        prefixMatches.push(product);
+      } else if (skuLower.includes(lowerQuery) || nameLower.includes(lowerQuery)) {
+        substringMatches.push(product);
       }
     });
 
-    // Limit results and sort by SKU
-    return results
-      .sort((a, b) => a.sku.localeCompare(b.sku))
-      .slice(0, 10);
+    // Prefix matches first, then substring matches, both sorted by SKU
+    return [
+      ...prefixMatches.sort((a, b) => a.sku.localeCompare(b.sku)),
+      ...substringMatches.sort((a, b) => a.sku.localeCompare(b.sku)),
+    ].slice(0, 20);
   }, []);
 
   // Check if exact SKU exists in cache
