@@ -388,6 +388,7 @@ export function Planner() {
                 onChange={handleSkuRowsChange}
                 canReview={canReview}
                 errors={errors}
+                productionLine={formState.productionLine.trim()}
               />
               {errors.skuRows && <p className="text-sm text-destructive mt-2">{errors.skuRows}</p>}
             </div>
