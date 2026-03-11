@@ -6,7 +6,7 @@ import { useProductSearch, lookupExactProduct } from '@/hooks/useProductSearch';
 interface Product {
   product_code: string;
   product_description: string;
-  weight_per_unit?: number;
+  weight_per_unit?: number | null;
 }
 
 interface ProductSearchProps {
