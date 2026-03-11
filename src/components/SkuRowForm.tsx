@@ -134,6 +134,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
               min="0"
               step="0.01"
               className="input-field text-sm pr-8"
+              data-blender-input
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
           </div>
