@@ -1,64 +1,67 @@
 
 
-# Dynamic Shift OEE Panel
+# Optimize Planner: Server-Side SKU Search + Performance Fixes
 
-## What Changes
+## Problem
+The current SKU search loads the **entire product catalog** into memory on page load (`useProductCache` fetches all rows). This causes loading delays, especially on slow factory networks. The user wants instant, on-demand search without preloading.
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+## What Already Exists (No Changes Needed)
+- Production Targets table with blender/weight calculations -- already built
+- Excel Import/Export template -- already built
+- Database trigram indexes on `product_code` and `product_description` -- already created
+- Dropdown with "SKU — Description" format, keyboard nav, highlight -- already built
 
-## Updated Panel Layout
+## Changes Required
 
-```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
-```
-
-## Status Color Rules (updated)
-
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
-
-## Empty State
-
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
+### 1. Replace Client-Side Cache with Server-Side Search
+**Current**: `useProductCache` loads all products into a `Map` on mount, searches in-memory.
+**New**: Search the database directly using the existing trigram indexes with a 300ms debounce. No preloading.
 
 | File | Change |
 |------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
+| `src/hooks/useProductSearch.ts` | **New hook**. Server-side search with 300ms debounce using `ilike` queries against `products` table. Returns up to 20 results. Prioritizes prefix matches. |
+| `src/components/ProductSearch.tsx` | Replace `useProductCache().searchProducts` with `useProductSearch`. Remove dependency on cache loading state. |
+| `src/pages/Planner.tsx` | Remove `useProductCache` import and `loadProducts()` call on mount. |
+| `src/components/SkuRowForm.tsx` | Remove `useProductCache` import. The `getProduct` call for batch paste will use a lightweight server query instead. |
 
-## Technical Details
+### 2. Fix History Edit Performance
+**Current**: `EditShiftDialog` triggers the full product cache load when opened.
+**New**: SKU fields in edit mode only search on user interaction (typing/clicking), no preloading.
 
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
+| File | Change |
+|------|--------|
+| `src/components/history/EditShiftDialog.tsx` | Remove any `loadProducts` calls. SKU search is now on-demand via the new server-side hook. |
 
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
+### 3. New `useProductSearch` Hook Design
 
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+```typescript
+// 300ms debounce, server-side search, no preloading
+function useProductSearch(query: string) {
+  // Returns { results, isLoading }
+  // Uses: supabase.from('products')
+  //   .select('product_code, product_description, weight_per_unit')
+  //   .or(`product_code.ilike.%${query}%,product_description.ilike.%${query}%`)
+  //   .order('product_code')
+  //   .limit(20)
+  // Debounced at 300ms, min 1 char
+}
+```
+
+The existing trigram GIN indexes will make these `ilike` queries fast (sub-100ms).
+
+### 4. Batch Paste SKU Lookup
+The "Paste SKUs" feature currently uses `getProduct()` from the cache. This will be replaced with a single batch query:
+
+```typescript
+const { data } = await supabase
+  .from('products')
+  .select('product_code, product_description')
+  .in('product_code', skuList);
+```
+
+### Summary of Performance Impact
+- **Page load**: No more fetching thousands of products upfront
+- **Search**: 300ms debounce + indexed server query = results in <500ms
+- **Edit history**: No SKU preloading, instant dialog open
+- **Batch paste**: Single targeted query instead of full cache dependency
 
