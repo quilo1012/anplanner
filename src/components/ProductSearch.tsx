@@ -15,6 +15,7 @@ interface ProductSearchProps {
   onFoundStatusChange?: (found: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
+  initialProduct?: { sku: string; name: string; weightPerUnit?: number };
 }
 
 function HighlightMatch({ text, query }: { text: string; query: string }) {
