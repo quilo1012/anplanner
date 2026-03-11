@@ -329,19 +329,37 @@ export function SkuRowForm({
     );
   }, [onChange]);
 
-  const handleProductSelect = useCallback((rowId: string, sku: string, product?: { sku: string; name: string }) => {
+  const handleProductSelect = useCallback(async (rowId: string, sku: string, product?: { sku: string; name: string }) => {
+    // Fetch weight_per_unit from products table if product found
+    let weightPerUnit = 0;
+    if (product) {
+      const { data } = await supabase
+        .from('products')
+        .select('weight_per_unit')
+        .eq('product_code', product.sku)
+        .maybeSingle();
+      weightPerUnit = (data as any)?.weight_per_unit || 0;
+    }
+
     onChange(
-      skuRowsRef.current.map(row =>
-        row.id === rowId
-          ? {
-              ...row,
-              sku,
-              product: product?.name || row.product,
-              isFoundInDb: !!product,
-              isNewProduct: false,
-            }
-          : row
-      )
+      skuRowsRef.current.map(row => {
+        if (row.id === rowId) {
+          const updated = {
+            ...row,
+            sku,
+            product: product?.name || row.product,
+            isFoundInDb: !!product,
+            isNewProduct: false,
+            weightPerUnit,
+          };
+          // Auto-calculate if blender size already set
+          if (updated.blenderSize > 0 && weightPerUnit > 0) {
+            updated.productionTarget = Math.floor(updated.blenderSize / weightPerUnit);
+          }
+          return updated;
+        }
+        return row;
+      })
     );
   }, [onChange]);
 
