@@ -60,6 +60,20 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   // Initial exact lookup when mounted with a value (e.g. editing history)
   useEffect(() => {
     if (initialLookupDone) return;
+
+    // If initialProduct is provided, skip the DB lookup entirely
+    if (initialProduct) {
+      setSelectedProduct({
+        product_code: initialProduct.sku,
+        product_description: initialProduct.name,
+        weight_per_unit: initialProduct.weightPerUnit ?? null,
+      });
+      setSkuNotFound(false);
+      setInitialLookupDone(true);
+      onFoundStatusChangeRef.current?.(true);
+      return;
+    }
+
     if (!value || value.trim().length < 1) {
       setInitialLookupDone(true);
       return;
