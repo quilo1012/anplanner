@@ -143,7 +143,9 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         const errors: string[] = [];
 
         // Validate date
-        const dateStr = dateVal instanceof Date ? dateVal.toISOString().split('T')[0] : dateVal;
+        const dateStr = (typeof dateVal === 'object' && dateVal !== null && 'toISOString' in (dateVal as any))
+          ? (dateVal as Date).toISOString().split('T')[0]
+          : dateVal;
         if (!dateStr || isNaN(new Date(dateStr).getTime())) {
           errors.push('Invalid date');
         }
