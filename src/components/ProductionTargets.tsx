@@ -91,9 +91,9 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
   };
 
   const handleUpdate = async (target: ProductionTarget, field: string, value: number) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('production_targets')
-      .update({ [field]: value } as any)
+      .update({ [field]: value })
       .eq('id', target.id);
     if (error) {
       toast.error('Failed to update');
