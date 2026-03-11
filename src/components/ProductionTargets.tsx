@@ -38,7 +38,7 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
 
   const fetchTargets = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('production_targets')
       .select('*')
       .order('product_code');
