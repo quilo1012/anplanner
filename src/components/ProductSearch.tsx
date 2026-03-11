@@ -126,8 +126,9 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
       setSelectedProduct({
         product_code: exactMatch.product_code,
         product_description: exactMatch.product_description,
+        weight_per_unit: exactMatch.weight_per_unit,
       });
-      onChangeRef.current(exactMatch.product_code, { sku: exactMatch.product_code, name: exactMatch.product_description });
+      onChangeRef.current(exactMatch.product_code, { sku: exactMatch.product_code, name: exactMatch.product_description, weightPerUnit: exactMatch.weight_per_unit ?? undefined });
     }
     setActiveIndex(-1);
   }, [searchResults, isLoading]);
