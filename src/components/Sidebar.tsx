@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Clock, FileBarChart, PanelLeftClose, PanelLeftOpen, Circle, Activity } from 'lucide-react';
+import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Clock, FileBarChart, PanelLeftClose, PanelLeftOpen, Circle } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
