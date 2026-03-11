@@ -1,9 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste, Copy } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste, Copy, FlaskConical, Hash } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { Checkbox } from './ui/checkbox';
 import { useProductCache } from '@/hooks/useProductCache';
+import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
@@ -102,6 +103,67 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
           />
         </div>
       </div>
+
+      {/* Batch Number and Blender Size Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div>
+          <label className="label text-xs flex items-center gap-1">
+            <Hash size={12} className="text-primary" />
+            Batch #
+          </label>
+          <input
+            type="text"
+            value={row.batchNumber}
+            onChange={e => onUpdate(row.id, 'batchNumber', e.target.value)}
+            placeholder="Batch number"
+            className="input-field text-sm"
+            maxLength={50}
+          />
+        </div>
+        <div>
+          <label className="label text-xs flex items-center gap-1">
+            <FlaskConical size={12} className="text-primary" />
+            Blender Size
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              value={row.blenderSize || ''}
+              onChange={e => onUpdate(row.id, 'blenderSize', parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              min="0"
+              step="0.01"
+              className="input-field text-sm pr-8"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
+          </div>
+        </div>
+        <div>
+          <label className="label text-xs flex items-center gap-1">
+            Weight/Unit
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              value={row.weightPerUnit || ''}
+              onChange={e => onUpdate(row.id, 'weightPerUnit', parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              min="0"
+              step="0.001"
+              className="input-field text-sm pr-8"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Blender estimate hint */}
+      {row.blenderSize > 0 && row.weightPerUnit > 0 && (
+        <div className="mb-3 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-md text-xs text-primary font-medium flex items-center gap-1">
+          <FlaskConical size={12} />
+          → Estimated: {Math.floor(row.blenderSize / row.weightPerUnit).toLocaleString()} units
+        </div>
+      )}
 
       {/* Save to catalog checkbox */}
       {!row.isFoundInDb && row.sku.trim().length >= 2 && (
@@ -253,6 +315,14 @@ export function SkuRowForm({
           if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
             updated.isNewProduct = true;
           }
+          // Auto-calculate production target when blenderSize or weightPerUnit changes
+          if (field === 'blenderSize' || field === 'weightPerUnit') {
+            const blender = field === 'blenderSize' ? Number(value) : row.blenderSize;
+            const weight = field === 'weightPerUnit' ? Number(value) : row.weightPerUnit;
+            if (blender > 0 && weight > 0) {
+              updated.productionTarget = Math.floor(blender / weight);
+            }
+          }
           return updated;
         }
         return row;
@@ -260,19 +330,37 @@ export function SkuRowForm({
     );
   }, [onChange]);
 
-  const handleProductSelect = useCallback((rowId: string, sku: string, product?: { sku: string; name: string }) => {
+  const handleProductSelect = useCallback(async (rowId: string, sku: string, product?: { sku: string; name: string }) => {
+    // Fetch weight_per_unit from products table if product found
+    let weightPerUnit = 0;
+    if (product) {
+      const { data } = await supabase
+        .from('products')
+        .select('weight_per_unit')
+        .eq('product_code', product.sku)
+        .maybeSingle();
+      weightPerUnit = (data as any)?.weight_per_unit || 0;
+    }
+
     onChange(
-      skuRowsRef.current.map(row =>
-        row.id === rowId
-          ? {
-              ...row,
-              sku,
-              product: product?.name || row.product,
-              isFoundInDb: !!product,
-              isNewProduct: false,
-            }
-          : row
-      )
+      skuRowsRef.current.map(row => {
+        if (row.id === rowId) {
+          const updated = {
+            ...row,
+            sku,
+            product: product?.name || row.product,
+            isFoundInDb: !!product,
+            isNewProduct: false,
+            weightPerUnit,
+          };
+          // Auto-calculate if blender size already set
+          if (updated.blenderSize > 0 && weightPerUnit > 0) {
+            updated.productionTarget = Math.floor(updated.blenderSize / weightPerUnit);
+          }
+          return updated;
+        }
+        return row;
+      })
     );
   }, [onChange]);
 

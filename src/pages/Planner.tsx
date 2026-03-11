@@ -108,6 +108,9 @@ export function Planner() {
                 productionTarget: item.quantityTarget,
                 realProduction: item.quantityActual,
                 isFoundInDb: true,
+                batchNumber: '',
+                blenderSize: 0,
+                weightPerUnit: 0,
               }))
             : [createEmptySkuRow()],
           observations: session.comments,
