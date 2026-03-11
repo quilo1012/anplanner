@@ -59,14 +59,14 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
       toast.error('Product code and production line are required');
       return;
     }
-    const { error } = await supabase.from('production_targets').insert({
+    const { error } = await (supabase as any).from('production_targets').insert({
       product_code: newCode.trim(),
       production_line: newLine.trim(),
       product_description: newDesc.trim() || null,
       weight_per_unit: newWeight,
       blender_capacity: newBlender,
       expected_units_per_hour: newUph,
-    } as any);
+    });
     if (error) {
       if (error.code === '23505') {
         toast.error('Target already exists for this SKU + Line combination');
