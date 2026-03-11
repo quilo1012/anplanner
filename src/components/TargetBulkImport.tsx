@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Upload, Download, FileSpreadsheet, Check, X, AlertTriangle } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
 interface ParsedRow {
@@ -90,10 +90,10 @@ async function parseFile(file: File): Promise<ParsedRow[]> {
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 2) return [];
-    const rawHeaders = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+    const rawHeaders = lines[0].split(',').map(h => h.replace(/^\"|\"$/g, '').trim());
     const colMap = mapHeaders(rawHeaders);
     return lines.slice(1).map(line => {
-      const cells = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+      const cells = line.split(',').map(c => c.replace(/^\"|\"$/g, '').trim());
       const obj: any = {};
       Object.entries(colMap).forEach(([i, field]) => { obj[field] = cells[Number(i)] || ''; });
       return validateRow({
@@ -143,6 +143,7 @@ async function parseFile(file: File): Promise<ParsedRow[]> {
 export function TargetBulkImport({ onImportComplete, targets }: TargetBulkImportProps) {
   const [preview, setPreview] = useState<ParsedRow[] | null>(null);
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,7 +171,7 @@ export function TargetBulkImport({ onImportComplete, targets }: TargetBulkImport
       return;
     }
     setImporting(true);
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('production_targets')
       .upsert(
         validRows.map(r => ({
@@ -199,22 +200,27 @@ export function TargetBulkImport({ onImportComplete, targets }: TargetBulkImport
       toast.error('No targets to export');
       return;
     }
-    const headers = ['Product Code', 'Production Line', 'Product Description', 'Weight (kg)', 'Blender Capacity (kg)', 'Units/Hour'];
-    const rows = targets.map(t => [
-      t.product_code, t.production_line, t.product_description || '',
-      t.weight_per_unit, t.blender_capacity, t.expected_units_per_hour,
-    ].map(c => `"${String(c).replace(/"/g, '""')}"`).join(','));
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `production-targets-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success('Targets exported');
+    setExporting(true);
+    try {
+      const headers = ['Product Code', 'Production Line', 'Product Description', 'Weight (kg)', 'Blender Capacity (kg)', 'Units/Hour'];
+      const rows = targets.map(t => [
+        t.product_code, t.production_line, t.product_description || '',
+        t.weight_per_unit, t.blender_capacity, t.expected_units_per_hour,
+      ].map(c => `\"${String(c).replace(/\"/g, '\"\"')}\"`).join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `production-targets-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Targets exported');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const validCount = preview?.filter(r => r.valid).length || 0;
@@ -228,8 +234,9 @@ export function TargetBulkImport({ onImportComplete, targets }: TargetBulkImport
         <button type="button" onClick={() => fileRef.current?.click()} className="btn-secondary text-sm flex items-center gap-1.5">
           <Upload size={14} /> Import CSV/Excel
         </button>
-        <button type="button" onClick={handleExport} className="btn-secondary text-sm flex items-center gap-1.5">
-          <Download size={14} /> Export CSV
+        <button type="button" onClick={handleExport} disabled={exporting} className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50">
+          {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          Export CSV
         </button>
       </div>
 
@@ -257,7 +264,11 @@ export function TargetBulkImport({ onImportComplete, targets }: TargetBulkImport
               </button>
               <button type="button" onClick={handleConfirm} disabled={importing || validCount === 0}
                 className="btn-primary text-xs px-3 py-1 flex items-center gap-1 disabled:opacity-50">
-                {importing ? 'Importing...' : `Import ${validCount} rows`}
+                {importing ? (
+                  <><Loader2 size={12} className="animate-spin" /> Importing...</>
+                ) : (
+                  `Import ${validCount} rows`
+                )}
               </button>
             </div>
           </div>

@@ -355,7 +355,7 @@ export function SkuRowForm({
     // Try to fetch production target for this SKU + current line
     let targetData: { weight_per_unit: number; blender_capacity: number; expected_units_per_hour: number } | null = null;
     if (product && productionLine) {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('production_targets')
         .select('weight_per_unit, blender_capacity, expected_units_per_hour')
         .eq('product_code', product.sku)
