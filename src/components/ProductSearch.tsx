@@ -160,6 +160,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     onChangeRef.current(product.product_code, {
       sku: product.product_code,
       name: product.product_description,
+      weightPerUnit: product.weight_per_unit ?? undefined,
     });
   }, []);
 
