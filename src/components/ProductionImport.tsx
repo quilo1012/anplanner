@@ -103,7 +103,7 @@ export function ProductionImport({ open, onClose }: Props) {
       sheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
         const vals = (row.values as unknown[]).slice(1);
-        const dateVal = String(vals[0] || '').trim();
+        const rawDate = vals[0];
         const assemblyNum = String(vals[1] || '').trim();
         const workCentre = String(vals[2] || '').trim();
         const productCode = String(vals[3] || '').trim();
@@ -114,14 +114,11 @@ export function ProductionImport({ open, onClose }: Props) {
         const finishTime = parseTime(vals[8]);
         const shift = String(vals[9] || '').trim().toUpperCase();
 
-        if (!dateVal && !productCode && !qty) return;
+        if (!String(rawDate || '').trim() && !productCode && !qty) return;
 
         const errors: string[] = [];
-        let dateStr = dateVal;
-        if (typeof vals[0] === 'object' && vals[0] !== null && 'toISOString' in (vals[0] as any)) {
-          dateStr = (vals[0] as Date).toISOString().split('T')[0];
-        }
-        if (!dateStr || isNaN(new Date(dateStr).getTime())) errors.push('Invalid date');
+        const dateStr = parseDate(rawDate);
+        if (!dateStr) errors.push('Invalid date format');
         if (!workCentre) errors.push('Work Centre is required');
         if (!productCode) errors.push('Product Code is required');
         if (!qty || qty <= 0) errors.push('QTY must be positive');
