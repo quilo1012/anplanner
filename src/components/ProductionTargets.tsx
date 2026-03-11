@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Save, Target, Search, X } from 'lucide-react';
 import { ProductSearch } from './ProductSearch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { TargetBulkImport } from './TargetBulkImport';
 
 interface ProductionTarget {
   id: string;
