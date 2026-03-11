@@ -1,64 +1,67 @@
 
 
-# Dynamic Shift OEE Panel
+# Add Batch Number and Blender Size to SKU Rows
 
-## What Changes
+## What It Does
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+Each SKU row in the Planner gets two new fields:
+- **Batch Number** — text field for tracking the batch
+- **Blender Size (kg)** — numeric field for the blender capacity
 
-## Updated Panel Layout
+When the user enters a Blender Size and the product has a Weight (from the `products` table or manual entry), the system auto-calculates **Estimated QTY** = Blender Size / Weight per unit. This gives a quick estimate of how many units a batch will produce. The **Real Production** field remains for the actual count (which accounts for losses).
+
+## How It Works
 
 ```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
+Blender Size: 500 kg
+Weight per unit: 0.375 kg
+→ Estimated QTY = 500 / 0.375 = 1,333 units (auto-filled into Production Target)
 ```
 
-## Status Color Rules (updated)
+The user can still override the Production Target manually. The estimate is a helper, not a lock.
 
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
+## Database Changes
 
-## Empty State
+Add two columns to `production_plans`:
+```sql
+ALTER TABLE public.production_plans ADD COLUMN batch_number text;
+ALTER TABLE public.production_plans ADD COLUMN blender_size numeric DEFAULT 0;
+```
 
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
+Add `weight_per_unit` to `products` table so each product can store its unit weight for auto-calculation:
+```sql
+ALTER TABLE public.products ADD COLUMN weight_per_unit numeric DEFAULT 0;
+```
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
+| `src/types/planner.ts` | Add `batchNumber: string` and `blenderSize: number` to `SkuRow` interface; update `createEmptySkuRow` |
+| `src/components/SkuRowForm.tsx` | Add Batch Number text input and Blender Size numeric input per row. When blenderSize changes and weight > 0, auto-calculate productionTarget = blenderSize / weight. Show the calculation hint below the field. |
+| `src/pages/Planner.tsx` | Pass weight data through; include batch_number in session save if needed |
+| `src/components/PlanImport.tsx` | Add optional batch_number column support in import |
+| `src/components/PlanTemplateExport.tsx` | Add optional Batch Number column to template |
+| Database migration | Add columns to `production_plans` and `products` tables |
 
-## Technical Details
+## UI Layout per SKU Row
 
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
+```text
+┌─────────────────────────────────────────────────┐
+│ Product #1                                  [X] │
+│ SKU: [________]    Product Name: [__________]   │
+│ Batch #: [______]  Blender Size: [___] kg       │
+│                    → Estimated: 1,333 units      │
+│ ─────────────────────────────────────────────── │
+│ Production Target: [1333] units                  │
+│ Real Production:   [____] units                  │
+└─────────────────────────────────────────────────┘
+```
 
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+## Key Behaviors
+- Weight per unit comes from the product catalog (auto-filled when SKU is selected) or can be entered manually
+- If weight is 0 or not set, no auto-calculation happens — user enters target manually as before
+- Changing blender size recalculates and updates Production Target automatically
+- Production Target remains editable (user can override the estimate)
+- Batch Number is optional, purely for tracking/reference
 
