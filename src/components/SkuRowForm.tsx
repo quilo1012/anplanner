@@ -306,8 +306,23 @@ export function SkuRowForm({
     const unique = [...new Set(skus)];
     if (unique.length === 0) return;
 
+    // Check which SKUs already exist in current rows
+    const existingSkus = new Set(
+      skuRowsRef.current.map(r => r.sku.trim().toLowerCase()).filter(Boolean)
+    );
+
+    const alreadyExist: string[] = [];
+    const toAdd: string[] = [];
+    unique.forEach(sku => {
+      if (existingSkus.has(sku.trim().toLowerCase())) {
+        alreadyExist.push(sku);
+      } else {
+        toAdd.push(sku);
+      }
+    });
+
     let foundCount = 0;
-    const newRows = unique.map(sku => {
+    const newRows = toAdd.map(sku => {
       const product = getProduct(sku);
       if (product) foundCount++;
       return {
@@ -319,10 +334,16 @@ export function SkuRowForm({
       };
     });
 
-    onChange([...skuRowsRef.current, ...newRows]);
+    if (newRows.length > 0) {
+      onChange([...skuRowsRef.current, ...newRows]);
+    }
     setShowBatchPaste(false);
     setBatchText('');
-    toast.success(`Added ${unique.length} SKU(s) (${foundCount} found in catalog, ${unique.length - foundCount} manual)`);
+
+    const parts: string[] = [];
+    if (toAdd.length > 0) parts.push(`${toAdd.length} added (${foundCount} from catalog)`);
+    if (alreadyExist.length > 0) parts.push(`${alreadyExist.length} skipped (already in list: ${alreadyExist.join(', ')})`);
+    toast.success(parts.join(' • ') || 'No SKUs to add');
   }, [batchText, onChange, getProduct]);
 
   return (
