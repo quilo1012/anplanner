@@ -276,6 +276,7 @@ export function SkuRowForm({
   canReview = false,
   errors = {},
   showTarget = true,
+  productionLine = '',
 }: SkuRowFormProps) {
   const [showBatchPaste, setShowBatchPaste] = useState(false);
   const [batchText, setBatchText] = useState('');
