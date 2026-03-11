@@ -309,10 +309,6 @@ export function Planner() {
         <div className="max-w-6xl mx-auto space-y-6">
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
-              <button type="button" onClick={() => setShowTargets(true)} className="btn-secondary">
-                <Target size={18} />
-                <span className="hidden sm:inline">Production Targets</span>
-              </button>
               <PlanTemplateExport />
               <button type="button" onClick={() => setShowPlanImport(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
