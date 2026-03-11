@@ -20,7 +20,7 @@ interface SkuRowItemProps {
   hasDuplicateError: boolean;
   onUpdate: (id: string, field: keyof SkuRow, value: string | number) => void;
   onRemove: (id: string) => void;
-  onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string }) => void;
+  onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => void;
   onFoundStatusChange: (rowId: string, found: boolean) => void;
   onSaveToggle: (rowId: string, checked: boolean) => void;
 }
