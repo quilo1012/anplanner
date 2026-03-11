@@ -308,13 +308,18 @@ export function Planner() {
         <div className="max-w-6xl mx-auto space-y-6">
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
+              <PlanTemplateExport />
+              <button type="button" onClick={() => setShowPlanImport(true)} className="btn-secondary">
+                <FileSpreadsheet size={18} />
+                <span className="hidden sm:inline">Import Plan</span>
+              </button>
               <button type="button" onClick={() => setShowProductUpload(true)} className="btn-secondary">
                 <Package size={18} />
                 <span className="hidden sm:inline">Import Products</span>
               </button>
               <button onClick={() => setShowExcelUpload(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
-                <span className="hidden sm:inline">Import Plan</span>
+                <span className="hidden sm:inline">Import Sessions</span>
               </button>
               <button onClick={() => setShowIntouchImport(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
