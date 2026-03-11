@@ -53,6 +53,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   const results: Product[] = searchResults.map(p => ({
     product_code: p.product_code,
     product_description: p.product_description,
+    weight_per_unit: p.weight_per_unit,
   }));
 
   // Initial exact lookup when mounted with a value (e.g. editing history)
