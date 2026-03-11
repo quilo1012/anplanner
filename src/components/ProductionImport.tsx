@@ -254,7 +254,7 @@ export function ProductionImport({ open, onClose }: Props) {
             const existingItems = existingItemsMap.get(existingSessionId) || [];
             const existingSkuMap = new Map(existingItems.map(i => [i.sku, i]));
 
-            const updatePromises: Promise<any>[] = [];
+            const updatePromises: PromiseLike<any>[] = [];
             const newItems: { session_id: string; sku: string; product_name: string; quantity_target: number; quantity_actual: number }[] = [];
 
             for (const [sku, agg] of skuAgg) {
