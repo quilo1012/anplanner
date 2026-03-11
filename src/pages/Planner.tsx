@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProductLineRecommendations } from '@/hooks/useProductLineRecommendations';
 import { ShiftType, SHIFT_TYPES } from '@/types/production';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
-import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock, Target } from 'lucide-react';
+import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { naturalLineSort } from '@/utils/naturalLineSort';
