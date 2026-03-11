@@ -8,7 +8,7 @@ import { IntouchImport, LineGroup } from '@/components/IntouchImport';
 import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
-import { ProductionTargets } from '@/components/ProductionTargets';
+
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProductLineRecommendations } from '@/hooks/useProductLineRecommendations';
