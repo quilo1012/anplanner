@@ -31,7 +31,7 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
   );
 }
 
-export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, placeholder = "Type SKU to search..." }: ProductSearchProps) {
+export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, placeholder = "Type SKU to search...", initialProduct }: ProductSearchProps) {
   const [query, setQuery] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
