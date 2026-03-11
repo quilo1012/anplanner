@@ -107,7 +107,7 @@ export function PlanTemplateExport() {
   return (
     <button type="button" onClick={handleExport} disabled={isExporting} className="btn-secondary disabled:opacity-50">
       {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-      <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export Template'}</span>
+      {isExporting ? 'Exporting...' : 'Export Template'}
     </button>
   );
 }
