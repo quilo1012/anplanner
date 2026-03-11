@@ -1,64 +1,47 @@
 
 
-# Dynamic Shift OEE Panel
+# Sync Production Import with Existing Sessions + Normalize Line Names
 
-## What Changes
+## Problem
+1. Excel uses "Line 1", "Line 2" etc. but the system standard is "Filler Line 1", "Filler Line 2". This creates duplicate sessions instead of updating existing ones.
+2. When a session already exists for a (line, date, shift), the import should **update actual quantities** on matching SKUs rather than overwriting everything.
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+Currently the DB has both "Line 1" and "Filler Line 1" as separate sessions because the names don't match.
 
-## Updated Panel Layout
+## Changes
+
+### 1. Normalize line names in `ProductionImport.tsx`
+- Import and apply `normalizeLineName()` to every `work_centre` value during parsing
+- "Line 1" → "Filler Line 1", "line 3" → "Filler Line 3", etc.
+- Show the normalized name in the preview table so users see the standardized format
+- Also normalize when building plan lookup keys
+
+### 2. Sync with existing sessions instead of blind upsert
+Currently `saveSession` upserts the session and **deletes all existing items** before re-inserting. This destroys any manually entered data. Instead:
+
+- Before confirming, query `production_sessions` + `production_items` for matching (line, date, shift) groups
+- For each group:
+  - If session exists: update `quantity_actual` on matching SKU items; insert new SKUs that don't exist yet
+  - If session doesn't exist: create new session via `saveSession` (current behavior)
+- Show in preview which sessions will be "updated" vs "created"
+
+### 3. Clean up duplicate DB records
+- Migration to update existing "Line X" sessions to "Filler Line X" and merge duplicates where both exist
+
+### 4. Enhance `normalizeLineName` utility
+- Add a rule: `^line\s+(\d+)$` → `Filler Line X` (the most common case from the Excel files)
+
+## Technical Detail
 
 ```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
+Import flow:
+  Parse Excel → normalize work_centre → lookup existing sessions
+  
+  For each (line, date, shift) group:
+    EXISTS in DB? → UPDATE production_items SET quantity_actual WHERE sku matches
+                  → INSERT new SKUs not in existing items
+    NOT EXISTS?   → saveSession() as before (creates new)
 ```
 
-## Status Color Rules (updated)
-
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
-
-## Empty State
-
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
-
-## Technical Details
-
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
-
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+The key change is in `handleConfirm`: instead of always calling `saveSession` (which deletes+recreates items), do a targeted update of `quantity_actual` per SKU when the session already exists.
 
