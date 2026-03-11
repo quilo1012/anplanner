@@ -170,6 +170,7 @@ export type Database = {
           line_revenue: number | null
           pcl_list: string | null
           product_code: string
+          product_description: string | null
           production_hours: number | null
           qty: number
           revenue_per_hour: number | null
@@ -199,6 +200,7 @@ export type Database = {
           line_revenue?: number | null
           pcl_list?: string | null
           product_code: string
+          product_description?: string | null
           production_hours?: number | null
           qty?: number
           revenue_per_hour?: number | null
@@ -228,6 +230,7 @@ export type Database = {
           line_revenue?: number | null
           pcl_list?: string | null
           product_code?: string
+          product_description?: string | null
           production_hours?: number | null
           qty?: number
           revenue_per_hour?: number | null
