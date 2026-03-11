@@ -347,17 +347,9 @@ export function SkuRowForm({
     );
   }, [onChange]);
 
-  const handleProductSelect = useCallback(async (rowId: string, sku: string, product?: { sku: string; name: string }) => {
-    // Fetch weight_per_unit from products table if product found
-    let weightPerUnit = 0;
-    if (product) {
-      const { data } = await supabase
-        .from('products')
-        .select('weight_per_unit')
-        .eq('product_code', product.sku)
-        .maybeSingle();
-      weightPerUnit = (data as any)?.weight_per_unit || 0;
-    }
+  const handleProductSelect = useCallback(async (rowId: string, sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => {
+    // Weight comes directly from ProductSearch — no extra DB query needed
+    let weightPerUnit = product?.weightPerUnit || 0;
 
     // Try to fetch production target for this SKU + current line
     let targetData: { weight_per_unit: number; blender_capacity: number; expected_units_per_hour: number } | null = null;
@@ -394,6 +386,17 @@ export function SkuRowForm({
         return row;
       })
     );
+
+    // Auto-focus the blender size field for faster data entry
+    if (product) {
+      setTimeout(() => {
+        const rowEl = document.querySelector(`[data-row-id="${rowId}"]`);
+        if (rowEl) {
+          const blenderInput = rowEl.querySelector('[data-blender-input]') as HTMLInputElement;
+          blenderInput?.focus();
+        }
+      }, 100);
+    }
   }, [onChange, productionLine]);
 
   const handleFoundStatusChange = useCallback((rowId: string, found: boolean) => {
