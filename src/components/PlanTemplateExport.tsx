@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { Download } from 'lucide-react';
+import { toast } from 'sonner';
 
 const TEMPLATE_COLUMNS = [
   { header: 'Date', key: 'date', width: 14 },
@@ -55,43 +56,46 @@ const EXAMPLE_ROWS = [
 
 export function PlanTemplateExport() {
   const handleExport = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Production Plan');
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Production Plan');
 
-    sheet.columns = TEMPLATE_COLUMNS;
+      sheet.columns = TEMPLATE_COLUMNS;
 
-    // Style header row
-    const headerRow = sheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
-    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
-    headerRow.height = 24;
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      headerRow.height = 24;
 
-    // Add Shift dropdown validation for column J (index 10)
-    for (let row = 2; row <= 200; row++) {
-      sheet.getCell(`J${row}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['"DAY,NIGHT"'],
-      };
+      for (let row = 2; row <= 200; row++) {
+        sheet.getCell(`J${row}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: ['"DAY,NIGHT"'],
+        };
+      }
+
+      EXAMPLE_ROWS.forEach((data) => {
+        const row = sheet.addRow(data);
+        row.font = { italic: true, color: { argb: 'FF9CA3AF' } };
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `production-plan-template.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Template exported successfully');
+    } catch (err) {
+      console.error('Export template failed:', err);
+      toast.error('Failed to export template');
     }
-
-    // Add example rows
-    EXAMPLE_ROWS.forEach((data) => {
-      const row = sheet.addRow(data);
-      row.font = { italic: true, color: { argb: 'FF9CA3AF' } };
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `production-plan-template.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   return (

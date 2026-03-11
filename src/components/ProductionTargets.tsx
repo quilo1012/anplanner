@@ -43,7 +43,8 @@ export function ProductionTargets({ open, onClose, lines }: ProductionTargetsPro
       .select('*')
       .order('product_code');
     if (error) {
-      toast.error('Failed to load production targets');
+      console.error('Failed to load production targets:', error);
+      toast.error(`Failed to load targets: ${error.message}`);
     } else {
       setTargets((data as any[]) || []);
     }
