@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Package, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useProductCache } from '@/hooks/useProductCache';
+import { useProductSearch } from '@/hooks/useProductSearch';
 
 interface Product {
   product_code: string;
@@ -17,7 +17,6 @@ interface ProductSearchProps {
   placeholder?: string;
 }
 
-// Highlight matching text in a string
 function HighlightMatch({ text, query }: { text: string; query: string }) {
   if (!query || query.length < 1) return <>{text}</>;
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -33,12 +32,9 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
 
 export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, placeholder = "Type SKU to search..." }: ProductSearchProps) {
   const [query, setQuery] = useState(value);
-  const [results, setResults] = useState<Product[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [skuNotFound, setSkuNotFound] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,8 +44,14 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   onChangeRef.current = onChange;
   const onFoundStatusChangeRef = useRef(onFoundStatusChange);
   onFoundStatusChangeRef.current = onFoundStatusChange;
-  
-  const { searchProducts, isLoaded: cacheLoaded } = useProductCache();
+
+  // Server-side search with 300ms debounce
+  const { results: searchResults, isLoading } = useProductSearch(query);
+
+  const results: Product[] = searchResults.map(p => ({
+    product_code: p.product_code,
+    product_description: p.product_description,
+  }));
 
   // Sync external value
   useEffect(() => {
@@ -67,51 +69,29 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Search products — 30ms debounce, 1 char minimum
+  // Update found status when results change
   useEffect(() => {
     if (query.length < 1) {
-      setResults([]);
       setSkuNotFound(false);
-      setHasSearched(false);
-      setIsLoading(false);
       return;
     }
+    if (isLoading) return;
 
-    if (!cacheLoaded) {
-      setIsLoading(true);
-      return;
+    const exactMatch = searchResults.find(
+      p => p.product_code.toLowerCase() === query.toLowerCase()
+    );
+    setSkuNotFound(!exactMatch);
+    onFoundStatusChangeRef.current?.(!!exactMatch);
+
+    if (exactMatch && !selectedProduct) {
+      setSelectedProduct({
+        product_code: exactMatch.product_code,
+        product_description: exactMatch.product_description,
+      });
+      onChangeRef.current(exactMatch.product_code, { sku: exactMatch.product_code, name: exactMatch.product_description });
     }
-
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setHasSearched(true);
-      const cachedResults = searchProducts(query);
-      const formattedResults: Product[] = cachedResults.map(p => ({
-        product_code: p.sku,
-        product_description: p.name,
-      }));
-      setResults(formattedResults);
-      setActiveIndex(-1);
-
-      const exactMatch = cachedResults.find(
-        p => p.sku.toLowerCase() === query.toLowerCase()
-      );
-      setSkuNotFound(!exactMatch);
-      onFoundStatusChangeRef.current?.(!!exactMatch);
-
-      if (exactMatch && !selectedProduct) {
-        setSelectedProduct({
-          product_code: exactMatch.sku,
-          product_description: exactMatch.name,
-        });
-        onChangeRef.current(exactMatch.sku, { sku: exactMatch.sku, name: exactMatch.name });
-      }
-      setIsLoading(false);
-    }, 30);
-
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, cacheLoaded]);
+    setActiveIndex(-1);
+  }, [searchResults, isLoading]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -129,8 +109,8 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     setSkuNotFound(false);
     setIsOpen(false);
     onFoundStatusChangeRef.current?.(true);
-    onChangeRef.current(product.product_code, { 
-      sku: product.product_code, 
+    onChangeRef.current(product.product_code, {
+      sku: product.product_code,
       name: product.product_description,
     });
   }, []);
@@ -139,10 +119,8 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     if (query.length >= 1) setIsOpen(true);
   };
 
-  // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isOpen || results.length === 0) return;
-    
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex(prev => (prev + 1) % results.length);
@@ -165,6 +143,8 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     }
   }, [activeIndex]);
 
+  const hasSearched = query.length >= 1 && !isLoading;
+
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
@@ -186,7 +166,6 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         )}
       </div>
 
-      {/* SKU not found warning */}
       {skuNotFound && hasSearched && !isOpen && !selectedProduct && query.length >= 1 && (
         <div className="mt-2 p-2 bg-warning/10 border border-warning/30 rounded-md flex items-center gap-2">
           <AlertTriangle size={14} className="text-warning flex-shrink-0" />
@@ -195,7 +174,6 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         </div>
       )}
 
-      {/* Selected product info */}
       {selectedProduct && (
         <div className="mt-2 p-2 bg-success/10 border border-success/30 rounded-md text-sm">
           <div className="flex items-center gap-2">
@@ -205,7 +183,6 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         </div>
       )}
 
-      {/* Dropdown results */}
       {isOpen && results.length > 0 && (
         <div ref={listRef} className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-72 overflow-auto">
           {results.map((product, idx) => (
@@ -233,8 +210,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         </div>
       )}
 
-      {/* No results message */}
-      {isOpen && query.length >= 1 && results.length === 0 && !isLoading && hasSearched && (
+      {isOpen && query.length >= 1 && results.length === 0 && !isLoading && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg p-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <AlertTriangle size={14} className="text-warning" />
