@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import ExcelJS from 'exceljs';
-import { Upload, AlertCircle, CheckCircle2, X, Loader2, Link2 } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle2, X, Loader2, Link2, RefreshCw } from 'lucide-react';
 import { useShifts } from '@/contexts/ShiftContext';
 import { toast } from 'sonner';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeLineName } from '@/utils/normalizeLineName';
 
 interface ImportRow {
   rowNum: number;
@@ -105,7 +106,7 @@ export function ProductionImport({ open, onClose }: Props) {
         const vals = (row.values as unknown[]).slice(1);
         const rawDate = vals[0];
         const assemblyNum = String(vals[1] || '').trim();
-        const workCentre = String(vals[2] || '').trim();
+        const workCentre = normalizeLineName(String(vals[2] || '').trim());
         const productCode = String(vals[3] || '').trim();
         const productDesc = String(vals[4] || '').trim();
         const weightKg = Number(vals[5]) || 0;
@@ -186,10 +187,49 @@ export function ProductionImport({ open, onClose }: Props) {
         groups.get(key)!.push(row);
       }
 
+      // Fetch existing sessions for all matching groups
+      const dates = [...new Set(validRows.map(r => r.date))];
+      const lines = [...new Set(validRows.map(r => r.work_centre))];
+      
+      const { data: existingSessions } = await supabase
+        .from('production_sessions')
+        .select('id, production_line, date, shift_type')
+        .in('date', dates)
+        .in('production_line', lines);
+
+      // Build lookup: "line|date|shift" → session id
+      const sessionLookup = new Map<string, string>();
+      existingSessions?.forEach(s => {
+        const key = `${s.production_line}|${s.date}|${s.shift_type.toUpperCase()}`;
+        sessionLookup.set(key, s.id);
+      });
+
+      // Fetch existing items for those sessions
+      const existingSessionIds = [...new Set([...(existingSessions || []).map(s => s.id)])];
+      let existingItemsMap = new Map<string, { id: string; sku: string; quantity_actual: number }[]>();
+      
+      if (existingSessionIds.length > 0) {
+        const { data: existingItems } = await supabase
+          .from('production_items')
+          .select('id, session_id, sku, quantity_actual')
+          .in('session_id', existingSessionIds);
+        
+        existingItems?.forEach(item => {
+          const list = existingItemsMap.get(item.session_id) || [];
+          list.push(item);
+          existingItemsMap.set(item.session_id, list);
+        });
+      }
+
       const entries = [...groups.entries()];
+      let updatedCount = 0;
+      let createdCount = 0;
+
       const results = await Promise.allSettled(
-        entries.map(([, groupRows]) => {
+        entries.map(async ([key, groupRows]) => {
           const first = groupRows[0];
+          const sessionKey = `${first.work_centre}|${first.date}|${first.shift_type}`;
+          const existingSessionId = sessionLookup.get(sessionKey);
 
           // Aggregate same-SKU rows within this group
           const skuAgg = new Map<string, { productName: string; actualQty: number; targetQty: number }>();
@@ -209,34 +249,90 @@ export function ProductionImport({ open, onClose }: Props) {
             }
           }
 
-          const items = [...skuAgg.entries()].map(([sku, agg]) => ({
-            sku,
-            productName: agg.productName,
-            quantityTarget: agg.targetQty,
-            quantityActual: agg.actualQty,
-          }));
+          if (existingSessionId) {
+            // SYNC MODE: update quantity_actual on existing items, insert new SKUs
+            const existingItems = existingItemsMap.get(existingSessionId) || [];
+            const existingSkuMap = new Map(existingItems.map(i => [i.sku, i]));
 
-          const totalPlanned = items.reduce((s, i) => s + i.quantityTarget, 0);
+            const updatePromises: PromiseLike<any>[] = [];
+            const newItems: { session_id: string; sku: string; product_name: string; quantity_target: number; quantity_actual: number }[] = [];
 
-          return saveSession({
-            date: first.date,
-            shift: first.shift_type as 'DAY' | 'NIGHT',
-            productionLine: first.work_centre,
-            lineLeader: 'Imported',
-            plannedQuantity: totalPlanned,
-            items,
-            comments: '',
-            staffPlanned: 0,
-            staffActual: 0,
-          }, { skipRefresh: true });
+            for (const [sku, agg] of skuAgg) {
+              const existingItem = existingSkuMap.get(sku);
+              if (existingItem) {
+                // Update quantity_actual
+                updatePromises.push(
+                  supabase
+                    .from('production_items')
+                    .update({ quantity_actual: agg.actualQty })
+                    .eq('id', existingItem.id)
+                    .then()
+                );
+              } else {
+                // New SKU → insert
+                newItems.push({
+                  session_id: existingSessionId,
+                  sku,
+                  product_name: agg.productName,
+                  quantity_target: agg.targetQty,
+                  quantity_actual: agg.actualQty,
+                });
+              }
+            }
+
+            await Promise.all(updatePromises);
+            if (newItems.length > 0) {
+              await supabase.from('production_items').insert(newItems);
+            }
+
+            // Update planned_quantity on the session
+            const totalPlanned = [...skuAgg.values()].reduce((s, a) => s + a.targetQty, 0);
+            // Recalculate total with existing items that weren't in import
+            const allItems = await supabase.from('production_items').select('quantity_target').eq('session_id', existingSessionId);
+            const newTotalPlanned = allItems.data?.reduce((s, i) => s + (i.quantity_target || 0), 0) || totalPlanned;
+            
+            await supabase
+              .from('production_sessions')
+              .update({ planned_quantity: newTotalPlanned, updated_at: new Date().toISOString() })
+              .eq('id', existingSessionId);
+
+            updatedCount++;
+          } else {
+            // CREATE MODE: new session via saveSession
+            const items = [...skuAgg.entries()].map(([sku, agg]) => ({
+              sku,
+              productName: agg.productName,
+              quantityTarget: agg.targetQty,
+              quantityActual: agg.actualQty,
+            }));
+
+            const totalPlanned = items.reduce((s, i) => s + i.quantityTarget, 0);
+
+            await saveSession({
+              date: first.date,
+              shift: first.shift_type as 'DAY' | 'NIGHT',
+              productionLine: first.work_centre,
+              lineLeader: 'Imported',
+              plannedQuantity: totalPlanned,
+              items,
+              comments: '',
+              staffPlanned: 0,
+              staffActual: 0,
+            }, { skipRefresh: true });
+
+            createdCount++;
+          }
         })
       );
 
-      const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
+      const failures = results.filter(r => r.status === 'rejected');
       if (failures.length > 0) {
         toast.error(`Failed to import ${failures.length} session(s)`);
       } else {
-        toast.success(`Registos de produção guardados com sucesso! ${entries.length} sessão(ões) com ${validRows.length} produto(s).`);
+        const parts: string[] = [];
+        if (createdCount > 0) parts.push(`${createdCount} sessão(ões) criada(s)`);
+        if (updatedCount > 0) parts.push(`${updatedCount} sessão(ões) atualizada(s)`);
+        toast.success(`Registos de produção guardados com sucesso! ${parts.join(', ')} com ${validRows.length} produto(s).`);
       }
 
       await refreshSessions();
@@ -299,7 +395,7 @@ export function ProductionImport({ open, onClose }: Props) {
                   </div>
                 )}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  → {new Set(validRows.map(r => `${r.work_centre}|${r.date}|${r.shift_type}`)).size} session(s) will be created
+                  → {new Set(validRows.map(r => `${r.work_centre}|${r.date}|${r.shift_type}`)).size} sessão(ões) a processar
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Link2 size={16} className="text-primary" />

@@ -6,9 +6,15 @@ export function normalizeLineName(name: string): string {
   if (!trimmed) return trimmed;
 
   // Match pattern like "filler line 6", "Filler  Line  6", etc.
-  const match = trimmed.match(/^filler\s+line\s+(\d+)$/i);
-  if (match) {
-    return `Filler Line ${match[1]}`;
+  const fillerMatch = trimmed.match(/^filler\s+line\s+(\d+)$/i);
+  if (fillerMatch) {
+    return `Filler Line ${fillerMatch[1]}`;
+  }
+
+  // Match "Line 1", "line 3", "LINE  6" → "Filler Line X"
+  const lineMatch = trimmed.match(/^line\s+(\d+)$/i);
+  if (lineMatch) {
+    return `Filler Line ${lineMatch[1]}`;
   }
 
   // Title-case fallback for non-standard names
