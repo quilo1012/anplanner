@@ -24,6 +24,32 @@ interface ImportRow {
   plannedQty?: number;
 }
 
+function parseDate(val: unknown): string {
+  if (!val) return '';
+  // ExcelJS Date object
+  if (typeof val === 'object' && val !== null && 'toISOString' in (val as any)) {
+    return (val as Date).toISOString().split('T')[0];
+  }
+  const s = String(val).trim();
+  // Already yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // European format: d/m/yy or dd/mm/yyyy (with / or -)
+  const eurMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (eurMatch) {
+    const day = parseInt(eurMatch[1]);
+    const month = parseInt(eurMatch[2]);
+    let year = parseInt(eurMatch[3]);
+    if (year < 100) year += 2000;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  // Fallback: try native Date
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  return '';
+}
+
 function parseTime(val: unknown): string {
   if (!val) return '';
   const s = String(val).trim();
