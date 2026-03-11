@@ -88,7 +88,9 @@ export function PlanTemplateExport() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `production-plan-template.xlsx`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
