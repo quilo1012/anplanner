@@ -11,7 +11,7 @@ interface Product {
 
 interface ProductSearchProps {
   value: string;
-  onChange: (sku: string, product?: { sku: string; name: string }) => void;
+  onChange: (sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => void;
   onFoundStatusChange?: (found: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
