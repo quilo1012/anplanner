@@ -7,6 +7,7 @@ import { ExcelUpload } from '@/components/ExcelUpload';
 import { IntouchImport, LineGroup } from '@/components/IntouchImport';
 import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
+import { ProductionImport } from '@/components/ProductionImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 
 import { useShifts } from '@/contexts/ShiftContext';
