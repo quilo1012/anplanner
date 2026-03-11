@@ -1,26 +1,64 @@
 
 
-# Auto-populate Weight/Unit from SKU Selection
+# Dynamic Shift OEE Panel
 
-## Current State
+## What Changes
 
-The `handleProductSelect` in `SkuRowForm.tsx` already fetches `weight_per_unit` from the products table and sets it on the row. However:
-1. The `ProductSearch` component's `onChange` callback only passes `{ sku, name }` — not `weight_per_unit`, forcing a redundant second DB query
-2. The Weight/Unit input field remains editable even when auto-filled from DB
-3. No auto-focus to the next field after SKU selection
+The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
 
-## Changes
+## Updated Panel Layout
 
-### `src/components/ProductSearch.tsx`
-- Include `weight_per_unit` in the `onChange` callback payload: change from `{ sku, name }` to `{ sku, name, weightPerUnit }`
-- Pass `weight_per_unit` from both initial lookup and search result selection
+```text
++---------------------------+
+|  SHIFT OEE                |
+|  DAY Shift                |
+|                           |
+|      [  106.9%  ]         |
+|      World Class          |
+|                           |
+|  Produced:  22,248 units  |
+|  Planned:   20,800 units  |
+|  Performance: 106.9%      |
++---------------------------+
+```
 
-### `src/components/SkuRowForm.tsx`
-1. **Update `onProductSelect` signature** to accept `weightPerUnit` from ProductSearch directly, avoiding the redundant products table query
-2. **Make Weight/Unit read-only** when `row.isFoundInDb` is true (same pattern as Product Name)
-3. **Auto-focus** the Blender Size or production target field after SKU selection for faster data entry
-4. **Show "(auto-filled)" label** on Weight/Unit when populated from DB
+## Status Color Rules (updated)
 
-### No database changes needed
-The `products.weight_per_unit` column already exists and is populated.
+| Performance | Color  | Label           |
+|-------------|--------|-----------------|
+| >= 100%     | Green  | World Class     |
+| 90-99%      | Yellow | On Target       |
+| < 90%       | Red    | Below Target    |
+| No data     | Gray   | -- (dash)       |
+
+## Empty State
+
+When no data exists for the selected filters, the panel shows:
+> "No production data for selected period"
+
+Instead of a blank or zero-filled panel.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
+| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
+
+## Technical Details
+
+### OEEPanel.tsx
+- Add `totalPlanned` prop to interface
+- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
+- Show "Produced" and "Planned" rows with formatted numbers
+- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
+- Performance displays as `--` when `totalPlanned === 0`
+
+### Dashboard.tsx (line 337)
+- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
+- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
+- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
+
+### Performance Note
+No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
 

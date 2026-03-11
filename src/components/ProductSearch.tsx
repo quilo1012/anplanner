@@ -6,12 +6,12 @@ import { useProductSearch, lookupExactProduct } from '@/hooks/useProductSearch';
 interface Product {
   product_code: string;
   product_description: string;
-  weight_per_unit?: number;
+  weight_per_unit?: number | null;
 }
 
 interface ProductSearchProps {
   value: string;
-  onChange: (sku: string, product?: { sku: string; name: string }) => void;
+  onChange: (sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => void;
   onFoundStatusChange?: (found: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
@@ -53,6 +53,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
   const results: Product[] = searchResults.map(p => ({
     product_code: p.product_code,
     product_description: p.product_description,
+    weight_per_unit: p.weight_per_unit,
   }));
 
   // Initial exact lookup when mounted with a value (e.g. editing history)
@@ -71,12 +72,14 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
         setSelectedProduct({
           product_code: product.product_code,
           product_description: product.product_description,
+          weight_per_unit: product.weight_per_unit,
         });
         setSkuNotFound(false);
         onFoundStatusChangeRef.current?.(true);
         onChangeRef.current(product.product_code, {
           sku: product.product_code,
           name: product.product_description,
+          weightPerUnit: product.weight_per_unit ?? undefined,
         });
       } else {
         setSkuNotFound(true);
@@ -123,8 +126,9 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
       setSelectedProduct({
         product_code: exactMatch.product_code,
         product_description: exactMatch.product_description,
+        weight_per_unit: exactMatch.weight_per_unit,
       });
-      onChangeRef.current(exactMatch.product_code, { sku: exactMatch.product_code, name: exactMatch.product_description });
+      onChangeRef.current(exactMatch.product_code, { sku: exactMatch.product_code, name: exactMatch.product_description, weightPerUnit: exactMatch.weight_per_unit ?? undefined });
     }
     setActiveIndex(-1);
   }, [searchResults, isLoading]);
@@ -157,6 +161,7 @@ export function ProductSearch({ value, onChange, onFoundStatusChange, disabled, 
     onChangeRef.current(product.product_code, {
       sku: product.product_code,
       name: product.product_description,
+      weightPerUnit: product.weight_per_unit ?? undefined,
     });
   }, []);
 

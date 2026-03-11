@@ -20,7 +20,7 @@ interface SkuRowItemProps {
   hasDuplicateError: boolean;
   onUpdate: (id: string, field: keyof SkuRow, value: string | number) => void;
   onRemove: (id: string) => void;
-  onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string }) => void;
+  onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => void;
   onFoundStatusChange: (rowId: string, found: boolean) => void;
   onSaveToggle: (rowId: string, checked: boolean) => void;
 }
@@ -35,7 +35,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
   const performanceColor = performance >= 100 ? 'text-green-600' : performance >= 80 ? 'text-yellow-600' : 'text-red-600';
 
   return (
-    <div className="p-4 bg-card rounded-lg border border-border">
+    <div className="p-4 bg-card rounded-lg border border-border" data-row-id={row.id}>
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-foreground flex items-center gap-2">
           <Package size={14} className="text-primary" />
@@ -134,6 +134,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
               min="0"
               step="0.01"
               className="input-field text-sm pr-8"
+              data-blender-input
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
           </div>
@@ -141,6 +142,9 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
         <div>
           <label className="label text-xs flex items-center gap-1">
             Weight/Unit
+            {row.isFoundInDb && row.weightPerUnit > 0 && (
+              <span className="text-xs text-muted-foreground ml-1">(auto-filled)</span>
+            )}
           </label>
           <div className="relative">
             <input
@@ -150,7 +154,9 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
               placeholder="0"
               min="0"
               step="0.001"
-              className="input-field text-sm pr-8"
+              className={`input-field text-sm pr-8 ${row.isFoundInDb && row.weightPerUnit > 0 ? 'bg-muted' : ''}`}
+              readOnly={row.isFoundInDb && row.weightPerUnit > 0}
+              data-weight-input
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
           </div>
@@ -342,17 +348,9 @@ export function SkuRowForm({
     );
   }, [onChange]);
 
-  const handleProductSelect = useCallback(async (rowId: string, sku: string, product?: { sku: string; name: string }) => {
-    // Fetch weight_per_unit from products table if product found
-    let weightPerUnit = 0;
-    if (product) {
-      const { data } = await supabase
-        .from('products')
-        .select('weight_per_unit')
-        .eq('product_code', product.sku)
-        .maybeSingle();
-      weightPerUnit = (data as any)?.weight_per_unit || 0;
-    }
+  const handleProductSelect = useCallback(async (rowId: string, sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => {
+    // Weight comes directly from ProductSearch — no extra DB query needed
+    let weightPerUnit = product?.weightPerUnit || 0;
 
     // Try to fetch production target for this SKU + current line
     let targetData: { weight_per_unit: number; blender_capacity: number; expected_units_per_hour: number } | null = null;
@@ -389,6 +387,17 @@ export function SkuRowForm({
         return row;
       })
     );
+
+    // Auto-focus the blender size field for faster data entry
+    if (product) {
+      setTimeout(() => {
+        const rowEl = document.querySelector(`[data-row-id="${rowId}"]`);
+        if (rowEl) {
+          const blenderInput = rowEl.querySelector('[data-blender-input]') as HTMLInputElement;
+          blenderInput?.focus();
+        }
+      }, 100);
+    }
   }, [onChange, productionLine]);
 
   const handleFoundStatusChange = useCallback((rowId: string, found: boolean) => {
