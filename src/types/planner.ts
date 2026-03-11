@@ -5,6 +5,9 @@ export interface SkuRow {
   product: string;
   productionTarget: number;
   realProduction: number;
+  batchNumber: string;
+  blenderSize: number;
+  weightPerUnit: number;
   isNewProduct?: boolean;  // Flag to save new product to catalog
   isFoundInDb?: boolean;   // Flag to track if SKU was found in database
 }
@@ -24,4 +27,7 @@ export const createEmptySkuRow = (): SkuRow => ({
   product: '',
   productionTarget: 0,
   realProduction: 0,
+  batchNumber: '',
+  blenderSize: 0,
+  weightPerUnit: 0,
 });
