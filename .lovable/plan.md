@@ -1,64 +1,39 @@
 
 
-# Dynamic Shift OEE Panel
+# Skeleton Loading + Fix Save Freeze in Planner
 
-## What Changes
+## Problems
+1. **No skeleton**: Planner shows nothing while ShiftContext loads session data in the background
+2. **Save freezes UI**: `handleSubmit` runs multiple sequential DB calls (product catalog check, upsert session, delete items, insert items) synchronously, blocking the UI
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+## Changes
 
-## Updated Panel Layout
+### 1. Add Skeleton Loading State to Planner (`src/pages/Planner.tsx`)
+- Check `isLoading` from `useShifts()`
+- When loading, show skeleton placeholders for the form cards (Shift Info, SKU rows, Staffing)
+- Use existing `Skeleton` component from `src/components/ui/skeleton.tsx`
+- The form becomes interactive as soon as data loads — users can start filling immediately even before sessions finish loading (only `uniqueLines`/`uniqueLeaders` datalists depend on sessions)
 
-```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
-```
+### 2. Fix Save Freeze (`src/pages/Planner.tsx` + `src/contexts/ShiftContext.tsx`)
+The freeze comes from:
+- **New product catalog save** blocking before session save (sequential `await`)
+- **`withTimeout(20000)`** wrapper adding overhead
+- **Delete + re-insert items** being sequential
 
-## Status Color Rules (updated)
+Fixes:
+- Run new product catalog save **in parallel** with session save (fire-and-forget with error toast)
+- Remove `withTimeout` wrapper from upsert — let the browser handle timeouts naturally
+- In `saveSession`, combine delete+insert into a single flow without extra awaits
+- Add a visible **saving overlay** on the form with a spinner so the UI feels responsive even if the DB call takes a moment
+- Disable form interactions during save (already done via `isSubmitting` but make the visual feedback stronger)
 
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
+### 3. Optimistic Navigation
+- Navigate to `/history` immediately after the optimistic local state update, don't wait for the full DB response to complete
+- Show success toast optimistically; show error toast if the background save fails
 
-## Empty State
-
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
-
-## Technical Details
-
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
-
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+## Summary
+- Skeleton cards while sessions load
+- Parallel product catalog save
+- Stronger visual saving state (overlay spinner)
+- Faster perceived save by navigating optimistically
 
