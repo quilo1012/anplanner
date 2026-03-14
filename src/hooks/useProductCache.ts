@@ -150,8 +150,8 @@ export function useProductCache() {
   }, []);
 
   // Add product to cache (when new product is saved)
-  const addToCache = useCallback((sku: string, name: string) => {
-    globalProductCache.set(sku.toLowerCase(), { sku, name });
+  const addToCache = useCallback((sku: string, name: string, weight = 0) => {
+    globalProductCache.set(sku.toLowerCase(), { sku, name, weight });
     setState(prev => ({ ...prev, products: new Map(globalProductCache) }));
   }, []);
 
