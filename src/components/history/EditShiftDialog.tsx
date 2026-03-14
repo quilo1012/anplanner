@@ -139,7 +139,10 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
         const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
         if (toInsert.length > 0) {
           const { error } = await supabase.from('products').insert(
-            toInsert.map(r => ({ product_code: r.sku, product_description: r.product }))
+            toInsert.map(r => ({
+              product_code: r.sku.replace(/[\s-]+B\d+$/i, ''),
+              product_description: r.product,
+            }))
           );
           if (!error) toast.success(`${toInsert.length} new product(s) saved to catalog`);
         }

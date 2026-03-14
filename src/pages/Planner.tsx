@@ -244,7 +244,10 @@ export function Planner() {
             const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
             if (toInsert.length > 0) {
               const { error } = await supabase.from('products').insert(
-                toInsert.map(r => ({ product_code: r.sku, product_description: r.product }))
+                toInsert.map(r => ({
+                  product_code: r.sku.replace(/[\s-]+B\d+$/i, ''),
+                  product_description: r.product,
+                }))
               );
               if (error) {
                 console.error('Error saving new products:', error);
