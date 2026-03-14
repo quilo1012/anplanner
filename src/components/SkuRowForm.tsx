@@ -144,7 +144,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
           <label className="label text-xs flex items-center gap-1">
             Weight/Unit
             {row.isFoundInDb && row.weightPerUnit > 0 && (
-              <span className="text-xs text-muted-foreground ml-1">(auto-filled)</span>
+              <span className="text-xs text-muted-foreground ml-1">(suggested)</span>
             )}
           </label>
           <div className="relative">
