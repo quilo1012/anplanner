@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface Product {
   sku: string;
   name: string;
+  weight: number;
 }
 
 interface ProductCacheState {
@@ -60,14 +61,14 @@ export function useProductCache() {
     loadPromise = (async () => {
       try {
         const PAGE_SIZE = 1000;
-        let allData: { product_code: string; product_description: string }[] = [];
+        let allData: { product_code: string; product_description: string; weight_per_unit: number | null }[] = [];
         let from = 0;
         let hasMore = true;
 
         while (hasMore) {
           const { data, error } = await supabase
             .from('products')
-            .select('product_code, product_description')
+            .select('product_code, product_description, weight_per_unit')
             .order('product_code')
             .range(from, from + PAGE_SIZE - 1);
 
@@ -86,6 +87,7 @@ export function useProductCache() {
           globalProductCache.set(p.product_code.toLowerCase(), {
             sku: p.product_code,
             name: p.product_description,
+            weight: p.weight_per_unit ?? 0,
           });
         });
 
@@ -148,8 +150,8 @@ export function useProductCache() {
   }, []);
 
   // Add product to cache (when new product is saved)
-  const addToCache = useCallback((sku: string, name: string) => {
-    globalProductCache.set(sku.toLowerCase(), { sku, name });
+  const addToCache = useCallback((sku: string, name: string, weight = 0) => {
+    globalProductCache.set(sku.toLowerCase(), { sku, name, weight });
     setState(prev => ({ ...prev, products: new Map(globalProductCache) }));
   }, []);
 

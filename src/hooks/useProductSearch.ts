@@ -41,7 +41,7 @@ export function useProductSearch(query: string) {
       setResults(cached.map(p => ({
         product_code: p.sku,
         product_description: p.name,
-        weight_per_unit: null,
+        weight_per_unit: p.weight ?? null,
       })));
       setIsLoading(false);
       return;

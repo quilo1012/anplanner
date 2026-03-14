@@ -1,27 +1,64 @@
 
 
-# Fix: Weight/Unit Not Filling Correctly
+# Dynamic Shift OEE Panel
 
-## Root Cause
+## What Changes
 
-The product cache (`useProductCache`) only stores `sku` and `name` — it does NOT fetch or store `weight_per_unit` from the products table. Since we recently optimized SKU search to use the local cache instead of server queries, the weight is now always `null` when a product is selected from search results.
+The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
 
-Flow: User selects product → `ProductSearch` passes `weightPerUnit: null` → `SkuRowForm.handleProductSelect` gets `weightPerUnit = 0` → field shows 0 or wrong value.
+## Updated Panel Layout
 
-## Fix
+```text
++---------------------------+
+|  SHIFT OEE                |
+|  DAY Shift                |
+|                           |
+|      [  106.9%  ]         |
+|      World Class          |
+|                           |
+|  Produced:  22,248 units  |
+|  Planned:   20,800 units  |
+|  Performance: 106.9%      |
++---------------------------+
+```
 
-### 1. Update `useProductCache.ts` — add `weight_per_unit` to cache
+## Status Color Rules (updated)
 
-- Change the `Product` interface to include `weight: number`
-- Update the Supabase query to select `weight_per_unit` alongside `product_code` and `product_description`
-- Store weight in the cache Map
-- Update `addToCache` to accept weight parameter
+| Performance | Color  | Label           |
+|-------------|--------|-----------------|
+| >= 100%     | Green  | World Class     |
+| 90-99%      | Yellow | On Target       |
+| < 90%       | Red    | Below Target    |
+| No data     | Gray   | -- (dash)       |
 
-### 2. Update `useProductSearch.ts` — pass weight from cache
+## Empty State
 
-- When mapping cached results, include `weight_per_unit` from the cached product instead of hardcoding `null`
+When no data exists for the selected filters, the panel shows:
+> "No production data for selected period"
 
-### 3. No other changes needed
+Instead of a blank or zero-filled panel.
 
-`ProductSearch` and `SkuRowForm` already handle `weightPerUnit` correctly when it's provided — the data was just missing from the cache layer.
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
+| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
+
+## Technical Details
+
+### OEEPanel.tsx
+- Add `totalPlanned` prop to interface
+- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
+- Show "Produced" and "Planned" rows with formatted numbers
+- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
+- Performance displays as `--` when `totalPlanned === 0`
+
+### Dashboard.tsx (line 337)
+- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
+- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
+- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
+
+### Performance Note
+No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
 
