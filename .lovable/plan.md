@@ -1,64 +1,23 @@
 
 
-# Dynamic Shift OEE Panel
+# Delete Duplicate SKUs with Blender Numbers from Product Catalog
 
-## What Changes
+## Problem
+The `products` table has 83 entries with blender number suffixes (e.g. `ABEBADB-B1`, `ABESP - B2`, `BFMG6V - B3`) that are duplicates of the original base SKU. These were likely saved to the catalog from Planner sessions where users appended batch/blender identifiers to the SKU code.
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+## What will be done
 
-## Updated Panel Layout
+Run a single SQL migration to delete all 83 product catalog entries where the `product_code` ends with a blender suffix pattern like `-B1`, `-B2`, `- B3`, etc.
 
-```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
+```sql
+DELETE FROM products
+WHERE product_code ~ '[\s-]+B\d+$';
 ```
 
-## Status Color Rules (updated)
+This keeps all original/base SKUs intact (2,134 total → ~2,051 after cleanup).
 
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
+No other tables reference these product codes via foreign keys, so no cascading issues.
 
-## Empty State
-
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
-
-## Technical Details
-
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
-
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+## Prevention
+Additionally, update the Planner's "Save to product catalog" logic in `SkuRowForm.tsx` to strip blender suffixes before saving new products, preventing this from happening again. The batch number is already stored in a separate `batchNumber` field — it should never be part of the SKU code saved to the catalog.
 
