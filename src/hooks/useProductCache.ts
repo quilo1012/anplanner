@@ -68,7 +68,7 @@ export function useProductCache() {
         while (hasMore) {
           const { data, error } = await supabase
             .from('products')
-            .select('product_code, product_description')
+            .select('product_code, product_description, weight_per_unit')
             .order('product_code')
             .range(from, from + PAGE_SIZE - 1);
 
@@ -87,6 +87,7 @@ export function useProductCache() {
           globalProductCache.set(p.product_code.toLowerCase(), {
             sku: p.product_code,
             name: p.product_description,
+            weight: p.weight_per_unit ?? 0,
           });
         });
 
