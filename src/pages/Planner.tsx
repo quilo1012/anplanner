@@ -560,5 +560,6 @@ export function Planner() {
           </>)}
         </div>
       </div>
+    </>
   );
 }
