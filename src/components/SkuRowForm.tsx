@@ -155,8 +155,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
               placeholder="0"
               min="0"
               step="0.001"
-              className={`input-field text-sm pr-8 ${row.isFoundInDb && row.weightPerUnit > 0 ? 'bg-muted' : ''}`}
-              readOnly={row.isFoundInDb && row.weightPerUnit > 0}
+              className="input-field text-sm pr-8"
               data-weight-input
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
