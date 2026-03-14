@@ -557,8 +557,8 @@ export function Planner() {
             open={showProductionImport}
             onClose={() => setShowProductionImport(false)}
           />
+          </>)}
         </div>
       </div>
-    </>
   );
 }
