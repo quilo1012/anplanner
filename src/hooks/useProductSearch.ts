@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useProductCache } from './useProductCache';
 
 interface ProductResult {
   product_code: string;
@@ -16,9 +17,16 @@ export function useProductSearch(query: string) {
   const [results, setResults] = useState<ProductResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const { isLoaded, loadProducts, searchProducts } = useProductCache();
+
+  // Trigger cache load on first use (non-blocking)
+  useEffect(() => {
+    if (!isLoaded) {
+      loadProducts();
+    }
+  }, [isLoaded, loadProducts]);
 
   useEffect(() => {
-    // Cancel previous request
     abortRef.current?.abort();
 
     if (!query || query.trim().length < 1) {
@@ -27,14 +35,25 @@ export function useProductSearch(query: string) {
       return;
     }
 
+    // If cache is loaded, use instant local search (no network)
+    if (isLoaded) {
+      const cached = searchProducts(query.trim());
+      setResults(cached.map(p => ({
+        product_code: p.sku,
+        product_description: p.name,
+        weight_per_unit: null,
+      })));
+      setIsLoading(false);
+      return;
+    }
+
+    // Fallback: server-side search if cache isn't ready yet
     setIsLoading(true);
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Safety timeout: force clear loading after 5s
     const safetyTimer = setTimeout(() => {
       if (!controller.signal.aborted) {
-        console.warn('[ProductSearch] Safety timeout — forcing isLoading=false');
         setIsLoading(false);
       }
     }, 5000);
@@ -44,7 +63,6 @@ export function useProductSearch(query: string) {
 
       try {
         const q = sanitizeIlike(query.trim());
-        console.log('[ProductSearch] Querying:', q);
         const { data, error } = await supabase
           .from('products')
           .select('product_code, product_description, weight_per_unit')
@@ -58,7 +76,6 @@ export function useProductSearch(query: string) {
           console.error('[ProductSearch] DB error:', error);
           setResults([]);
         } else {
-          // Sort: prefix matches first, then substring
           const lowerQ = query.trim().toLowerCase();
           const prefix: ProductResult[] = [];
           const substring: ProductResult[] = [];
@@ -72,7 +89,6 @@ export function useProductSearch(query: string) {
               substring.push(p);
             }
           });
-          console.log('[ProductSearch] Results:', prefix.length + substring.length);
           setResults([...prefix, ...substring]);
         }
       } catch (err) {
@@ -81,7 +97,6 @@ export function useProductSearch(query: string) {
           setResults([]);
         }
       } finally {
-        // Always clear loading — the abort guard caused stuck spinners
         setIsLoading(false);
       }
     }, 300);
@@ -91,7 +106,7 @@ export function useProductSearch(query: string) {
       clearTimeout(safetyTimer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, isLoaded, searchProducts]);
 
   return { results, isLoading };
 }
@@ -100,7 +115,6 @@ export function useProductSearch(query: string) {
 export async function lookupExactProduct(productCode: string): Promise<ProductResult | null> {
   if (!productCode?.trim()) return null;
   try {
-    console.log('[ProductSearch] Exact lookup:', productCode);
     const { data, error } = await supabase
       .from('products')
       .select('product_code, product_description, weight_per_unit')
