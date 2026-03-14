@@ -53,7 +53,7 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { saveSession, updateSession, getSessionById, refreshSessions, sessions } = useShifts();
+  const { saveSession, updateSession, getSessionById, refreshSessions, sessions, isLoading: sessionsLoading } = useShifts();
   const { user, hasRole } = useAuth();
   const { getTopLinesForProduct } = useProductLineRecommendations();
 
