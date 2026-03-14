@@ -5,7 +5,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Layout } from '@/components/Layout';
-import { Planner } from '@/pages/Planner';
 import { History } from '@/pages/History';
 import { Login } from '@/pages/Login';
 import { Loader2 } from 'lucide-react';
