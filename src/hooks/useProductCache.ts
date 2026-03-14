@@ -61,7 +61,7 @@ export function useProductCache() {
     loadPromise = (async () => {
       try {
         const PAGE_SIZE = 1000;
-        let allData: { product_code: string; product_description: string }[] = [];
+        let allData: { product_code: string; product_description: string; weight_per_unit: number | null }[] = [];
         let from = 0;
         let hasMore = true;
 
