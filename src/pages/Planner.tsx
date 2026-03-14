@@ -9,6 +9,7 @@ import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
 import { ProductionImport } from '@/components/ProductionImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
+import { Skeleton } from '@/components/ui/skeleton';
 
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
