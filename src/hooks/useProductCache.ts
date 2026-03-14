@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface Product {
   sku: string;
   name: string;
+  weight: number;
 }
 
 interface ProductCacheState {
