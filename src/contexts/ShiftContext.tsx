@@ -264,14 +264,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         created_by: user.id,
       };
 
-      const { data: upsertedSession, error: sessionError } = await withTimeout(
-        supabase
+      const { data: upsertedSession, error: sessionError } = await supabase
           .from('production_sessions')
           .upsert(sessionData, { onConflict: 'production_line,date,shift_type' })
           .select('id')
-          .single(),
-        20000
-      );
+          .single();
 
       if (sessionError) {
         console.error('Error upserting session:', sessionError);

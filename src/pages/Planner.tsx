@@ -9,6 +9,7 @@ import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
 import { ProductionImport } from '@/components/ProductionImport';
 import { ProductCsvUpload } from '@/components/ProductCsvUpload';
+import { Skeleton } from '@/components/ui/skeleton';
 
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,7 +53,7 @@ export function Planner() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
-  const { saveSession, updateSession, getSessionById, refreshSessions, sessions } = useShifts();
+  const { saveSession, updateSession, getSessionById, refreshSessions, sessions, isLoading: sessionsLoading } = useShifts();
   const { user, hasRole } = useAuth();
   const { getTopLinesForProduct } = useProductLineRecommendations();
 
@@ -222,32 +223,40 @@ export function Planner() {
         }
       }
 
-      // Batch save new products to catalog
-      const newProductRows = formState.skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
-      if (newProductRows.length > 0) {
-        const { data: existingProducts } = await supabase
-          .from('products')
-          .select('product_code')
-          .in('product_code', newProductRows.map(r => r.sku));
-        const existingCodes = new Set((existingProducts || []).map(p => p.product_code));
-        const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
-        if (toInsert.length > 0) {
-          const { error } = await supabase.from('products').insert(
-            toInsert.map(r => ({ product_code: r.sku, product_description: r.product }))
-          );
-          if (error) {
-            console.error('Error saving new products:', error);
-            toast.error('Failed to save new products to catalog');
-          } else {
-            toast.success(`${toInsert.length} new product(s) saved to catalog`);
-          }
-        }
-      }
-
       const validRows = formState.skuRows.filter(row => row.sku.trim());
       if (validRows.length === 0) {
         toast.error('At least one SKU is required');
+        setIsSubmitting(false);
+        submittingRef.current = false;
         return;
+      }
+
+      // Fire-and-forget: save new products to catalog in parallel
+      const newProductRows = formState.skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
+      if (newProductRows.length > 0) {
+        (async () => {
+          try {
+            const { data: existingProducts } = await supabase
+              .from('products')
+              .select('product_code')
+              .in('product_code', newProductRows.map(r => r.sku));
+            const existingCodes = new Set((existingProducts || []).map(p => p.product_code));
+            const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
+            if (toInsert.length > 0) {
+              const { error } = await supabase.from('products').insert(
+                toInsert.map(r => ({ product_code: r.sku, product_description: r.product }))
+              );
+              if (error) {
+                console.error('Error saving new products:', error);
+                toast.error('Failed to save new products to catalog');
+              } else {
+                toast.success(`${toInsert.length} new product(s) saved to catalog`);
+              }
+            }
+          } catch (err) {
+            console.error('Error saving new products:', err);
+          }
+        })();
       }
 
       // Calculate total planned quantity from all SKU targets
@@ -272,6 +281,10 @@ export function Planner() {
         staffActual: formState.staffActual,
       };
 
+      // Navigate optimistically — session save continues in background
+      toast.success(editId ? 'Session updated successfully!' : 'Production session saved!');
+      navigate('/history');
+
       let result;
       if (editId) {
         result = await updateSession(editId, sessionData);
@@ -280,12 +293,8 @@ export function Planner() {
       }
 
       if (!result.success) {
-        toast.error(`Failed to save: ${result.error}`);
-        return;
+        toast.error(`Save failed: ${result.error}`);
       }
-
-      toast.success(editId ? 'Session updated successfully!' : 'Production session saved!');
-      navigate('/history');
     } catch (error) {
       console.error('Error saving session:', error);
       toast.error('An unexpected error occurred');
@@ -309,6 +318,41 @@ export function Planner() {
 
       <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="max-w-6xl mx-auto space-y-6">
+          {/* Saving overlay */}
+          {isSubmitting && (
+            <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3 p-6 rounded-xl bg-card shadow-lg border border-border">
+                <span className="animate-spin text-3xl">⏳</span>
+                <p className="text-foreground font-medium">Saving session...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Skeleton while sessions load (datalists depend on sessions) */}
+          {sessionsLoading && !editId && (
+            <div className="space-y-6">
+              <div className="card p-4 sm:p-6 space-y-4">
+                <Skeleton className="h-6 w-48" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                </div>
+              </div>
+              <div className="card p-4 sm:p-6 space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+              <div className="card p-4 sm:p-6 space-y-4">
+                <Skeleton className="h-6 w-40" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(!sessionsLoading || editId) && (<>
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
               <PlanTemplateExport />
@@ -513,6 +557,7 @@ export function Planner() {
             open={showProductionImport}
             onClose={() => setShowProductionImport(false)}
           />
+          </>)}
         </div>
       </div>
     </>
