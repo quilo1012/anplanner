@@ -1,53 +1,64 @@
 
 
-# Performance Optimization: Faster Site Load & SKU Search
+# Dynamic Shift OEE Panel
 
-## Problem Analysis
+## What Changes
 
-After investigating the code, I identified these bottlenecks causing slow load times:
+The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
 
-1. **Planner is NOT lazy-loaded** — it's eagerly bundled (`import { Planner }` in App.tsx), unlike Dashboard/Admin/WeeklyReport which use `lazy()`. This increases the initial JS bundle size for every page.
-
-2. **ShiftContext loads ALL data upfront** — On mount, it fetches all sessions (90 days) + all production_items + all structured_downtimes in a waterfall. This blocks the entire app with a loading spinner until complete.
-
-3. **SKU search hits the database on every keystroke** (with 300ms debounce) — There's a `useProductCache` hook already built but it's NOT being used by `ProductSearch` or `useProductSearch`. The search goes to the server every time instead of searching the local cache.
-
-4. **Auth initialization is serial** — `getSession()` → `fetchUserData()` → profile query → role query → (admin: refreshUsers) — all sequential before the app renders.
-
-## Changes
-
-### 1. Lazy-load Planner page (`src/App.tsx`)
-- Change `import { Planner }` to `lazy(() => import('@/pages/Planner'))` like the other heavy pages
-- Wrap with `<Suspense fallback={<PageLoader />}>`
-- This cuts the initial bundle significantly since Planner imports ExcelJS, SkuRowForm, ProductSearch, etc.
-
-### 2. Use ProductCache for SKU search (`src/hooks/useProductSearch.ts`)
-- The `useProductCache` hook already exists with a singleton Map, O(1) lookups, and prefix-first sorting — but nothing uses it
-- Rewrite `useProductSearch` to check the product cache first (instant, no network)
-- Only fall back to server-side search if cache isn't loaded yet
-- Trigger cache load on first use (background, non-blocking)
-- This makes SKU search **instant** after the first load
-
-### 3. Parallelize auth queries (`src/contexts/AuthContext.tsx`)
-- Fetch profile and role in parallel (`Promise.all`) instead of sequentially
-- Saves ~100-200ms on login/page refresh
-
-### 4. Defer ShiftContext session loading
-- Set `isLoading` to `false` initially so the app renders immediately
-- Show the Planner UI skeleton while sessions load in the background
-- Users can start typing immediately instead of staring at a spinner
-
-## Technical Detail
+## Updated Panel Layout
 
 ```text
-Current load sequence (serial):
-  Auth getSession → profile query → role query → render app → ShiftProvider loads 90 days → ready
-
-Optimized sequence (parallel + deferred):
-  Auth getSession → [profile + role in parallel] → render app immediately
-  ShiftProvider loads in background (non-blocking)
-  SKU search uses local cache (no server round-trip)
++---------------------------+
+|  SHIFT OEE                |
+|  DAY Shift                |
+|                           |
+|      [  106.9%  ]         |
+|      World Class          |
+|                           |
+|  Produced:  22,248 units  |
+|  Planned:   20,800 units  |
+|  Performance: 106.9%      |
++---------------------------+
 ```
 
-The biggest win is using the existing `useProductCache` for search — it eliminates server round-trips entirely for SKU lookups after the cache is warm.
+## Status Color Rules (updated)
+
+| Performance | Color  | Label           |
+|-------------|--------|-----------------|
+| >= 100%     | Green  | World Class     |
+| 90-99%      | Yellow | On Target       |
+| < 90%       | Red    | Below Target    |
+| No data     | Gray   | -- (dash)       |
+
+## Empty State
+
+When no data exists for the selected filters, the panel shows:
+> "No production data for selected period"
+
+Instead of a blank or zero-filled panel.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
+| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
+
+## Technical Details
+
+### OEEPanel.tsx
+- Add `totalPlanned` prop to interface
+- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
+- Show "Produced" and "Planned" rows with formatted numbers
+- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
+- Performance displays as `--` when `totalPlanned === 0`
+
+### Dashboard.tsx (line 337)
+- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
+- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
+- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
+
+### Performance Note
+No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
 

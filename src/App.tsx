@@ -5,7 +5,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Layout } from '@/components/Layout';
-import { Planner } from '@/pages/Planner';
 import { History } from '@/pages/History';
 import { Login } from '@/pages/Login';
 import { Loader2 } from 'lucide-react';
@@ -15,6 +14,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m
 const Downtime = lazy(() => import('@/pages/Downtime').then(m => ({ default: m.Downtime })));
 const Admin = lazy(() => import('@/pages/Admin').then(m => ({ default: m.Admin })));
 const WeeklyReport = lazy(() => import('@/pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
+const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
 
 
 function PageLoader() {
@@ -42,7 +42,7 @@ const App = () => (
             }
           >
             <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
-            <Route path="planner" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Planner /></ProtectedRoute>} />
+            <Route path="planner" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Planner /></Suspense></ProtectedRoute>} />
             <Route path="downtime" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Downtime /></Suspense></ProtectedRoute>} />
             <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><History /></ProtectedRoute>} />
             <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><WeeklyReport /></Suspense></ProtectedRoute>} />
