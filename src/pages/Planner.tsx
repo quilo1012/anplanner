@@ -318,6 +318,41 @@ export function Planner() {
 
       <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="max-w-6xl mx-auto space-y-6">
+          {/* Saving overlay */}
+          {isSubmitting && (
+            <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3 p-6 rounded-xl bg-card shadow-lg border border-border">
+                <span className="animate-spin text-3xl">⏳</span>
+                <p className="text-foreground font-medium">Saving session...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Skeleton while sessions load (datalists depend on sessions) */}
+          {sessionsLoading && !editId && (
+            <div className="space-y-6">
+              <div className="card p-4 sm:p-6 space-y-4">
+                <Skeleton className="h-6 w-48" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                </div>
+              </div>
+              <div className="card p-4 sm:p-6 space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+              <div className="card p-4 sm:p-6 space-y-4">
+                <Skeleton className="h-6 w-40" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(!sessionsLoading || editId) && (<>
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
               <PlanTemplateExport />
