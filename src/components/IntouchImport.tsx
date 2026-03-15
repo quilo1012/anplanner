@@ -170,7 +170,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
     // Check for Machine: separator
     const machineName = isMachineRow(row);
     if (machineName) {
-      currentLine = machineName;
+      currentLine = normalizeLineName(machineName);
       // Don't skip — also check if this row has data columns
     }
 
