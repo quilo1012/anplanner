@@ -186,7 +186,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
     // If we have a per-row line column, use it (overrides Machine: section)
     if (lineColIdx >= 0) {
       const lineVal = String(row.getCell(lineColIdx + 1).value ?? '').trim();
-      if (lineVal) parsed.line = lineVal;
+      if (lineVal) parsed.line = normalizeLineName(lineVal);
     }
     
     Object.entries(colMap).forEach(([colIdx, field]) => {
