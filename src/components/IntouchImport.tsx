@@ -40,7 +40,9 @@ interface IntouchImportProps {
   onImport: (groups: LineGroup[], date: string, shift: ShiftType) => Promise<void>;
 }
 
-const HEADER_MAP: Record<string, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {
+type DataField = keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>;
+
+const HEADER_MAP: Record<string, DataField> = {
   'part code': 'sku',
   'partcode': 'sku',
   'part_code': 'sku',
@@ -52,6 +54,12 @@ const HEADER_MAP: Record<string, keyof Omit<ParsedRow, 'line' | 'valid' | 'error
   'order no': 'orderNo',
   'orderno': 'orderNo',
 };
+
+// Column names that indicate per-row line info
+const LINE_COLUMN_NAMES = new Set([
+  'work centre', 'workcentre', 'work_centre',
+  'machine', 'line', 'production line', 'filler line',
+]);
 
 const DOWNTIME_HEADER_MAP: Record<string, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> = {
   'category': 'category',
