@@ -84,13 +84,15 @@ function extractLineName(cellValue: string): string {
   return parts[0].trim() || 'Unknown Line';
 }
 
-function detectColumns(headers: string[]): Record<number, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> {
-  const map: Record<number, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {};
+function detectColumns(headers: string[]): { colMap: Record<number, DataField>; lineColIdx: number } {
+  const colMap: Record<number, DataField> = {};
+  let lineColIdx = -1;
   headers.forEach((h, i) => {
     const key = h.trim().toLowerCase();
-    if (HEADER_MAP[key]) map[i] = HEADER_MAP[key];
+    if (HEADER_MAP[key]) colMap[i] = HEADER_MAP[key];
+    if (LINE_COLUMN_NAMES.has(key)) lineColIdx = i;
   });
-  return map;
+  return { colMap, lineColIdx };
 }
 
 function detectDowntimeColumns(headers: string[]): Record<number, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> {
