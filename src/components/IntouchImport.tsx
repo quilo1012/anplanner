@@ -244,7 +244,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       for (let r = dtHeaderIdx + 1; r <= dtSheet.rowCount; r++) {
         const row = dtSheet.getRow(r);
         const machineName = isMachineRow(row);
-        if (machineName) { dtCurrentLine = machineName; continue; }
+        if (machineName) { dtCurrentLine = normalizeLineName(machineName); continue; }
 
         const parsed: Partial<ParsedDowntime> = { line: dtCurrentLine, category: '', reason: '', duration: 0, comment: '' };
         Object.entries(dtColMap).forEach(([colIdx, field]) => {
