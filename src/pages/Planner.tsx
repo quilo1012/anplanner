@@ -5,6 +5,7 @@ import { SkuRowForm } from '@/components/SkuRowForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { ExcelUpload } from '@/components/ExcelUpload';
 import { IntouchImport, LineGroup } from '@/components/IntouchImport';
+import { normalizeLineName } from '@/utils/normalizeLineName';
 import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
 import { ProductionImport } from '@/components/ProductionImport';
@@ -515,7 +516,7 @@ export function Planner() {
                   return saveSession({
                     date: importDate,
                     shift: importShift,
-                    productionLine: group.line,
+                    productionLine: normalizeLineName(group.line),
                     lineLeader: group.lineLeader,
                     plannedQuantity: totalPlanned,
                     items: group.rows.map(r => ({

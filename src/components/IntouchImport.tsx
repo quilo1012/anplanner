@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { SHIFT_TYPES, ShiftType } from '@/types/production';
+import { normalizeLineName } from '@/utils/normalizeLineName';
 import ExcelJS from 'exceljs';
 
 interface ParsedRow {
@@ -40,7 +41,9 @@ interface IntouchImportProps {
   onImport: (groups: LineGroup[], date: string, shift: ShiftType) => Promise<void>;
 }
 
-const HEADER_MAP: Record<string, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {
+type DataField = keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>;
+
+const HEADER_MAP: Record<string, DataField> = {
   'part code': 'sku',
   'partcode': 'sku',
   'part_code': 'sku',
@@ -52,6 +55,12 @@ const HEADER_MAP: Record<string, keyof Omit<ParsedRow, 'line' | 'valid' | 'error
   'order no': 'orderNo',
   'orderno': 'orderNo',
 };
+
+// Column names that indicate per-row line info
+const LINE_COLUMN_NAMES = new Set([
+  'work centre', 'workcentre', 'work_centre',
+  'machine', 'line', 'production line', 'filler line',
+]);
 
 const DOWNTIME_HEADER_MAP: Record<string, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> = {
   'category': 'category',
@@ -68,7 +77,7 @@ const DOWNTIME_HEADER_MAP: Record<string, keyof Omit<ParsedDowntime, 'line' | 'v
   'notes': 'comment',
 };
 
-const MACHINE_PATTERN = /machine\s*[:]/i;
+const MACHINE_PATTERN = /machine\s*[:\-]/i;
 
 function extractLineName(cellValue: string): string {
   const afterMachine = cellValue.replace(MACHINE_PATTERN, '').trim();
@@ -76,13 +85,15 @@ function extractLineName(cellValue: string): string {
   return parts[0].trim() || 'Unknown Line';
 }
 
-function detectColumns(headers: string[]): Record<number, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> {
-  const map: Record<number, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {};
+function detectColumns(headers: string[]): { colMap: Record<number, DataField>; lineColIdx: number } {
+  const colMap: Record<number, DataField> = {};
+  let lineColIdx = -1;
   headers.forEach((h, i) => {
     const key = h.trim().toLowerCase();
-    if (HEADER_MAP[key]) map[i] = HEADER_MAP[key];
+    if (HEADER_MAP[key]) colMap[i] = HEADER_MAP[key];
+    if (LINE_COLUMN_NAMES.has(key)) lineColIdx = i;
   });
-  return map;
+  return { colMap, lineColIdx };
 }
 
 function detectDowntimeColumns(headers: string[]): Record<number, keyof Omit<ParsedDowntime, 'line' | 'valid' | 'error'>> {
@@ -105,8 +116,7 @@ function isMachineRow(row: ExcelJS.Row): string | null {
   return found;
 }
 
-function isHeaderRow(row: ExcelJS.Row, colMap: Record<number, string>): boolean {
-  // Check if this row looks like a header row (contains known header text)
+function isHeaderRow(row: ExcelJS.Row): boolean {
   let matches = 0;
   row.eachCell({ includeEmpty: false }, (cell) => {
     const val = String(cell.value ?? '').trim().toLowerCase();
@@ -124,7 +134,8 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
 
   // First pass: find the header row (could be row 1 or later)
   let headerRowIdx = -1;
-  let colMap: Record<number, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {};
+  let colMap: Record<number, DataField> = {};
+  let lineColIdx = -1;
 
   for (let r = 1; r <= Math.min(ws.rowCount, 20); r++) {
     const row = ws.getRow(r);
@@ -133,8 +144,9 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       headers[col - 1] = String(cell.value ?? '');
     });
     const candidate = detectColumns(headers);
-    if (Object.values(candidate).includes('sku')) {
-      colMap = candidate;
+    if (Object.values(candidate.colMap).includes('sku')) {
+      colMap = candidate.colMap;
+      lineColIdx = candidate.lineColIdx;
       headerRowIdx = r;
       break;
     }
@@ -149,7 +161,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
   // Check if there's a Machine: row before the header
   for (let r = 1; r < headerRowIdx; r++) {
     const machineName = isMachineRow(ws.getRow(r));
-    if (machineName) currentLine = machineName;
+    if (machineName) currentLine = normalizeLineName(machineName);
   }
 
   for (let r = headerRowIdx + 1; r <= ws.rowCount; r++) {
@@ -158,15 +170,25 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
     // Check for Machine: separator
     const machineName = isMachineRow(row);
     if (machineName) {
-      currentLine = machineName;
+      currentLine = normalizeLineName(machineName);
+      // Don't skip — also check if this row has data columns
+    }
+
+    // Skip if it looks like a repeated header row (but check for Machine: first)
+    if (isHeaderRow(row)) {
+      // Even on header rows, check for machine marker (already done above)
       continue;
     }
 
-    // Skip if it looks like a repeated header row
-    if (isHeaderRow(row, colMap)) continue;
-
     // Parse data row
     const parsed: Partial<ParsedRow> = { orderNo: '', sku: '', product: '', quantity: 0, line: currentLine };
+    
+    // If we have a per-row line column, use it (overrides Machine: section)
+    if (lineColIdx >= 0) {
+      const lineVal = String(row.getCell(lineColIdx + 1).value ?? '').trim();
+      if (lineVal) parsed.line = normalizeLineName(lineVal);
+    }
+    
     Object.entries(colMap).forEach(([colIdx, field]) => {
       const val = row.getCell(Number(colIdx) + 1).value;
       if (field === 'quantity') {
@@ -184,6 +206,11 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       error: !parsed.sku ? 'Missing Part Code' : parsed.quantity! <= 0 ? 'Quantity must be > 0' : undefined,
     });
   }
+
+  // Debug: log parsed groups
+  const lineGroups = new Map<string, number>();
+  rows.forEach(r => lineGroups.set(r.line, (lineGroups.get(r.line) || 0) + 1));
+  console.log('[iTouching Parser] Lines detected:', Object.fromEntries(lineGroups), `(lineColIdx: ${lineColIdx})`);
 
   // Parse downtimes from second worksheet or downtime-labeled sheet
   const downtimes: ParsedDowntime[] = [];
@@ -211,13 +238,13 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       let dtCurrentLine = 'Unknown Line';
       for (let r = 1; r < dtHeaderIdx; r++) {
         const machineName = isMachineRow(dtSheet.getRow(r));
-        if (machineName) dtCurrentLine = machineName;
+        if (machineName) dtCurrentLine = normalizeLineName(machineName);
       }
 
       for (let r = dtHeaderIdx + 1; r <= dtSheet.rowCount; r++) {
         const row = dtSheet.getRow(r);
         const machineName = isMachineRow(row);
-        if (machineName) { dtCurrentLine = machineName; continue; }
+        if (machineName) { dtCurrentLine = normalizeLineName(machineName); continue; }
 
         const parsed: Partial<ParsedDowntime> = { line: dtCurrentLine, category: '', reason: '', duration: 0, comment: '' };
         Object.entries(dtColMap).forEach(([colIdx, field]) => {
