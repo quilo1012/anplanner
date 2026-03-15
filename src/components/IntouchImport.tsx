@@ -76,7 +76,7 @@ const DOWNTIME_HEADER_MAP: Record<string, keyof Omit<ParsedDowntime, 'line' | 'v
   'notes': 'comment',
 };
 
-const MACHINE_PATTERN = /machine\s*[:]/i;
+const MACHINE_PATTERN = /machine\s*[:\-]/i;
 
 function extractLineName(cellValue: string): string {
   const afterMachine = cellValue.replace(MACHINE_PATTERN, '').trim();
