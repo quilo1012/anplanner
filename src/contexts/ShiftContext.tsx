@@ -238,6 +238,9 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     if (!user) return { success: false, error: 'User not authenticated' };
     const timer = createPerfTimer('saveSession');
 
+    console.log(`[saveSession] Line: "${data.productionLine}", Items: ${data.items.length}`, 
+      data.items.map(i => `${i.sku} (target: ${i.quantityTarget})`));
+
     try {
       // Upload photo if base64
       let photoUrl: string | null = null;

@@ -1,49 +1,64 @@
 
 
-# Fix: iTouching Import Saving Same Products to All Lines
+# Dynamic Shift OEE Panel
 
-## Problem Confirmed
-The iTouching import preview shows correct line grouping, but after saving to History, all lines end up with the same products. The database for March 15 currently shows correct data (possibly from a manual fix), but the user reports the issue persists on re-import.
+## What Changes
 
-## Root Causes Found
+The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
 
-### 1. Race condition in parallel saves
-The `onImport` callback uses `Promise.allSettled` to save all line groups **in parallel**. Each `saveSession` call does:
-1. Upsert session → get sessionId
-2. Delete ALL items for that sessionId  
-3. Insert new items
+## Updated Panel Layout
 
-When running in parallel, if the upsert for two groups resolves to the same session (e.g., due to a brief timing issue with the unique constraint), one save's delete step can wipe out another save's newly inserted items. **This is the most likely cause.**
-
-### 2. Insufficient parser debugging
-The current debug log only shows line counts. It doesn't log the actual SKU-to-line mapping, making it impossible to confirm whether the parser or the save logic is at fault.
-
-## Fix Plan
-
-### File: `src/pages/Planner.tsx` — Make iTouching saves sequential
-Change the `onImport` callback from `Promise.allSettled` (parallel) to a **sequential loop**. Each line group saves fully (upsert + delete items + insert items) before the next one starts. This eliminates any race condition.
-
-```
-// Before: parallel (race-prone)
-Promise.allSettled(groups.map(group => saveSession(...)))
-
-// After: sequential (safe)  
-for (const group of groups) {
-  await saveSession(...)
-}
+```text
++---------------------------+
+|  SHIFT OEE                |
+|  DAY Shift                |
+|                           |
+|      [  106.9%  ]         |
+|      World Class          |
+|                           |
+|  Produced:  22,248 units  |
+|  Planned:   20,800 units  |
+|  Performance: 106.9%      |
++---------------------------+
 ```
 
-### File: `src/components/IntouchImport.tsx` — Enhanced debug logging
-Add detailed console logging before the import showing which SKUs belong to which line, so the user and developer can verify the parser output in the browser console before saving.
+## Status Color Rules (updated)
 
-### File: `src/contexts/ShiftContext.tsx` — Add save guard
-In `saveSession`, add a console log showing the production_line and items being saved, to trace exactly what data reaches the database.
+| Performance | Color  | Label           |
+|-------------|--------|-----------------|
+| >= 100%     | Green  | World Class     |
+| 90-99%      | Yellow | On Target       |
+| < 90%       | Red    | Below Target    |
+| No data     | Gray   | -- (dash)       |
 
-### Also: Clean up March 15 bad data
-Delete the 3 sessions for March 15 and ask the user to re-import with the fix applied, to confirm it works.
+## Empty State
 
-## Files to modify
-- `src/pages/Planner.tsx` — sequential save loop
-- `src/components/IntouchImport.tsx` — detailed SKU-per-line debug log  
-- `src/contexts/ShiftContext.tsx` — save tracing log
+When no data exists for the selected filters, the panel shows:
+> "No production data for selected period"
+
+Instead of a blank or zero-filled panel.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
+| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
+
+## Technical Details
+
+### OEEPanel.tsx
+- Add `totalPlanned` prop to interface
+- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
+- Show "Produced" and "Planned" rows with formatted numbers
+- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
+- Performance displays as `--` when `totalPlanned === 0`
+
+### Dashboard.tsx (line 337)
+- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
+- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
+- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
+
+### Performance Note
+No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
 
