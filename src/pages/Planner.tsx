@@ -510,39 +510,49 @@ export function Planner() {
             open={showIntouchImport}
             onClose={() => setShowIntouchImport(false)}
             onImport={async (groups: LineGroup[], importDate: string, importShift: ShiftType) => {
-              const results = await Promise.allSettled(
-                groups.map(group => {
-                  const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
-                  return saveSession({
-                    date: importDate,
-                    shift: importShift,
-                    productionLine: normalizeLineName(group.line),
-                    lineLeader: group.lineLeader,
-                    plannedQuantity: totalPlanned,
-                    items: group.rows.map(r => ({
-                      sku: r.sku,
-                      productName: r.product,
-                      quantityTarget: r.quantityTarget,
-                      quantityActual: 0,
-                    })),
-                    comments: '',
-                    structuredDowntimes: group.downtimes?.map(d => ({
-                      id: crypto.randomUUID(),
-                      category: d.category,
-                      reason: d.reason,
-                      duration: d.duration,
-                      comment: d.comment,
-                    })),
-                    staffPlanned: 0,
-                    staffActual: 0,
-                  }, { skipRefresh: true });
-                })
-              );
+              const failures: string[] = [];
+              
+              // Save sequentially to avoid race conditions with upsert + delete + insert
+              for (const group of groups) {
+                const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
+                const lineName = normalizeLineName(group.line);
+                
+                console.log(`[iTouching Import] Saving line "${lineName}" with ${group.rows.length} SKUs:`, 
+                  group.rows.map(r => `${r.sku} (target: ${r.quantityTarget})`));
+                
+                const result = await saveSession({
+                  date: importDate,
+                  shift: importShift,
+                  productionLine: lineName,
+                  lineLeader: group.lineLeader,
+                  plannedQuantity: totalPlanned,
+                  items: group.rows.map(r => ({
+                    sku: r.sku,
+                    productName: r.product,
+                    quantityTarget: r.quantityTarget,
+                    quantityActual: 0,
+                  })),
+                  comments: '',
+                  structuredDowntimes: group.downtimes?.map(d => ({
+                    id: crypto.randomUUID(),
+                    category: d.category,
+                    reason: d.reason,
+                    duration: d.duration,
+                    comment: d.comment,
+                  })),
+                  staffPlanned: 0,
+                  staffActual: 0,
+                }, { skipRefresh: true });
+                
+                if (!result.success) {
+                  console.error(`[iTouching Import] Failed to save line "${lineName}":`, result.error);
+                  failures.push(lineName);
+                }
+              }
 
-              const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
               const dtCount = groups.reduce((sum, g) => sum + (g.downtimes?.length || 0), 0);
               if (failures.length > 0) {
-                toast.error(`Failed to import ${failures.length} line(s)`);
+                toast.error(`Failed to import ${failures.length} line(s): ${failures.join(', ')}`);
               } else {
                 toast.success(`Imported ${groups.length} line(s)${dtCount > 0 ? ` with ${dtCount} downtime(s)` : ''} successfully!`);
               }
