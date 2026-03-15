@@ -238,7 +238,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       let dtCurrentLine = 'Unknown Line';
       for (let r = 1; r < dtHeaderIdx; r++) {
         const machineName = isMachineRow(dtSheet.getRow(r));
-        if (machineName) dtCurrentLine = machineName;
+        if (machineName) dtCurrentLine = normalizeLineName(machineName);
       }
 
       for (let r = dtHeaderIdx + 1; r <= dtSheet.rowCount; r++) {
