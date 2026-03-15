@@ -115,8 +115,7 @@ function isMachineRow(row: ExcelJS.Row): string | null {
   return found;
 }
 
-function isHeaderRow(row: ExcelJS.Row, colMap: Record<number, string>): boolean {
-  // Check if this row looks like a header row (contains known header text)
+function isHeaderRow(row: ExcelJS.Row): boolean {
   let matches = 0;
   row.eachCell({ includeEmpty: false }, (cell) => {
     const val = String(cell.value ?? '').trim().toLowerCase();
@@ -134,7 +133,8 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
 
   // First pass: find the header row (could be row 1 or later)
   let headerRowIdx = -1;
-  let colMap: Record<number, keyof Omit<ParsedRow, 'line' | 'valid' | 'error'>> = {};
+  let colMap: Record<number, DataField> = {};
+  let lineColIdx = -1;
 
   for (let r = 1; r <= Math.min(ws.rowCount, 20); r++) {
     const row = ws.getRow(r);
@@ -143,8 +143,9 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       headers[col - 1] = String(cell.value ?? '');
     });
     const candidate = detectColumns(headers);
-    if (Object.values(candidate).includes('sku')) {
-      colMap = candidate;
+    if (Object.values(candidate.colMap).includes('sku')) {
+      colMap = candidate.colMap;
+      lineColIdx = candidate.lineColIdx;
       headerRowIdx = r;
       break;
     }
@@ -169,14 +170,24 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
     const machineName = isMachineRow(row);
     if (machineName) {
       currentLine = machineName;
+      // Don't skip — also check if this row has data columns
+    }
+
+    // Skip if it looks like a repeated header row (but check for Machine: first)
+    if (isHeaderRow(row)) {
+      // Even on header rows, check for machine marker (already done above)
       continue;
     }
 
-    // Skip if it looks like a repeated header row
-    if (isHeaderRow(row, colMap)) continue;
-
     // Parse data row
     const parsed: Partial<ParsedRow> = { orderNo: '', sku: '', product: '', quantity: 0, line: currentLine };
+    
+    // If we have a per-row line column, use it (overrides Machine: section)
+    if (lineColIdx >= 0) {
+      const lineVal = String(row.getCell(lineColIdx + 1).value ?? '').trim();
+      if (lineVal) parsed.line = lineVal;
+    }
+    
     Object.entries(colMap).forEach(([colIdx, field]) => {
       const val = row.getCell(Number(colIdx) + 1).value;
       if (field === 'quantity') {
@@ -194,6 +205,11 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       error: !parsed.sku ? 'Missing Part Code' : parsed.quantity! <= 0 ? 'Quantity must be > 0' : undefined,
     });
   }
+
+  // Debug: log parsed groups
+  const lineGroups = new Map<string, number>();
+  rows.forEach(r => lineGroups.set(r.line, (lineGroups.get(r.line) || 0) + 1));
+  console.log('[iTouching Parser] Lines detected:', Object.fromEntries(lineGroups), `(lineColIdx: ${lineColIdx})`);
 
   // Parse downtimes from second worksheet or downtime-labeled sheet
   const downtimes: ParsedDowntime[] = [];
