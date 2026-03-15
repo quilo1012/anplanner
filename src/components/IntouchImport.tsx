@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { SHIFT_TYPES, ShiftType } from '@/types/production';
+import { normalizeLineName } from '@/utils/normalizeLineName';
 import ExcelJS from 'exceljs';
 
 interface ParsedRow {

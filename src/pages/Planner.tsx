@@ -515,7 +515,7 @@ export function Planner() {
                   return saveSession({
                     date: importDate,
                     shift: importShift,
-                    productionLine: group.line,
+                    productionLine: normalizeLineName(group.line),
                     lineLeader: group.lineLeader,
                     plannedQuantity: totalPlanned,
                     items: group.rows.map(r => ({
