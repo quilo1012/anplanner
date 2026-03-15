@@ -161,7 +161,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
   // Check if there's a Machine: row before the header
   for (let r = 1; r < headerRowIdx; r++) {
     const machineName = isMachineRow(ws.getRow(r));
-    if (machineName) currentLine = machineName;
+    if (machineName) currentLine = normalizeLineName(machineName);
   }
 
   for (let r = headerRowIdx + 1; r <= ws.rowCount; r++) {
