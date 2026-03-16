@@ -15,6 +15,7 @@ const Downtime = lazy(() => import('@/pages/Downtime').then(m => ({ default: m.D
 const Admin = lazy(() => import('@/pages/Admin').then(m => ({ default: m.Admin })));
 const WeeklyReport = lazy(() => import('@/pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
+const Products = lazy(() => import('@/pages/Products').then(m => ({ default: m.Products })));
 
 
 function PageLoader() {
