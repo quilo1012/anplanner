@@ -170,21 +170,13 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
         </div>
       )}
 
-      {/* Save to catalog checkbox */}
+      {/* SKU not in catalog warning */}
       {!row.isFoundInDb && row.sku.trim().length >= 2 && (
         <div className="flex items-center gap-2 mb-3 p-2 bg-warning/10 border border-warning/30 rounded-md">
-          <Checkbox
-            id={`save-${row.id}`}
-            checked={row.isNewProduct || false}
-            onCheckedChange={(checked) => onSaveToggle(row.id, !!checked)}
-          />
-          <label
-            htmlFor={`save-${row.id}`}
-            className="text-sm text-foreground flex items-center gap-1 cursor-pointer"
-          >
-            <Save size={12} className="text-primary" />
-            Save to product catalog
-          </label>
+          <AlertTriangle size={14} className="text-warning shrink-0" />
+          <span className="text-sm text-foreground">
+            SKU not in catalog — add it via <strong>Products Database</strong>
+          </span>
         </div>
       )}
 
