@@ -47,9 +47,9 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     return { totalProduction: total, performance: perf };
   }, [skuRows, lineTarget]);
 
-  // Initialize form state when session changes (moved from render body to useEffect)
+  // Initialize form state when session changes — fetch items fresh from DB
   useEffect(() => {
-    if (!session) return;
+    if (!session || !open) return;
     setDate(session.date);
     setShiftType(session.shift);
     setProductionLine(session.productionLine);
@@ -59,14 +59,37 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     setObservations(session.comments);
     setMonitoringPhoto(session.monitoringPhoto);
     setPhotoFilename(session.photoFilename);
-    setStructuredDowntimes(session.structuredDowntimes || []);
     setLineTarget(session.plannedQuantity);
-    setSkuRows(session.items.map(item => ({
-      id: item.id, sku: item.sku, product: item.productName,
-      productionTarget: item.quantityTarget, realProduction: item.quantityActual, isFoundInDb: true,
-      batchNumber: '', blenderSize: 0, weightPerUnit: 0,
-    })));
-  }, [session?.id]);
+
+    // Fetch items and downtimes fresh from DB to avoid stale in-memory data
+    const loadFreshData = async () => {
+      const [itemsRes, downtimesRes] = await Promise.all([
+        supabase.from('production_items').select('*').eq('session_id', session.id),
+        supabase.from('structured_downtimes').select('*').eq('session_id', session.id),
+      ]);
+
+      setSkuRows((itemsRes.data || []).map(item => ({
+        id: item.id,
+        sku: item.sku,
+        product: item.product_name || '',
+        productionTarget: item.quantity_target || 0,
+        realProduction: item.quantity_actual || 0,
+        isFoundInDb: true,
+        batchNumber: '',
+        blenderSize: 0,
+        weightPerUnit: 0,
+      })));
+
+      setStructuredDowntimes((downtimesRes.data || []).map(dt => ({
+        id: dt.id,
+        category: dt.category,
+        reason: dt.reason,
+        duration: dt.duration,
+        comment: dt.comment || '',
+      })));
+    };
+    loadFreshData();
+  }, [session?.id, open]);
 
   const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
     setMonitoringPhoto(photo);

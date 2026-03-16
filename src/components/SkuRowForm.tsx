@@ -405,7 +405,7 @@ export function SkuRowForm({
           return {
             ...row,
             isFoundInDb: found,
-            isNewProduct: !found && row.product.trim().length > 0 ? true : (found ? false : row.isNewProduct)
+            isNewProduct: found ? false : row.isNewProduct
           };
         }
         return row;
