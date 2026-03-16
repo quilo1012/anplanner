@@ -330,9 +330,7 @@ export function SkuRowForm({
       skuRowsRef.current.map(row => {
         if (row.id === id) {
           const updated = { ...row, [field]: value };
-          if (field === 'product' && !row.isFoundInDb && String(value).trim().length > 0) {
-            updated.isNewProduct = true;
-          }
+          // No longer auto-flag isNewProduct — user must explicitly check the checkbox
           // Auto-calculate production target when blenderSize or weightPerUnit changes
           if (field === 'blenderSize' || field === 'weightPerUnit') {
             const blender = field === 'blenderSize' ? Number(value) : row.blenderSize;
@@ -407,7 +405,7 @@ export function SkuRowForm({
           return {
             ...row,
             isFoundInDb: found,
-            isNewProduct: !found && row.product.trim().length > 0 ? true : (found ? false : row.isNewProduct)
+            isNewProduct: found ? false : row.isNewProduct
           };
         }
         return row;
