@@ -469,9 +469,7 @@ export function Planner() {
           {showExcelUpload && (
             <ExcelUpload onImport={handleExcelImport} onClose={() => setShowExcelUpload(false)} />
           )}
-          {showProductUpload && (
-            <ProductCsvUpload onClose={() => setShowProductUpload(false)} />
-          )}
+          {/* ProductCsvUpload removed — managed via Products Database page */}
           <IntouchImport
             open={showIntouchImport}
             onClose={() => setShowIntouchImport(false)}
