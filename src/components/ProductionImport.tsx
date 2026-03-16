@@ -22,6 +22,7 @@ interface ImportRow {
   finish_time: string;
   shift_type: string;
   errors: string[];
+  warnings: string[];
   plannedQty?: number;
 }
 
