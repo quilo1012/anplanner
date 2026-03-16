@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Clock, FileBarChart, PanelLeftClose, PanelLeftOpen, Circle } from 'lucide-react';
+import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, Clock, FileBarChart, PanelLeftClose, PanelLeftOpen, Circle, Package } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
@@ -24,6 +24,12 @@ const navGroups: NavGroup[] = [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
       { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
       { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
+    label: 'Data',
+    items: [
+      { path: '/products', label: 'Products', icon: Package, roles: ['supervisor', 'admin'] },
     ],
   },
   {

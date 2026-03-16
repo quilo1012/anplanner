@@ -1,8 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Save, Clock, ClipboardPaste, Copy, FlaskConical, Hash } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Clock, ClipboardPaste, Copy, FlaskConical, Hash } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
-import { Checkbox } from './ui/checkbox';
 import { batchLookupProducts } from '@/hooks/useProductSearch';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
@@ -22,12 +21,11 @@ interface SkuRowItemProps {
   onRemove: (id: string) => void;
   onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => void;
   onFoundStatusChange: (rowId: string, found: boolean) => void;
-  onSaveToggle: (rowId: string, checked: boolean) => void;
 }
 
 const MemoizedSkuRow = React.memo(function SkuRowItem({
   row, index, canReview, showTarget, hasSkuError, hasDuplicateError,
-  onUpdate, onRemove, onProductSelect, onFoundStatusChange, onSaveToggle,
+  onUpdate, onRemove, onProductSelect, onFoundStatusChange,
 }: SkuRowItemProps) {
   const performance = row.productionTarget > 0
     ? Math.round((row.realProduction / row.productionTarget) * 100)
@@ -171,21 +169,13 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
         </div>
       )}
 
-      {/* Save to catalog checkbox */}
+      {/* SKU not in catalog warning */}
       {!row.isFoundInDb && row.sku.trim().length >= 2 && (
         <div className="flex items-center gap-2 mb-3 p-2 bg-warning/10 border border-warning/30 rounded-md">
-          <Checkbox
-            id={`save-${row.id}`}
-            checked={row.isNewProduct || false}
-            onCheckedChange={(checked) => onSaveToggle(row.id, !!checked)}
-          />
-          <label
-            htmlFor={`save-${row.id}`}
-            className="text-sm text-foreground flex items-center gap-1 cursor-pointer"
-          >
-            <Save size={12} className="text-primary" />
-            Save to product catalog
-          </label>
+          <AlertTriangle size={14} className="text-warning shrink-0" />
+          <span className="text-sm text-foreground">
+            SKU not in catalog — add it via <strong>Products Database</strong>
+          </span>
         </div>
       )}
 
@@ -413,15 +403,7 @@ export function SkuRowForm({
     );
   }, [onChange]);
 
-  const handleSaveToggle = useCallback((rowId: string, checked: boolean) => {
-    onChange(
-      skuRowsRef.current.map(row =>
-        row.id === rowId
-          ? { ...row, isNewProduct: checked }
-          : row
-      )
-    );
-  }, [onChange]);
+  // handleSaveToggle removed — product creation managed via Products Database page
 
   const handleBatchPaste = useCallback(async () => {
     const skus = batchText.split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
@@ -523,7 +505,6 @@ export function SkuRowForm({
               onRemove={handleRemove}
               onProductSelect={handleProductSelect}
               onFoundStatusChange={handleFoundStatusChange}
-              onSaveToggle={handleSaveToggle}
             />
           ))}
         </div>

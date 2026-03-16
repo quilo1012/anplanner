@@ -9,7 +9,6 @@ import { normalizeLineName } from '@/utils/normalizeLineName';
 import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
 import { ProductionImport } from '@/components/ProductionImport';
-import { ProductCsvUpload } from '@/components/ProductCsvUpload';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { useShifts } from '@/contexts/ShiftContext';
@@ -17,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProductLineRecommendations } from '@/hooks/useProductLineRecommendations';
 import { ShiftType, SHIFT_TYPES } from '@/types/production';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
-import { Save, RotateCcw, FileSpreadsheet, Package, Users, User, ClipboardCheck, Lock } from 'lucide-react';
+import { Save, RotateCcw, FileSpreadsheet, Users, User, ClipboardCheck, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { naturalLineSort } from '@/utils/naturalLineSort';
@@ -68,7 +67,7 @@ export function Planner() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
-  const [showProductUpload, setShowProductUpload] = useState(false);
+  const [showProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
   const [showPlanImport, setShowPlanImport] = useState(false);
   const [showProductionImport, setShowProductionImport] = useState(false);
@@ -232,36 +231,7 @@ export function Planner() {
         return;
       }
 
-      // Fire-and-forget: save new products to catalog in parallel
-      const newProductRows = formState.skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
-      if (newProductRows.length > 0) {
-        (async () => {
-          try {
-            const { data: existingProducts } = await supabase
-              .from('products')
-              .select('product_code')
-              .in('product_code', newProductRows.map(r => r.sku));
-            const existingCodes = new Set((existingProducts || []).map(p => p.product_code));
-            const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
-            if (toInsert.length > 0) {
-              const { error } = await supabase.from('products').insert(
-                toInsert.map(r => ({
-                  product_code: r.sku.replace(/[\s-]+B\d+$/i, ''),
-                  product_description: r.product,
-                }))
-              );
-              if (error) {
-                console.error('Error saving new products:', error);
-                toast.error('Failed to save new products to catalog');
-              } else {
-                toast.success(`${toInsert.length} new product(s) saved to catalog`);
-              }
-            }
-          } catch (err) {
-            console.error('Error saving new products:', err);
-          }
-        })();
-      }
+      // Planner no longer writes to products table — manage products in Products Database page
 
       // Calculate total planned quantity from all SKU targets
       const totalPlanned = validRows.reduce((sum, row) => sum + (row.productionTarget || 0), 0);
@@ -363,10 +333,6 @@ export function Planner() {
               <button type="button" onClick={() => setShowPlanImport(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import Plan</span>
-              </button>
-              <button type="button" onClick={() => setShowProductUpload(true)} className="btn-secondary">
-                <Package size={18} />
-                <span className="hidden sm:inline">Import Products</span>
               </button>
               <button onClick={() => setShowExcelUpload(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
@@ -503,9 +469,7 @@ export function Planner() {
           {showExcelUpload && (
             <ExcelUpload onImport={handleExcelImport} onClose={() => setShowExcelUpload(false)} />
           )}
-          {showProductUpload && (
-            <ProductCsvUpload onClose={() => setShowProductUpload(false)} />
-          )}
+          {/* ProductCsvUpload removed — managed via Products Database page */}
           <IntouchImport
             open={showIntouchImport}
             onClose={() => setShowIntouchImport(false)}

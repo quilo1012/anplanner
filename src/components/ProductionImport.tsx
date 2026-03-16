@@ -22,6 +22,7 @@ interface ImportRow {
   finish_time: string;
   shift_type: string;
   errors: string[];
+  warnings: string[];
   plannedQty?: number;
 }
 
@@ -139,11 +140,25 @@ export function ProductionImport({ open, onClose }: Props) {
           rowNum: rowNumber, date: dateStr, assembly_number: assemblyNum,
           work_centre: workCentre, product_code: productCode, product_description: productDesc,
           weight_kg: weightKg, qty, start_time: startTime, finish_time: finishTime,
-          shift_type: shift || 'DAY', errors,
+          shift_type: shift || 'DAY', errors, warnings: [],
         });
       });
 
       if (parsed.length === 0) { toast.error('No data rows found'); setLoading(false); return; }
+
+      // Validate SKUs against products database
+      const uniqueSkus = [...new Set(parsed.map(r => r.product_code).filter(Boolean))];
+      const { data: existingProducts } = await supabase
+        .from('products')
+        .select('product_code')
+        .in('product_code', uniqueSkus);
+      const validCodes = new Set((existingProducts || []).map(p => p.product_code));
+
+      for (const row of parsed) {
+        if (row.product_code && !validCodes.has(row.product_code)) {
+          row.warnings.push('SKU not found in Products Database');
+        }
+      }
 
       // Fetch matching plans from production_plans
       const validParsed = parsed.filter(r => r.errors.length === 0);
@@ -406,6 +421,15 @@ export function ProductionImport({ open, onClose }: Props) {
                     <span className="text-destructive">{errorRows.length} row(s) with errors</span>
                   </div>
                 )}
+                {(() => {
+                  const warningCount = rows.filter(r => r.warnings.length > 0).length;
+                  return warningCount > 0 ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <AlertCircle size={16} className="text-yellow-500" />
+                      <span className="text-yellow-600 dark:text-yellow-400">{warningCount} row(s) with unknown SKUs</span>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   → {new Set(validRows.map(r => `${r.work_centre}|${r.date}|${r.shift_type}`)).size} sessão(ões) a processar
                 </div>
@@ -433,9 +457,10 @@ export function ProductionImport({ open, onClose }: Props) {
                   <TableBody>
                     {rows.map((row, i) => {
                       const hasErr = row.errors.length > 0;
+                      const hasWarn = row.warnings.length > 0;
                       const perf = row.plannedQty ? (row.qty / row.plannedQty) * 100 : undefined;
                       return (
-                        <TableRow key={i} className={hasErr ? 'bg-destructive/10' : 'bg-green-500/5'}>
+                        <TableRow key={i} className={hasErr ? 'bg-destructive/10' : hasWarn ? 'bg-yellow-500/10' : 'bg-green-500/5'}>
                           <TableCell className="font-mono text-xs">{row.rowNum}</TableCell>
                           <TableCell className="text-xs">{row.date}</TableCell>
                           <TableCell className="text-xs">{row.work_centre}</TableCell>
@@ -453,6 +478,11 @@ export function ProductionImport({ open, onClose }: Props) {
                               <div className="flex items-start gap-1">
                                 <AlertCircle size={14} className="text-destructive shrink-0 mt-0.5" />
                                 <span className="text-xs text-destructive">{row.errors.join('; ')}</span>
+                              </div>
+                            ) : hasWarn ? (
+                              <div className="flex items-start gap-1">
+                                <AlertCircle size={14} className="text-yellow-500 shrink-0 mt-0.5" />
+                                <span className="text-xs text-yellow-600 dark:text-yellow-400">{row.warnings.join('; ')}</span>
                               </div>
                             ) : (
                               <CheckCircle2 size={14} className="text-green-500" />

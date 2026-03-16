@@ -150,26 +150,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
         return;
       }
 
-      // Supervisor/Admin path: full update
-      // Batch save new products to catalog
-      const newProductRows = skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
-      if (newProductRows.length > 0) {
-        const { data: existingProducts } = await supabase
-          .from('products')
-          .select('product_code')
-          .in('product_code', newProductRows.map(r => r.sku));
-        const existingCodes = new Set((existingProducts || []).map(p => p.product_code));
-        const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
-        if (toInsert.length > 0) {
-          const { error } = await supabase.from('products').insert(
-            toInsert.map(r => ({
-              product_code: r.sku.replace(/[\s-]+B\d+$/i, ''),
-              product_description: r.product,
-            }))
-          );
-          if (!error) toast.success(`${toInsert.length} new product(s) saved to catalog`);
-        }
-      }
+      // Supervisor/Admin path: full update (no longer auto-creates products)
 
       const result = await updateSession(session.id, {
         date, shift: shiftType, productionLine: productionLine.trim(), lineLeader: lineLeader.trim(),
