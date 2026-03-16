@@ -231,36 +231,7 @@ export function Planner() {
         return;
       }
 
-      // Fire-and-forget: save new products to catalog in parallel
-      const newProductRows = formState.skuRows.filter(r => r.isNewProduct && r.sku.trim() && r.product.trim());
-      if (newProductRows.length > 0) {
-        (async () => {
-          try {
-            const { data: existingProducts } = await supabase
-              .from('products')
-              .select('product_code')
-              .in('product_code', newProductRows.map(r => r.sku));
-            const existingCodes = new Set((existingProducts || []).map(p => p.product_code));
-            const toInsert = newProductRows.filter(r => !existingCodes.has(r.sku));
-            if (toInsert.length > 0) {
-              const { error } = await supabase.from('products').insert(
-                toInsert.map(r => ({
-                  product_code: r.sku.replace(/[\s-]+B\d+$/i, ''),
-                  product_description: r.product,
-                }))
-              );
-              if (error) {
-                console.error('Error saving new products:', error);
-                toast.error('Failed to save new products to catalog');
-              } else {
-                toast.success(`${toInsert.length} new product(s) saved to catalog`);
-              }
-            }
-          } catch (err) {
-            console.error('Error saving new products:', err);
-          }
-        })();
-      }
+      // Planner no longer writes to products table — manage products in Products Database page
 
       // Calculate total planned quantity from all SKU targets
       const totalPlanned = validRows.reduce((sum, row) => sum + (row.productionTarget || 0), 0);
