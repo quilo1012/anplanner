@@ -334,10 +334,6 @@ export function Planner() {
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import Plan</span>
               </button>
-              <button type="button" onClick={() => setShowProductUpload(true)} className="btn-secondary">
-                <Package size={18} />
-                <span className="hidden sm:inline">Import Products</span>
-              </button>
               <button onClick={() => setShowExcelUpload(true)} className="btn-secondary">
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import Sessions</span>
