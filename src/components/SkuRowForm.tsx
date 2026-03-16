@@ -26,7 +26,7 @@ interface SkuRowItemProps {
 
 const MemoizedSkuRow = React.memo(function SkuRowItem({
   row, index, canReview, showTarget, hasSkuError, hasDuplicateError,
-  onUpdate, onRemove, onProductSelect, onFoundStatusChange, onSaveToggle,
+  onUpdate, onRemove, onProductSelect, onFoundStatusChange,
 }: SkuRowItemProps) {
   const performance = row.productionTarget > 0
     ? Math.round((row.realProduction / row.productionTarget) * 100)
