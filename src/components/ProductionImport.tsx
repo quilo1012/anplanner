@@ -421,6 +421,15 @@ export function ProductionImport({ open, onClose }: Props) {
                     <span className="text-destructive">{errorRows.length} row(s) with errors</span>
                   </div>
                 )}
+                {(() => {
+                  const warningCount = rows.filter(r => r.warnings.length > 0).length;
+                  return warningCount > 0 ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <AlertCircle size={16} className="text-yellow-500" />
+                      <span className="text-yellow-600 dark:text-yellow-400">{warningCount} row(s) with unknown SKUs</span>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   → {new Set(validRows.map(r => `${r.work_centre}|${r.date}|${r.shift_type}`)).size} sessão(ões) a processar
                 </div>
