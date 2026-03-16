@@ -479,6 +479,11 @@ export function ProductionImport({ open, onClose }: Props) {
                                 <AlertCircle size={14} className="text-destructive shrink-0 mt-0.5" />
                                 <span className="text-xs text-destructive">{row.errors.join('; ')}</span>
                               </div>
+                            ) : hasWarn ? (
+                              <div className="flex items-start gap-1">
+                                <AlertCircle size={14} className="text-yellow-500 shrink-0 mt-0.5" />
+                                <span className="text-xs text-yellow-600 dark:text-yellow-400">{row.warnings.join('; ')}</span>
+                              </div>
                             ) : (
                               <CheckCircle2 size={14} className="text-green-500" />
                             )}
