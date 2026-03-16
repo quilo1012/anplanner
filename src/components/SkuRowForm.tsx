@@ -403,15 +403,7 @@ export function SkuRowForm({
     );
   }, [onChange]);
 
-  const handleSaveToggle = useCallback((rowId: string, checked: boolean) => {
-    onChange(
-      skuRowsRef.current.map(row =>
-        row.id === rowId
-          ? { ...row, isNewProduct: checked }
-          : row
-      )
-    );
-  }, [onChange]);
+  // handleSaveToggle removed — product creation managed via Products Database page
 
   const handleBatchPaste = useCallback(async () => {
     const skus = batchText.split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
