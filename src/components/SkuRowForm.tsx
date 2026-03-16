@@ -505,7 +505,6 @@ export function SkuRowForm({
               onRemove={handleRemove}
               onProductSelect={handleProductSelect}
               onFoundStatusChange={handleFoundStatusChange}
-              onSaveToggle={handleSaveToggle}
             />
           ))}
         </div>
