@@ -457,9 +457,10 @@ export function ProductionImport({ open, onClose }: Props) {
                   <TableBody>
                     {rows.map((row, i) => {
                       const hasErr = row.errors.length > 0;
+                      const hasWarn = row.warnings.length > 0;
                       const perf = row.plannedQty ? (row.qty / row.plannedQty) * 100 : undefined;
                       return (
-                        <TableRow key={i} className={hasErr ? 'bg-destructive/10' : 'bg-green-500/5'}>
+                        <TableRow key={i} className={hasErr ? 'bg-destructive/10' : hasWarn ? 'bg-yellow-500/10' : 'bg-green-500/5'}>
                           <TableCell className="font-mono text-xs">{row.rowNum}</TableCell>
                           <TableCell className="text-xs">{row.date}</TableCell>
                           <TableCell className="text-xs">{row.work_centre}</TableCell>
