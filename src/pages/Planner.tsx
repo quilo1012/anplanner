@@ -67,7 +67,7 @@ export function Planner() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
-  const [showProductUpload, setShowProductUpload] = useState(false);
+  const [showProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
   const [showPlanImport, setShowPlanImport] = useState(false);
   const [showProductionImport, setShowProductionImport] = useState(false);
