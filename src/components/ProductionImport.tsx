@@ -146,6 +146,20 @@ export function ProductionImport({ open, onClose }: Props) {
 
       if (parsed.length === 0) { toast.error('No data rows found'); setLoading(false); return; }
 
+      // Validate SKUs against products database
+      const uniqueSkus = [...new Set(parsed.map(r => r.product_code).filter(Boolean))];
+      const { data: existingProducts } = await supabase
+        .from('products')
+        .select('product_code')
+        .in('product_code', uniqueSkus);
+      const validCodes = new Set((existingProducts || []).map(p => p.product_code));
+
+      for (const row of parsed) {
+        if (row.product_code && !validCodes.has(row.product_code)) {
+          row.warnings.push('SKU not found in Products Database');
+        }
+      }
+
       // Fetch matching plans from production_plans
       const validParsed = parsed.filter(r => r.errors.length === 0);
       const dates = [...new Set(validParsed.map(r => r.date))];
