@@ -22,7 +22,6 @@ interface SkuRowItemProps {
   onRemove: (id: string) => void;
   onProductSelect: (rowId: string, sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => void;
   onFoundStatusChange: (rowId: string, found: boolean) => void;
-  onSaveToggle: (rowId: string, checked: boolean) => void;
 }
 
 const MemoizedSkuRow = React.memo(function SkuRowItem({
