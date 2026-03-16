@@ -140,7 +140,7 @@ export function ProductionImport({ open, onClose }: Props) {
           rowNum: rowNumber, date: dateStr, assembly_number: assemblyNum,
           work_centre: workCentre, product_code: productCode, product_description: productDesc,
           weight_kg: weightKg, qty, start_time: startTime, finish_time: finishTime,
-          shift_type: shift || 'DAY', errors,
+          shift_type: shift || 'DAY', errors, warnings: [],
         });
       });
 
