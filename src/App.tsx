@@ -44,6 +44,7 @@ const App = () => (
           >
             <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
             <Route path="planner" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Planner /></Suspense></ProtectedRoute>} />
+            <Route path="products" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Products /></Suspense></ProtectedRoute>} />
             <Route path="downtime" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Downtime /></Suspense></ProtectedRoute>} />
             <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><History /></ProtectedRoute>} />
             <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><WeeklyReport /></Suspense></ProtectedRoute>} />

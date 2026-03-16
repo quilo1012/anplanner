@@ -27,6 +27,12 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Data',
+    items: [
+      { path: '/products', label: 'Products', icon: Package, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
     label: 'Reports',
     items: [
       { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
