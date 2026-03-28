@@ -96,6 +96,7 @@ export function ProductionImport({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [planMap, setPlanMap] = useState<Map<string, number>>(new Map());
+  const [leaderName, setLeaderName] = useState('');
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
