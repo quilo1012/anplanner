@@ -354,6 +354,7 @@ export function ProductionImport({ open, onClose }: Props) {
       onClose();
       setRows([]);
       setPlanMap(new Map());
+      setLeaderName('');
       navigate('/history');
     } catch (err: any) {
       toast.error(`Import failed: ${err.message}`);
@@ -504,7 +505,7 @@ export function ProductionImport({ open, onClose }: Props) {
             <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); }}>Choose Different File</Button>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); }}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving}>
+              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !leaderName.trim()}>
                 {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>
