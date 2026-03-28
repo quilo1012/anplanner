@@ -1,32 +1,45 @@
 
 
-# Add Leader Name Field to Production Import
+# Fix: Planner Manual Save Not Persisting to History
 
-## What changes
+## Root Cause
 
-### `src/components/ProductionImport.tsx`
+In `src/pages/Planner.tsx` lines 258-267, the code navigates to `/history` **before** calling `saveSession`:
 
-1. **Add a `leaderName` state** — a single text input field shown above the preview table after file is parsed.
+```typescript
+// Navigate optimistically — session save continues in background
+toast.success('Production session saved!');
+navigate('/history');  // ← unmounts Planner + ShiftProvider
 
-2. **Also support per-group leaders** — Add a `leaderMap` state (`Map<string, string>`) keyed by `work_centre|date|shift_type`. Show an editable leader name column in the summary or a single global input with an option to override per group.
+let result = await saveSession(sessionData);  // ← never completes
+```
 
-   **Simpler approach (recommended):** One global input field for leader name, since typically the same person imports the data. Default value: empty (required before confirming).
+When `navigate('/history')` runs, the Planner component unmounts. Since `saveSession` comes from the `ShiftContext` provider (which may also unmount or lose its closure), the database write is killed mid-flight. The toast says "saved" but nothing actually persists.
 
-3. **Use the leader name when saving:**
-   - Line 328: Replace `lineLeader: 'Imported'` with `lineLeader: leaderName`
-   - For existing sessions (sync mode, line 307-310): also update `line_leader` on the session
+## Fix
 
-4. **Validation:** Disable the "Import" button if `leaderName` is empty.
+**`src/pages/Planner.tsx`** — Move `navigate('/history')` to AFTER the save completes:
 
-### UI placement
-- After the stats row (valid rows, errors, etc.) and before the table, add:
-  ```
-  Label: "Nome do Líder"
-  Input: text field, placeholder "Introduza o nome do líder..."
-  ```
+```typescript
+let result;
+if (editId) {
+  result = await updateSession(editId, sessionData);
+} else {
+  result = await saveSession(sessionData);
+}
 
-### Files
+if (!result.success) {
+  toast.error(`Save failed: ${result.error}`);
+} else {
+  toast.success(editId ? 'Session updated!' : 'Production session saved!');
+  navigate('/history');
+}
+```
+
+Remove the premature toast and navigate that currently sit above the save call.
+
+## Files
 | File | Change |
 |------|--------|
-| `src/components/ProductionImport.tsx` | Add `leaderName` state, input field, pass to `saveSession` and session update |
+| `src/pages/Planner.tsx` | Move navigate + toast after await saveSession/updateSession |
 
