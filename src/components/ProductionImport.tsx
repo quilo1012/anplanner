@@ -307,7 +307,7 @@ export function ProductionImport({ open, onClose }: Props) {
             
             await supabase
               .from('production_sessions')
-              .update({ planned_quantity: newTotalPlanned, updated_at: new Date().toISOString() })
+              .update({ planned_quantity: newTotalPlanned, line_leader: leaderName.trim(), updated_at: new Date().toISOString() })
               .eq('id', existingSessionId);
 
             updatedCount++;
@@ -326,7 +326,7 @@ export function ProductionImport({ open, onClose }: Props) {
               date: first.date,
               shift: first.shift_type as 'DAY' | 'NIGHT',
               productionLine: first.work_centre,
-              lineLeader: 'Imported',
+              lineLeader: leaderName.trim(),
               plannedQuantity: totalPlanned,
               items,
               comments: '',
