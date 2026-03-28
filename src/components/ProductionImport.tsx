@@ -96,6 +96,7 @@ export function ProductionImport({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [planMap, setPlanMap] = useState<Map<string, number>>(new Map());
+  const [leaderName, setLeaderName] = useState('');
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -306,7 +307,7 @@ export function ProductionImport({ open, onClose }: Props) {
             
             await supabase
               .from('production_sessions')
-              .update({ planned_quantity: newTotalPlanned, updated_at: new Date().toISOString() })
+              .update({ planned_quantity: newTotalPlanned, line_leader: leaderName.trim(), updated_at: new Date().toISOString() })
               .eq('id', existingSessionId);
 
             updatedCount++;
@@ -325,7 +326,7 @@ export function ProductionImport({ open, onClose }: Props) {
               date: first.date,
               shift: first.shift_type as 'DAY' | 'NIGHT',
               productionLine: first.work_centre,
-              lineLeader: 'Imported',
+              lineLeader: leaderName.trim(),
               plannedQuantity: totalPlanned,
               items,
               comments: '',
@@ -353,6 +354,7 @@ export function ProductionImport({ open, onClose }: Props) {
       onClose();
       setRows([]);
       setPlanMap(new Map());
+      setLeaderName('');
       navigate('/history');
     } catch (err: any) {
       toast.error(`Import failed: ${err.message}`);
@@ -374,7 +376,7 @@ export function ProductionImport({ open, onClose }: Props) {
       <div className="bg-background rounded-xl shadow-2xl w-[95vw] max-w-5xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Import Production Data</h2>
-          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); }} className="p-2 hover:bg-muted rounded-lg">
+          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }} className="p-2 hover:bg-muted rounded-lg">
             <X size={20} />
           </button>
         </div>
@@ -423,6 +425,19 @@ export function ProductionImport({ open, onClose }: Props) {
                 <div className="flex items-center gap-2 text-sm">
                   <Link2 size={16} className="text-primary" />
                   <span className="text-foreground">{matchedRows.length} of {validRows.length} rows matched to plans</span>
+                </div>
+              </div>
+
+              <div className="flex items-end gap-3 mb-2">
+                <div className="flex-1 max-w-xs">
+                  <label className="text-sm font-medium text-foreground mb-1 block">Nome do Líder</label>
+                  <input
+                    type="text"
+                    value={leaderName}
+                    onChange={e => setLeaderName(e.target.value)}
+                    placeholder="Introduza o nome do líder..."
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
                 </div>
               </div>
 
@@ -487,10 +502,10 @@ export function ProductionImport({ open, onClose }: Props) {
 
         {rows.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
-            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); }}>Choose Different File</Button>
+            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Choose Different File</Button>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); }}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving}>
+              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Cancel</Button>
+              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !leaderName.trim()}>
                 {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>
