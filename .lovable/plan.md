@@ -1,46 +1,32 @@
 
 
-# Fix: Production Import Saving Same SKUs to All Lines
+# Add Leader Name Field to Production Import
 
-## Root Cause
+## What changes
 
-In `src/components/ProductionImport.tsx`, line 252, `handleConfirm` saves all line groups using **`Promise.allSettled` (parallel)**. Each group calls `saveSession`, which does:
+### `src/components/ProductionImport.tsx`
 
-1. Upsert session (by `production_line,date,shift_type`)
-2. Delete ALL items for that session ID
-3. Insert new items
+1. **Add a `leaderName` state** — a single text input field shown above the preview table after file is parsed.
 
-When multiple groups run simultaneously, one group's delete step can wipe items that another group just inserted. This is the **exact same race condition** that was already fixed in the iTouching import but was never applied here.
+2. **Also support per-group leaders** — Add a `leaderMap` state (`Map<string, string>`) keyed by `work_centre|date|shift_type`. Show an editable leader name column in the summary or a single global input with an option to override per group.
 
-## Fix
+   **Simpler approach (recommended):** One global input field for leader name, since typically the same person imports the data. Default value: empty (required before confirming).
 
-### File: `src/components/ProductionImport.tsx`
+3. **Use the leader name when saving:**
+   - Line 328: Replace `lineLeader: 'Imported'` with `lineLeader: leaderName`
+   - For existing sessions (sync mode, line 307-310): also update `line_leader` on the session
 
-Replace the parallel `Promise.allSettled` block (lines 252-353) with a **sequential `for...of` loop**, identical to the pattern used in the iTouching import:
+4. **Validation:** Disable the "Import" button if `leaderName` is empty.
 
-```typescript
-// BEFORE (race-prone):
-const results = await Promise.allSettled(
-  entries.map(async ([key, groupRows]) => { ... })
-);
+### UI placement
+- After the stats row (valid rows, errors, etc.) and before the table, add:
+  ```
+  Label: "Nome do Líder"
+  Input: text field, placeholder "Introduza o nome do líder..."
+  ```
 
-// AFTER (safe):
-const failures: string[] = [];
-for (const [key, groupRows] of entries) {
-  try {
-    // ... same logic per group ...
-  } catch (err) {
-    failures.push(key);
-  }
-}
-```
-
-Each session (upsert → delete items → insert items) completes fully before the next line begins, preventing any cross-contamination between groups.
-
-No other files need changes. The `saveSession` function itself is correct — the only issue is calling it concurrently for multiple lines.
-
-## Files to modify
+### Files
 | File | Change |
 |------|--------|
-| `src/components/ProductionImport.tsx` | Replace `Promise.allSettled` with sequential `for...of` loop |
+| `src/components/ProductionImport.tsx` | Add `leaderName` state, input field, pass to `saveSession` and session update |
 
