@@ -427,6 +427,19 @@ export function ProductionImport({ open, onClose }: Props) {
                 </div>
               </div>
 
+              <div className="flex items-end gap-3 mb-2">
+                <div className="flex-1 max-w-xs">
+                  <label className="text-sm font-medium text-foreground mb-1 block">Nome do Líder</label>
+                  <input
+                    type="text"
+                    value={leaderName}
+                    onChange={e => setLeaderName(e.target.value)}
+                    placeholder="Introduza o nome do líder..."
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                </div>
+              </div>
+
               <div className="border border-border rounded-lg overflow-auto max-h-[55vh]">
                 <Table>
                   <TableHeader>
