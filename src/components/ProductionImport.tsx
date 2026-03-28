@@ -249,8 +249,10 @@ export function ProductionImport({ open, onClose }: Props) {
       let updatedCount = 0;
       let createdCount = 0;
 
-      const results = await Promise.allSettled(
-        entries.map(async ([key, groupRows]) => {
+      const failures: string[] = [];
+
+      for (const [key, groupRows] of entries) {
+        try {
           const first = groupRows[0];
           const sessionKey = `${first.work_centre}|${first.date}|${first.shift_type}`;
           const existingSessionId = sessionLookup.get(sessionKey);
@@ -278,45 +280,29 @@ export function ProductionImport({ open, onClose }: Props) {
             const existingItems = existingItemsMap.get(existingSessionId) || [];
             const existingSkuMap = new Map(existingItems.map(i => [i.sku, i]));
 
-            const updatePromises: PromiseLike<any>[] = [];
-            const newItems: { session_id: string; sku: string; product_name: string; quantity_target: number; quantity_actual: number }[] = [];
-
             for (const [sku, agg] of skuAgg) {
               const existingItem = existingSkuMap.get(sku);
               if (existingItem) {
-                // Update quantity_actual
-                updatePromises.push(
-                  supabase
-                    .from('production_items')
-                    .update({ quantity_actual: agg.actualQty })
-                    .eq('id', existingItem.id)
-                    .then(({ error }) => {
-                      if (error) console.error('Failed to update item:', sku, error);
-                    })
-                );
+                const { error } = await supabase
+                  .from('production_items')
+                  .update({ quantity_actual: agg.actualQty })
+                  .eq('id', existingItem.id);
+                if (error) console.error('Failed to update item:', sku, error);
               } else {
-                // New SKU → insert
-                newItems.push({
+                const { error: insertErr } = await supabase.from('production_items').insert({
                   session_id: existingSessionId,
                   sku,
                   product_name: agg.productName,
                   quantity_target: agg.targetQty,
                   quantity_actual: agg.actualQty,
                 });
+                if (insertErr) console.error('Failed to insert new item:', sku, insertErr);
               }
             }
 
-            await Promise.all(updatePromises);
-            if (newItems.length > 0) {
-              const { error: insertErr } = await supabase.from('production_items').insert(newItems);
-              if (insertErr) console.error('Failed to insert new items:', insertErr);
-            }
-
             // Update planned_quantity on the session
-            const totalPlanned = [...skuAgg.values()].reduce((s, a) => s + a.targetQty, 0);
-            // Recalculate total with existing items that weren't in import
             const allItems = await supabase.from('production_items').select('quantity_target').eq('session_id', existingSessionId);
-            const newTotalPlanned = allItems.data?.reduce((s, i) => s + (i.quantity_target || 0), 0) || totalPlanned;
+            const newTotalPlanned = allItems.data?.reduce((s, i) => s + (i.quantity_target || 0), 0) || 0;
             
             await supabase
               .from('production_sessions')
@@ -349,10 +335,11 @@ export function ProductionImport({ open, onClose }: Props) {
 
             createdCount++;
           }
-        })
-      );
+        } catch (err) {
+          failures.push(key);
+        }
+      }
 
-      const failures = results.filter(r => r.status === 'rejected');
       if (failures.length > 0) {
         toast.error(`Failed to import ${failures.length} session(s)`);
       } else {
