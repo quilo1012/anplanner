@@ -1,64 +1,46 @@
 
 
-# Dynamic Shift OEE Panel
+# Fix: Production Import Saving Same SKUs to All Lines
 
-## What Changes
+## Root Cause
 
-The OEE panel will be updated to show **Produced**, **Planned**, **Performance %**, and **Status** -- all dynamically recalculated when any filter (date, line, shift, leader) changes. The panel already reacts to filter changes since it reads from `filteredSessions`, so no backend function is needed -- the data is already loaded client-side.
+In `src/components/ProductionImport.tsx`, line 252, `handleConfirm` saves all line groups using **`Promise.allSettled` (parallel)**. Each group calls `saveSession`, which does:
 
-## Updated Panel Layout
+1. Upsert session (by `production_line,date,shift_type`)
+2. Delete ALL items for that session ID
+3. Insert new items
 
-```text
-+---------------------------+
-|  SHIFT OEE                |
-|  DAY Shift                |
-|                           |
-|      [  106.9%  ]         |
-|      World Class          |
-|                           |
-|  Produced:  22,248 units  |
-|  Planned:   20,800 units  |
-|  Performance: 106.9%      |
-+---------------------------+
+When multiple groups run simultaneously, one group's delete step can wipe items that another group just inserted. This is the **exact same race condition** that was already fixed in the iTouching import but was never applied here.
+
+## Fix
+
+### File: `src/components/ProductionImport.tsx`
+
+Replace the parallel `Promise.allSettled` block (lines 252-353) with a **sequential `for...of` loop**, identical to the pattern used in the iTouching import:
+
+```typescript
+// BEFORE (race-prone):
+const results = await Promise.allSettled(
+  entries.map(async ([key, groupRows]) => { ... })
+);
+
+// AFTER (safe):
+const failures: string[] = [];
+for (const [key, groupRows] of entries) {
+  try {
+    // ... same logic per group ...
+  } catch (err) {
+    failures.push(key);
+  }
+}
 ```
 
-## Status Color Rules (updated)
+Each session (upsert → delete items → insert items) completes fully before the next line begins, preventing any cross-contamination between groups.
 
-| Performance | Color  | Label           |
-|-------------|--------|-----------------|
-| >= 100%     | Green  | World Class     |
-| 90-99%      | Yellow | On Target       |
-| < 90%       | Red    | Below Target    |
-| No data     | Gray   | -- (dash)       |
+No other files need changes. The `saveSession` function itself is correct — the only issue is calling it concurrently for multiple lines.
 
-## Empty State
-
-When no data exists for the selected filters, the panel shows:
-> "No production data for selected period"
-
-Instead of a blank or zero-filled panel.
-
-## Files to Modify
-
+## Files to modify
 | File | Change |
 |------|--------|
-| `src/components/dashboard/OEEPanel.tsx` | Add `totalPlanned` prop, update layout to show Produced/Planned/Performance, update status thresholds, add empty state |
-| `src/pages/Dashboard.tsx` | Pass `totalPlanned` (sum of `plannedQuantity`) to `OEEPanel` |
-
-## Technical Details
-
-### OEEPanel.tsx
-- Add `totalPlanned` prop to interface
-- Update `getOEEStatus` thresholds: >=100 World Class/green, >=90 On Target/warning, <90 Below Target/red
-- Show "Produced" and "Planned" rows with formatted numbers
-- If `totalPlanned === 0 && totalProduction === 0`, show empty state message
-- Performance displays as `--` when `totalPlanned === 0`
-
-### Dashboard.tsx (line 337)
-- Compute `totalPlanned` in `stats` useMemo (already has `filteredSessions.reduce` for other totals)
-- Pass `totalPlanned={stats.totalPlanned}` to `OEEPanel`
-- The panel already uses `stats.totalProduction` and `stats.avgPerformance` which auto-update on filter change
-
-### Performance Note
-No page reload, no backend call, no global refresh. The `useMemo` on `filteredSessions` already ensures instant recalculation when any filter changes. The panel updates in under 1ms since it's just reading pre-computed values.
+| `src/components/ProductionImport.tsx` | Replace `Promise.allSettled` with sequential `for...of` loop |
 
