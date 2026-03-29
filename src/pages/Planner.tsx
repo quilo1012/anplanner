@@ -255,10 +255,6 @@ export function Planner() {
         staffActual: formState.staffActual,
       };
 
-      // Navigate optimistically — session save continues in background
-      toast.success(editId ? 'Session updated successfully!' : 'Production session saved!');
-      navigate('/history');
-
       let result;
       if (editId) {
         result = await updateSession(editId, sessionData);
@@ -268,6 +264,9 @@ export function Planner() {
 
       if (!result.success) {
         toast.error(`Save failed: ${result.error}`);
+      } else {
+        toast.success(editId ? 'Session updated successfully!' : 'Production session saved!');
+        navigate('/history');
       }
     } catch (error) {
       console.error('Error saving session:', error);
