@@ -119,7 +119,7 @@ export function ProductionImport({ open, onClose }: Props) {
         const rawDate = vals[0];
         const assemblyNum = String(vals[1] || '').trim();
         const workCentre = normalizeLineName(String(vals[2] || '').trim());
-        const productCode = String(vals[3] || '').trim();
+        const productCode = normalizeSku(vals[3]);
         const productDesc = String(vals[4] || '').trim();
         const weightKg = Number(vals[5]) || 0;
         const qty = Number(vals[6]) || 0;
