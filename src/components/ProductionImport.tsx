@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeLineName } from '@/utils/normalizeLineName';
+import { normalizeSku, isValidSku } from '@/utils/normalizeSku';
 
 interface ImportRow {
   rowNum: number;
@@ -118,7 +119,7 @@ export function ProductionImport({ open, onClose }: Props) {
         const rawDate = vals[0];
         const assemblyNum = String(vals[1] || '').trim();
         const workCentre = normalizeLineName(String(vals[2] || '').trim());
-        const productCode = String(vals[3] || '').trim();
+        const productCode = normalizeSku(vals[3]);
         const productDesc = String(vals[4] || '').trim();
         const weightKg = Number(vals[5]) || 0;
         const qty = Number(vals[6]) || 0;
@@ -133,6 +134,7 @@ export function ProductionImport({ open, onClose }: Props) {
         if (!dateStr) errors.push('Invalid date format');
         if (!workCentre) errors.push('Work Centre is required');
         if (!productCode) errors.push('Product Code is required');
+        else if (!isValidSku(productCode)) errors.push('Invalid SKU format');
         if (!qty || qty <= 0) errors.push('QTY must be positive');
         if (shift && shift !== 'DAY' && shift !== 'NIGHT') errors.push('Shift must be DAY or NIGHT');
         if (!shift) errors.push('Shift is required');
@@ -195,8 +197,10 @@ export function ProductionImport({ open, onClose }: Props) {
     }
   };
 
-  const validRows = rows.filter(r => r.errors.length === 0);
   const errorRows = rows.filter(r => r.errors.length > 0);
+  const warnedRows = rows.filter(r => r.errors.length === 0 && r.warnings.length > 0);
+  // Only rows with no errors AND no warnings (i.e. SKU exists in catalog) are eligible to save
+  const validRows = rows.filter(r => r.errors.length === 0 && r.warnings.length === 0);
   const matchedRows = validRows.filter(r => r.plannedQty !== undefined);
 
   const handleConfirm = async () => {
