@@ -134,6 +134,7 @@ export function ProductionImport({ open, onClose }: Props) {
         if (!dateStr) errors.push('Invalid date format');
         if (!workCentre) errors.push('Work Centre is required');
         if (!productCode) errors.push('Product Code is required');
+        else if (!isValidSku(productCode)) errors.push('Invalid SKU format');
         if (!qty || qty <= 0) errors.push('QTY must be positive');
         if (shift && shift !== 'DAY' && shift !== 'NIGHT') errors.push('Shift must be DAY or NIGHT');
         if (!shift) errors.push('Shift is required');
