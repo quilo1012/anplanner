@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeLineName } from '@/utils/normalizeLineName';
+import { normalizeSku, isValidSku } from '@/utils/normalizeSku';
 
 interface ImportRow {
   rowNum: number;
