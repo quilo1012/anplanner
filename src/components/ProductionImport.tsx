@@ -197,8 +197,10 @@ export function ProductionImport({ open, onClose }: Props) {
     }
   };
 
-  const validRows = rows.filter(r => r.errors.length === 0);
   const errorRows = rows.filter(r => r.errors.length > 0);
+  const warnedRows = rows.filter(r => r.errors.length === 0 && r.warnings.length > 0);
+  // Only rows with no errors AND no warnings (i.e. SKU exists in catalog) are eligible to save
+  const validRows = rows.filter(r => r.errors.length === 0 && r.warnings.length === 0);
   const matchedRows = validRows.filter(r => r.plannedQty !== undefined);
 
   const handleConfirm = async () => {
