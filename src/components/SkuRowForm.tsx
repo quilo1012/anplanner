@@ -204,7 +204,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
             {row.productionTarget > 0 && (
               <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                 <Clock size={10} />
-                {(row.productionTarget / 570).toFixed(2)} units/min
+                {(row.productionTarget / NET_SHIFT_MINUTES).toFixed(2)} units/min
               </div>
             )}
           </div>
