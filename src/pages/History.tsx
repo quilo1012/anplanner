@@ -350,9 +350,10 @@ export function History() {
                       <th className="text-right">Actual</th>
                       <th>Perf</th>
                       <th className="text-right">Downtime</th>
-                      <th className="text-center">Staff</th>
-                      <th className="text-center">Photo</th>
-                      {(canEdit || canDelete) && <th className="w-24">Actions</th>}
+                       <th className="text-center">Staff</th>
+                       <th className="text-center">Photo</th>
+                       {!isOperator && <th>Last edited by</th>}
+                       {(canEdit || canDelete) && <th className="w-24">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
