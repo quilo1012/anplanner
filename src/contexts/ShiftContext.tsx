@@ -172,6 +172,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           isArchived: row.is_archived,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
+          updatedBy: row.updated_by || undefined,
         };
       });
 
