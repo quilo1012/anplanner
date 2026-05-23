@@ -348,7 +348,7 @@ export function Dashboard() {
         </div>
 
         {/* Trend Alerts */}
-        {trendAlerts.length > 0 && (
+        {canViewCharts && trendAlerts.length > 0 && (
           <div className="card mb-3 overflow-hidden">
             <div className="px-3 py-2 border-b border-border bg-destructive/5">
               <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
