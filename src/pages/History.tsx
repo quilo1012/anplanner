@@ -39,6 +39,18 @@ export function History() {
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
 
+  // Per-session edit check: operators may only edit sessions where they are the line leader
+  const canEditSession = (session: ProductionSession) => {
+    if (!canEdit) return false;
+    if (isOperator) {
+      if (!user?.name) return false;
+      return session.lineLeader.trim().toLowerCase() === user.name.trim().toLowerCase();
+    }
+    return true;
+  };
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const { uniqueLines, uniqueLeaders, uniqueSkus } = useMemo(() => {
     const lines = new Set<string>();
     const leaders = new Set<string>();
