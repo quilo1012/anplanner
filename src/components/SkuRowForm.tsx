@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
+import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
 
 /* ─── Memoized single-row component ─── */
 
