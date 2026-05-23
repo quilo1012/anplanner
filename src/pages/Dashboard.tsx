@@ -108,7 +108,7 @@ export function Dashboard() {
     const totalActualStaff = filteredSessions.reduce((sum, s) => sum + (s.staffActual || 0), 0);
     const totalPlanned = filteredSessions.reduce((sum, s) => sum + (s.plannedQuantity || 0), 0);
     const availability = totalSessions > 0 ? Math.min(100, 100 - (totalDowntime / (totalSessions * NET_SHIFT_MINUTES)) * 100) : 0;
-    // Quality is neutral (100) until real quality data is available
+    // TODO: replace with real quality data when available
     const quality = 100;
 
     return {
