@@ -409,6 +409,45 @@ export function Admin() {
           </div>
         </div>
       </div>
+      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <span className="font-medium">{resetTarget?.name}</span> ({resetTarget?.email}). They will need to use this password on their next sign-in.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div>
+              <label className="label">New password</label>
+              <input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                className="input-field w-full"
+                minLength={8}
+                required
+                autoFocus
+                placeholder="Minimum 8 characters"
+              />
+            </div>
+            {resetError && (
+              <div className="p-3 bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 rounded text-sm text-[hsl(var(--destructive))]">
+                {resetError}
+              </div>
+            )}
+            <DialogFooter>
+              <button type="button" onClick={closeResetDialog} className="btn-secondary" disabled={resetSubmitting}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={resetSubmitting || resetPassword.length < 8}>
+                {resetSubmitting ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
+                Update password
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
