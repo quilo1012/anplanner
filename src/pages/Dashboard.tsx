@@ -106,7 +106,7 @@ export function Dashboard() {
     const totalPlannedStaff = filteredSessions.reduce((sum, s) => sum + (s.staffPlanned || 0), 0);
     const totalActualStaff = filteredSessions.reduce((sum, s) => sum + (s.staffActual || 0), 0);
     const totalPlanned = filteredSessions.reduce((sum, s) => sum + (s.plannedQuantity || 0), 0);
-    const availability = totalSessions > 0 ? Math.min(100, 100 - (totalDowntime / (totalSessions * 8 * 60)) * 100) : 0;
+    const availability = totalSessions > 0 ? Math.min(100, 100 - (totalDowntime / (totalSessions * 570)) * 100) : 0;
     const quality = 98;
 
     return {
