@@ -383,11 +383,21 @@ export function History() {
                             <td className="text-center text-sm">
                               <span className={session.staffActual < session.staffPlanned ? 'text-destructive font-medium' : ''}>{session.staffActual}/{session.staffPlanned}</span>
                             </td>
-                            <td className="text-center">
-                              {session.monitoringPhoto ? (
-                                <button onClick={() => setPreviewPhoto(session.monitoringPhoto!)} className="p-1 text-primary hover:bg-primary/10 rounded transition-colors" title="View photo"><Image size={14} /></button>
-                              ) : <span className="text-muted-foreground text-xs">-</span>}
-                            </td>
+                             <td className="text-center">
+                               {session.monitoringPhoto ? (
+                                 <button onClick={() => setPreviewPhoto(session.monitoringPhoto!)} className="p-1 text-primary hover:bg-primary/10 rounded transition-colors" title="View photo"><Image size={14} /></button>
+                               ) : <span className="text-muted-foreground text-xs">-</span>}
+                             </td>
+                             {!isOperator && (
+                               <td className="text-xs whitespace-nowrap">
+                                 {session.updatedBy ? (
+                                   <div>
+                                     <div className="font-medium">{session.updatedBy}</div>
+                                     <div className="text-muted-foreground">{new Date(session.updatedAt).toLocaleString()}</div>
+                                   </div>
+                                 ) : <span className="text-muted-foreground">-</span>}
+                               </td>
+                             )}
                             {(canEdit || canDelete) && (
                               <td>
                                 <div className="flex gap-1">
