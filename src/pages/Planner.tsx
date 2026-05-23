@@ -550,6 +550,27 @@ export function Planner() {
           </>)}
         </div>
       </div>
+      <AlertDialog open={confirmZeroOpen} onOpenChange={setConfirmZeroOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save without real production?</AlertDialogTitle>
+            <AlertDialogDescription>
+              One or more products have no real production recorded. Are you sure you want to save?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back and fill in</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmZeroOpen(false);
+                handleSubmit(undefined, { skipZeroCheck: true });
+              }}
+            >
+              Save anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
