@@ -20,7 +20,8 @@ export function History() {
   
   
   const today = new Date().toISOString().split('T')[0];
-  const [filterFromDate, setFilterFromDate] = useState(today);
+  const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const [filterFromDate, setFilterFromDate] = useState(sevenDaysAgo);
   const [filterToDate, setFilterToDate] = useState(today);
   const [filterShift, setFilterShift] = useState<ShiftType | ''>('');
   const [filterLine, setFilterLine] = useState('');
