@@ -90,6 +90,24 @@ export function History() {
     }).sort((a, b) => naturalLineSort(a.productionLine, b.productionLine));
   }, [sessions, filterFromDate, filterToDate, filterShift, filterLine, filterLeader, filterSku, searchQuery, isOperator, user?.name]);
 
+  // Handle ?edit=<sessionId> from URL — block operators from accessing other leaders' sessions
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId) return;
+    const target = sessions.find(s => s.id === editId);
+    if (!target) return;
+    if (!canEditSession(target)) {
+      toast.error('You can only edit your own sessions');
+      searchParams.delete('edit');
+      setSearchParams(searchParams, { replace: true });
+      return;
+    }
+    setEditSession(target);
+    searchParams.delete('edit');
+    setSearchParams(searchParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, sessions, isOperator, user?.name]);
+
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
