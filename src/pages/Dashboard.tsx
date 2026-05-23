@@ -22,6 +22,7 @@ import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Cale
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import appliedLogo from '@/assets/applied-logo-mono.jpg';
+import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -106,8 +107,9 @@ export function Dashboard() {
     const totalPlannedStaff = filteredSessions.reduce((sum, s) => sum + (s.staffPlanned || 0), 0);
     const totalActualStaff = filteredSessions.reduce((sum, s) => sum + (s.staffActual || 0), 0);
     const totalPlanned = filteredSessions.reduce((sum, s) => sum + (s.plannedQuantity || 0), 0);
-    const availability = totalSessions > 0 ? Math.min(100, 100 - (totalDowntime / (totalSessions * 570)) * 100) : 0;
-    const quality = 98;
+    const availability = totalSessions > 0 ? Math.min(100, 100 - (totalDowntime / (totalSessions * NET_SHIFT_MINUTES)) * 100) : 0;
+    // Quality is neutral (100) until real quality data is available
+    const quality = 100;
 
     return {
       totalSessions, avgPerformance, totalDowntime, totalProduction,
@@ -133,7 +135,7 @@ export function Dashboard() {
         currentLeader: session.lineLeader,
         staffPlanned: session.staffPlanned,
         staffActual: session.staffActual,
-        availability: Math.max(0, Math.min(100, 100 - (session.totalDowntime / 570) * 100)),
+        availability: Math.max(0, Math.min(100, 100 - (session.totalDowntime / NET_SHIFT_MINUTES) * 100)),
         colorClass: '',
         status: session.performance >= 90 ? 'running' : session.performance >= 70 ? 'warning' : 'stopped',
         realProduction: session.totalProduction,

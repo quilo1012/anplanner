@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { getLineBorderClass, getLineHeaderClass } from '@/utils/lineColors';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDuration } from '@/utils/formatDuration';
+import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
 
 interface LineStatusCardProps {
   lineName: string;
@@ -131,7 +132,7 @@ export function LineStatusCard({
                 {hasTargetData && (
                   <span className="flex items-center gap-1">
                     <Clock size={10} />
-                    {(realProduction / 570).toFixed(1)}/{(productionTarget / 570).toFixed(1)} UPM
+                    {(realProduction / NET_SHIFT_MINUTES).toFixed(1)}/{(productionTarget / NET_SHIFT_MINUTES).toFixed(1)} UPM
                   </span>
                 )}
                 {(staffPlanned > 0 || staffActual > 0) && (
