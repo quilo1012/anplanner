@@ -326,7 +326,7 @@ export function History() {
                   )}
                   {(canEdit || canDelete) && (
                     <div className="flex gap-2 pt-3 border-t border-border">
-                      {canEdit && <button onClick={() => setEditSession(session)} className="btn-secondary flex-1 text-sm py-2"><Edit size={14} /> Edit</button>}
+                      {canEditSession(session) && <button onClick={() => setEditSession(session)} className="btn-secondary flex-1 text-sm py-2"><Edit size={14} /> Edit</button>}
                       {canDelete && <button onClick={() => setDeleteSessionState(session)} className="flex-1 text-sm py-2 rounded-md btn-secondary text-destructive hover:bg-destructive hover:text-destructive-foreground"><Trash2 size={14} className="inline mr-1" /> Delete</button>}
                     </div>
                   )}
