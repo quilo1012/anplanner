@@ -370,7 +370,7 @@ export function Dashboard() {
         )}
 
         {/* ═══ CHARTS ═══ */}
-        {showCharts && (
+        {canViewCharts && showCharts && (
           <>
             {/* Section: Performance */}
             <div className="flex items-center gap-2 mb-2">
