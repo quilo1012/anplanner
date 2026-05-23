@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Header } from '@/components/Header';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
@@ -36,6 +38,18 @@ export function History() {
 
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
+
+  // Per-session edit check: operators may only edit sessions where they are the line leader
+  const canEditSession = (session: ProductionSession) => {
+    if (!canEdit) return false;
+    if (isOperator) {
+      if (!user?.name) return false;
+      return session.lineLeader.trim().toLowerCase() === user.name.trim().toLowerCase();
+    }
+    return true;
+  };
+
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { uniqueLines, uniqueLeaders, uniqueSkus } = useMemo(() => {
     const lines = new Set<string>();
@@ -75,6 +89,24 @@ export function History() {
       return true;
     }).sort((a, b) => naturalLineSort(a.productionLine, b.productionLine));
   }, [sessions, filterFromDate, filterToDate, filterShift, filterLine, filterLeader, filterSku, searchQuery, isOperator, user?.name]);
+
+  // Handle ?edit=<sessionId> from URL — block operators from accessing other leaders' sessions
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId) return;
+    const target = sessions.find(s => s.id === editId);
+    if (!target) return;
+    if (!canEditSession(target)) {
+      toast.error('You can only edit your own sessions');
+      searchParams.delete('edit');
+      setSearchParams(searchParams, { replace: true });
+      return;
+    }
+    setEditSession(target);
+    searchParams.delete('edit');
+    setSearchParams(searchParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, sessions, isOperator, user?.name]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
@@ -294,7 +326,7 @@ export function History() {
                   )}
                   {(canEdit || canDelete) && (
                     <div className="flex gap-2 pt-3 border-t border-border">
-                      {canEdit && <button onClick={() => setEditSession(session)} className="btn-secondary flex-1 text-sm py-2"><Edit size={14} /> Edit</button>}
+                      {canEditSession(session) && <button onClick={() => setEditSession(session)} className="btn-secondary flex-1 text-sm py-2"><Edit size={14} /> Edit</button>}
                       {canDelete && <button onClick={() => setDeleteSessionState(session)} className="flex-1 text-sm py-2 rounded-md btn-secondary text-destructive hover:bg-destructive hover:text-destructive-foreground"><Trash2 size={14} className="inline mr-1" /> Delete</button>}
                     </div>
                   )}
@@ -358,7 +390,7 @@ export function History() {
                             {(canEdit || canDelete) && (
                               <td>
                                 <div className="flex gap-1">
-                                  {canEdit && <button onClick={() => setEditSession(session)} className="p-1.5 text-primary hover:bg-primary/10 rounded" title="Edit"><Edit size={14} /></button>}
+                                  {canEditSession(session) && <button onClick={() => setEditSession(session)} className="p-1.5 text-primary hover:bg-primary/10 rounded" title="Edit"><Edit size={14} /></button>}
                                   {canDelete && <button onClick={() => setDeleteSessionState(session)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded" title="Delete"><Trash2 size={14} /></button>}
                                 </div>
                               </td>
