@@ -11,6 +11,56 @@ export function Admin() {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  const isAdmin = currentUser?.role === 'admin';
+
+  const openResetDialog = (u: User) => {
+    setResetTarget(u);
+    setResetPassword('');
+    setResetError('');
+  };
+
+  const closeResetDialog = () => {
+    if (resetSubmitting) return;
+    setResetTarget(null);
+    setResetPassword('');
+    setResetError('');
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTarget) return;
+    if (resetPassword.length < 8) {
+      setResetError('Password must be at least 8 characters');
+      return;
+    }
+    setResetSubmitting(true);
+    setResetError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { action: 'reset_password', userId: resetTarget.id, password: resetPassword },
+      });
+      if (error || (data as any)?.error) {
+        const msg = (data as any)?.error || error?.message || 'Failed to reset password';
+        toast.error(msg);
+        setResetError(msg);
+        return;
+      }
+      toast.success('Password updated successfully');
+      setResetTarget(null);
+      setResetPassword('');
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to reset password';
+      toast.error(msg);
+      setResetError(msg);
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState({
