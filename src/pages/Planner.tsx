@@ -200,10 +200,22 @@ export function Planner() {
   };
 
   const submittingRef = useRef(false);
+  const [confirmZeroOpen, setConfirmZeroOpen] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, opts?: { skipZeroCheck?: boolean }) => {
+    e?.preventDefault();
     if (!validate()) return;
+
+    // Warn when supervisor/admin saves with any SKU having no real production
+    if (canReview && !opts?.skipZeroCheck) {
+      const hasZeroProduction = formState.skuRows
+        .filter(r => r.sku.trim())
+        .some(r => !r.realProduction || r.realProduction === 0);
+      if (hasZeroProduction) {
+        setConfirmZeroOpen(true);
+        return;
+      }
+    }
     if (submittingRef.current) return;
     submittingRef.current = true;
     setIsSubmitting(true);
