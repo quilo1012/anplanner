@@ -483,6 +483,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           staff_actual: data.staffActual || 0,
           planned_quantity: data.plannedQuantity,
           comments: data.comments || null,
+          updated_by: user?.name || null,
+          updated_at: new Date().toISOString(),
           ...(photoUrl && { monitoring_photo_url: photoUrl }),
         })
         .eq('id', id);
