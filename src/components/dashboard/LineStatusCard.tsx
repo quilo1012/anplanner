@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { getLineBorderClass, getLineHeaderClass } from '@/utils/lineColors';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDuration } from '@/utils/formatDuration';
+import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
 
 interface LineStatusCardProps {
   lineName: string;
