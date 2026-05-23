@@ -339,9 +339,11 @@ export function Dashboard() {
               )}
             </div>
 
+            {canViewCharts && (
             <div className="hidden lg:flex flex-col gap-2 w-56 shrink-0">
               <OEEPanel performance={stats.avgPerformance} availability={stats.availability} oee={stats.oee} shiftType={selectedShift} totalProduction={stats.totalProduction} totalPlanned={stats.totalPlanned} />
             </div>
+            )}
           </div>
         </div>
 
