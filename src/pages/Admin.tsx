@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Header } from '@/components/Header';
 import { useAuth, User, UserRole, ROLE_LABELS, ROLE_COLORS } from '@/contexts/AuthContext';
-import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2, KeyRound } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function Admin() {
   const { users, user: currentUser, addUser, updateUser, deleteUser } = useAuth();
