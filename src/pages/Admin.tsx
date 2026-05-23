@@ -340,6 +340,15 @@ export function Admin() {
                           >
                             <Edit size={16} />
                           </button>
+                          {isAdmin && u.id !== currentUser?.id && (
+                            <button
+                              onClick={() => openResetDialog(u)}
+                              className="p-1.5 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
+                              title="Reset password"
+                            >
+                              <KeyRound size={16} />
+                            </button>
+                          )}
                           {u.id !== currentUser?.id && (
                             <button
                               onClick={() => handleDelete(u.id)}
