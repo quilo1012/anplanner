@@ -226,6 +226,7 @@ export function Dashboard() {
             </div>
           </div>
           {/* Row 2: Line, Leader, Downtime filters */}
+          {canViewCharts && (
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <Filter size={14} className="text-muted-foreground shrink-0" />
@@ -263,6 +264,7 @@ export function Dashboard() {
               </button>
             </div>
           </div>
+          )}
         </div>
 
         {/* Print Header */}
