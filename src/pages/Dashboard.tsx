@@ -29,6 +29,7 @@ export function Dashboard() {
   const { sessions, isLoading } = useShifts();
   const { user } = useAuth();
   const isOperator = user?.role === 'operator';
+  const canViewCharts = !isOperator;
   const [selectedShift, setSelectedShift] = useState<ShiftType>('DAY');
   const [startDate, setStartDate] = useState<string>(today);
   const [endDate, setEndDate] = useState<string>(today);
@@ -225,6 +226,7 @@ export function Dashboard() {
             </div>
           </div>
           {/* Row 2: Line, Leader, Downtime filters */}
+          {canViewCharts && (
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <Filter size={14} className="text-muted-foreground shrink-0" />
@@ -262,6 +264,7 @@ export function Dashboard() {
               </button>
             </div>
           </div>
+          )}
         </div>
 
         {/* Print Header */}
@@ -274,6 +277,7 @@ export function Dashboard() {
         </div>
 
         {/* ═══ KPI SUMMARY BAR ═══ */}
+        {canViewCharts && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
           <div className="bg-card border border-border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground uppercase mb-1">Total Production</p>
@@ -296,6 +300,7 @@ export function Dashboard() {
             <p className="text-xl font-bold text-foreground tabular-nums">{stats.totalActualStaff}<span className="text-sm font-normal text-muted-foreground">/{stats.totalPlannedStaff}</span></p>
           </div>
         </div>
+        )}
 
         {/* ═══ LINE STATUS ═══ */}
         <div className="mb-3">
@@ -334,14 +339,16 @@ export function Dashboard() {
               )}
             </div>
 
+            {canViewCharts && (
             <div className="hidden lg:flex flex-col gap-2 w-56 shrink-0">
               <OEEPanel performance={stats.avgPerformance} availability={stats.availability} oee={stats.oee} shiftType={selectedShift} totalProduction={stats.totalProduction} totalPlanned={stats.totalPlanned} />
             </div>
+            )}
           </div>
         </div>
 
         {/* Trend Alerts */}
-        {trendAlerts.length > 0 && (
+        {canViewCharts && trendAlerts.length > 0 && (
           <div className="card mb-3 overflow-hidden">
             <div className="px-3 py-2 border-b border-border bg-destructive/5">
               <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
@@ -363,7 +370,7 @@ export function Dashboard() {
         )}
 
         {/* ═══ CHARTS ═══ */}
-        {showCharts && (
+        {canViewCharts && showCharts && (
           <>
             {/* Section: Performance */}
             <div className="flex items-center gap-2 mb-2">
