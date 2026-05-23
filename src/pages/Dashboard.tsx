@@ -277,6 +277,7 @@ export function Dashboard() {
         </div>
 
         {/* ═══ KPI SUMMARY BAR ═══ */}
+        {canViewCharts && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
           <div className="bg-card border border-border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground uppercase mb-1">Total Production</p>
@@ -299,6 +300,7 @@ export function Dashboard() {
             <p className="text-xl font-bold text-foreground tabular-nums">{stats.totalActualStaff}<span className="text-sm font-normal text-muted-foreground">/{stats.totalPlannedStaff}</span></p>
           </div>
         </div>
+        )}
 
         {/* ═══ LINE STATUS ═══ */}
         <div className="mb-3">
