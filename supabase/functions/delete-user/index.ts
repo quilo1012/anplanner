@@ -141,6 +141,44 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // === RESET PASSWORD ===
+    if (action === "reset_password") {
+      const { userId: targetId, password: newPassword } = body;
+      if (!targetId || !newPassword) {
+        return new Response(
+          JSON.stringify({ error: "userId and password are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (typeof newPassword !== "string" || newPassword.length < 8) {
+        return new Response(
+          JSON.stringify({ error: "Password must be at least 8 characters" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (targetId === callerId) {
+        return new Response(
+          JSON.stringify({ error: "Use account settings to change your own password" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetId, {
+        password: newPassword,
+      });
+      if (updateError) {
+        console.error("Error resetting password:", updateError);
+        return new Response(
+          JSON.stringify({ error: updateError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // === DELETE USER ===
     const { userId } = body;
     if (!userId) {

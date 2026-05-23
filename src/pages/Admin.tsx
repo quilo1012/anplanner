@@ -1,13 +1,66 @@
 import { useState } from 'react';
 import { Header } from '@/components/Header';
 import { useAuth, User, UserRole, ROLE_LABELS, ROLE_COLORS } from '@/contexts/AuthContext';
-import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2, KeyRound } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function Admin() {
   const { users, user: currentUser, addUser, updateUser, deleteUser } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  const isAdmin = currentUser?.role === 'admin';
+
+  const openResetDialog = (u: User) => {
+    setResetTarget(u);
+    setResetPassword('');
+    setResetError('');
+  };
+
+  const closeResetDialog = () => {
+    if (resetSubmitting) return;
+    setResetTarget(null);
+    setResetPassword('');
+    setResetError('');
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTarget) return;
+    if (resetPassword.length < 8) {
+      setResetError('Password must be at least 8 characters');
+      return;
+    }
+    setResetSubmitting(true);
+    setResetError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { action: 'reset_password', userId: resetTarget.id, password: resetPassword },
+      });
+      if (error || (data as any)?.error) {
+        const msg = (data as any)?.error || error?.message || 'Failed to reset password';
+        toast.error(msg);
+        setResetError(msg);
+        return;
+      }
+      toast.success('Password updated successfully');
+      setResetTarget(null);
+      setResetPassword('');
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to reset password';
+      toast.error(msg);
+      setResetError(msg);
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState({
@@ -224,6 +277,16 @@ export function Admin() {
                       <Edit size={14} />
                       Edit
                     </button>
+                    {isAdmin && u.id !== currentUser?.id && (
+                      <button
+                        onClick={() => openResetDialog(u)}
+                        className="btn-secondary flex-1 text-sm py-2"
+                        title="Reset password"
+                      >
+                        <KeyRound size={14} />
+                        Reset
+                      </button>
+                    )}
                     {u.id !== currentUser?.id && (
                       <button
                         onClick={() => handleDelete(u.id)}
@@ -277,6 +340,15 @@ export function Admin() {
                           >
                             <Edit size={16} />
                           </button>
+                          {isAdmin && u.id !== currentUser?.id && (
+                            <button
+                              onClick={() => openResetDialog(u)}
+                              className="p-1.5 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
+                              title="Reset password"
+                            >
+                              <KeyRound size={16} />
+                            </button>
+                          )}
                           {u.id !== currentUser?.id && (
                             <button
                               onClick={() => handleDelete(u.id)}
@@ -337,6 +409,45 @@ export function Admin() {
           </div>
         </div>
       </div>
+      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <span className="font-medium">{resetTarget?.name}</span> ({resetTarget?.email}). They will need to use this password on their next sign-in.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div>
+              <label className="label">New password</label>
+              <input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                className="input-field w-full"
+                minLength={8}
+                required
+                autoFocus
+                placeholder="Minimum 8 characters"
+              />
+            </div>
+            {resetError && (
+              <div className="p-3 bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 rounded text-sm text-[hsl(var(--destructive))]">
+                {resetError}
+              </div>
+            )}
+            <DialogFooter>
+              <button type="button" onClick={closeResetDialog} className="btn-secondary" disabled={resetSubmitting}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={resetSubmitting || resetPassword.length < 8}>
+                {resetSubmitting ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
+                Update password
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
