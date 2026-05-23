@@ -57,16 +57,20 @@ Deno.serve(async (req) => {
 
     const userName = profileData?.name || "";
 
-    // Parse request body
-    const body = await req.json();
-    const line = body.line;
-    const weekStart = body.week_start;
-    const shiftFilter = body.shift || "ALL";
+    // Parse + validate request body
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Normalize: frontend sends "Line 1", DB stores "1"
-    const lineNumber = line.replace(/^Line\s+/i, "");
-    // Normalize: frontend sends "DAY"/"NIGHT", DB stores "day"/"night"
-    const shiftFilterDb = shiftFilter.toLowerCase();
+    const line = typeof body.line === "string" ? body.line.trim() : "";
+    const weekStart = typeof body.week_start === "string" ? body.week_start.trim() : "";
+    const shiftFilter = typeof body.shift === "string" ? body.shift.toUpperCase() : "ALL";
 
     if (!line || !weekStart) {
       return new Response(
@@ -74,11 +78,41 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    if (line.length > 50 || !/^[A-Za-z0-9 _\-./]+$/.test(line)) {
+      return new Response(JSON.stringify({ error: "Invalid line value" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+      return new Response(JSON.stringify({ error: "week_start must be YYYY-MM-DD" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const startDate = new Date(weekStart + "T00:00:00Z");
+    if (isNaN(startDate.getTime())) {
+      return new Response(JSON.stringify({ error: "Invalid week_start date" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const now = Date.now();
+    const fiveYearsMs = 5 * 365 * 24 * 60 * 60 * 1000;
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    if (startDate.getTime() < now - fiveYearsMs || startDate.getTime() > now + oneYearMs) {
+      return new Response(JSON.stringify({ error: "week_start out of allowed range" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!["ALL", "DAY", "NIGHT"].includes(shiftFilter)) {
+      return new Response(JSON.stringify({ error: "shift must be one of ALL, DAY, NIGHT" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Calculate week end (Mon-Sun)
-    const startDate = new Date(weekStart);
+    const lineNumber = line.replace(/^Line\s+/i, "");
+    const shiftFilterDb = shiftFilter.toLowerCase();
+
     const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 6);
+    endDate.setUTCDate(endDate.getUTCDate() + 6);
     const weekEnd = endDate.toISOString().split("T")[0];
 
     // Build sessions query
