@@ -196,6 +196,39 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     }
   }, [authLoading, refreshSessions]);
 
+  // Real-time subscriptions: refetch when other users mutate shared tables
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !user?.id) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { refreshSessions(); }, 400);
+    };
+
+    const sessionsChannel = supabase
+      .channel('production-sessions-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_sessions' }, scheduleRefresh)
+      .subscribe();
+
+    const itemsChannel = supabase
+      .channel('production-items-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_items' }, scheduleRefresh)
+      .subscribe();
+
+    const downtimesChannel = supabase
+      .channel('structured-downtimes-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'structured_downtimes' }, scheduleRefresh)
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(sessionsChannel);
+      supabase.removeChannel(itemsChannel);
+      supabase.removeChannel(downtimesChannel);
+    };
+  }, [authLoading, isAuthenticated, user?.id, refreshSessions]);
+
   const sanitizeFilename = (filename: string): string => {
     const lastDot = filename.lastIndexOf('.');
     const name = lastDot > 0 ? filename.slice(0, lastDot) : filename;
