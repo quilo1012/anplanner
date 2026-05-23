@@ -22,6 +22,7 @@ import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Cale
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import appliedLogo from '@/assets/applied-logo-mono.jpg';
+import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
