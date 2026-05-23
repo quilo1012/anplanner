@@ -10,6 +10,7 @@ import { PlanTemplateExport } from '@/components/PlanTemplateExport';
 import { PlanImport } from '@/components/PlanImport';
 import { ProductionImport } from '@/components/ProductionImport';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -199,10 +200,22 @@ export function Planner() {
   };
 
   const submittingRef = useRef(false);
+  const [confirmZeroOpen, setConfirmZeroOpen] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, opts?: { skipZeroCheck?: boolean }) => {
+    e?.preventDefault();
     if (!validate()) return;
+
+    // Warn when supervisor/admin saves with any SKU having no real production
+    if (canReview && !opts?.skipZeroCheck) {
+      const hasZeroProduction = formState.skuRows
+        .filter(r => r.sku.trim())
+        .some(r => !r.realProduction || r.realProduction === 0);
+      if (hasZeroProduction) {
+        setConfirmZeroOpen(true);
+        return;
+      }
+    }
     if (submittingRef.current) return;
     submittingRef.current = true;
     setIsSubmitting(true);
@@ -537,6 +550,27 @@ export function Planner() {
           </>)}
         </div>
       </div>
+      <AlertDialog open={confirmZeroOpen} onOpenChange={setConfirmZeroOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save without real production?</AlertDialogTitle>
+            <AlertDialogDescription>
+              One or more products have no real production recorded. Are you sure you want to save?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back and fill in</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmZeroOpen(false);
+                handleSubmit(undefined, { skipZeroCheck: true });
+              }}
+            >
+              Save anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
