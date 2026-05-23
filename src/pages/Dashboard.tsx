@@ -29,6 +29,7 @@ export function Dashboard() {
   const { sessions, isLoading } = useShifts();
   const { user } = useAuth();
   const isOperator = user?.role === 'operator';
+  const canViewCharts = !isOperator;
   const [selectedShift, setSelectedShift] = useState<ShiftType>('DAY');
   const [startDate, setStartDate] = useState<string>(today);
   const [endDate, setEndDate] = useState<string>(today);
