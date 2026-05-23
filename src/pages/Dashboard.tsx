@@ -135,7 +135,7 @@ export function Dashboard() {
         currentLeader: session.lineLeader,
         staffPlanned: session.staffPlanned,
         staffActual: session.staffActual,
-        availability: Math.max(0, Math.min(100, 100 - (session.totalDowntime / 570) * 100)),
+        availability: Math.max(0, Math.min(100, 100 - (session.totalDowntime / NET_SHIFT_MINUTES) * 100)),
         colorClass: '',
         status: session.performance >= 90 ? 'running' : session.performance >= 70 ? 'warning' : 'stopped',
         realProduction: session.totalProduction,
