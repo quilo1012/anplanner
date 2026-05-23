@@ -277,6 +277,16 @@ export function Admin() {
                       <Edit size={14} />
                       Edit
                     </button>
+                    {isAdmin && u.id !== currentUser?.id && (
+                      <button
+                        onClick={() => openResetDialog(u)}
+                        className="btn-secondary flex-1 text-sm py-2"
+                        title="Reset password"
+                      >
+                        <KeyRound size={14} />
+                        Reset
+                      </button>
+                    )}
                     {u.id !== currentUser?.id && (
                       <button
                         onClick={() => handleDelete(u.id)}
