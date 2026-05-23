@@ -32,6 +32,7 @@ export interface ProductionSession {
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
+  updatedBy?: string;
 }
 
 export interface ProductionSessionFormData {

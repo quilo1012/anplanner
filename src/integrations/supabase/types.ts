@@ -270,6 +270,7 @@ export type Database = {
           staff_actual: number | null
           staff_planned: number | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           comments?: string | null
@@ -286,6 +287,7 @@ export type Database = {
           staff_actual?: number | null
           staff_planned?: number | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           comments?: string | null
@@ -302,6 +304,7 @@ export type Database = {
           staff_actual?: number | null
           staff_planned?: number | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
