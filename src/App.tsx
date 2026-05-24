@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 
 // Lazy load heavy pages
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
-const Downtime = lazy(() => import('@/pages/Downtime').then(m => ({ default: m.Downtime })));
+
 const Admin = lazy(() => import('@/pages/Admin').then(m => ({ default: m.Admin })));
 const WeeklyReport = lazy(() => import('@/pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
@@ -45,7 +45,7 @@ const App = () => (
             <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
             <Route path="planner" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Planner /></Suspense></ProtectedRoute>} />
             <Route path="products" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Products /></Suspense></ProtectedRoute>} />
-            <Route path="downtime" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Downtime /></Suspense></ProtectedRoute>} />
+            
             <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><History /></ProtectedRoute>} />
             <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><WeeklyReport /></Suspense></ProtectedRoute>} />
             

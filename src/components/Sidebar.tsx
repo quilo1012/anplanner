@@ -23,7 +23,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
       { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
-      { path: '/downtime', label: 'Downtime', icon: Clock, roles: ['supervisor', 'admin'] },
+      
     ],
   },
   {
