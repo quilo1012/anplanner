@@ -61,32 +61,56 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     setPhotoFilename(session.photoFilename);
     setLineTarget(session.plannedQuantity);
 
-    // Fetch items and downtimes fresh from DB to avoid stale in-memory data
+    // Seed immediately from already-loaded session data so the form shows values right away
+    setSkuRows((session.items || []).map(item => ({
+      id: item.id,
+      sku: item.sku,
+      product: item.productName || '',
+      productionTarget: item.quantityTarget || 0,
+      realProduction: item.quantityActual || 0,
+      isFoundInDb: true,
+      batchNumber: '',
+      blenderSize: 0,
+      weightPerUnit: 0,
+    })));
+    setStructuredDowntimes((session.structuredDowntimes || []).map(dt => ({
+      id: dt.id,
+      category: dt.category,
+      reason: dt.reason,
+      duration: dt.duration,
+      comment: dt.comment || '',
+    })));
+
+    // Then refresh from DB to pick up any newer changes
     const loadFreshData = async () => {
       const [itemsRes, downtimesRes] = await Promise.all([
         supabase.from('production_items').select('*').eq('session_id', session.id),
         supabase.from('structured_downtimes').select('*').eq('session_id', session.id),
       ]);
 
-      setSkuRows((itemsRes.data || []).map(item => ({
-        id: item.id,
-        sku: item.sku,
-        product: item.product_name || '',
-        productionTarget: item.quantity_target || 0,
-        realProduction: item.quantity_actual || 0,
-        isFoundInDb: true,
-        batchNumber: '',
-        blenderSize: 0,
-        weightPerUnit: 0,
-      })));
+      if (itemsRes.data && itemsRes.data.length > 0) {
+        setSkuRows(itemsRes.data.map(item => ({
+          id: item.id,
+          sku: item.sku,
+          product: item.product_name || '',
+          productionTarget: item.quantity_target || 0,
+          realProduction: item.quantity_actual || 0,
+          isFoundInDb: true,
+          batchNumber: '',
+          blenderSize: 0,
+          weightPerUnit: 0,
+        })));
+      }
 
-      setStructuredDowntimes((downtimesRes.data || []).map(dt => ({
-        id: dt.id,
-        category: dt.category,
-        reason: dt.reason,
-        duration: dt.duration,
-        comment: dt.comment || '',
-      })));
+      if (downtimesRes.data && downtimesRes.data.length > 0) {
+        setStructuredDowntimes(downtimesRes.data.map(dt => ({
+          id: dt.id,
+          category: dt.category,
+          reason: dt.reason,
+          duration: dt.duration,
+          comment: dt.comment || '',
+        })));
+      }
     };
     loadFreshData();
   }, [session?.id, open]);
