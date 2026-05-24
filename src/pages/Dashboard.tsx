@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format, subDays, startOfMonth } from 'date-fns';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
@@ -31,14 +32,30 @@ export function Dashboard() {
   const { user } = useAuth();
   const isOperator = user?.role === 'operator';
   const canViewCharts = !isOperator;
-  const [selectedShift, setSelectedShift] = useState<ShiftType>('DAY');
-  const [startDate, setStartDate] = useState<string>(today);
-  const [endDate, setEndDate] = useState<string>(today);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlDate = searchParams.get('date');
+  const urlShift = searchParams.get('shift') as ShiftType | null;
+  const [selectedShift, setSelectedShift] = useState<ShiftType>(urlShift === 'NIGHT' || urlShift === 'DAY' ? urlShift : 'DAY');
+  const [startDate, setStartDate] = useState<string>(urlDate || today);
+  const [endDate, setEndDate] = useState<string>(urlDate || today);
   const [selectedLine, setSelectedLine] = useState<string>('');
   const [selectedLeader, setSelectedLeader] = useState<string>('');
   const [showCharts, setShowCharts] = useState(true);
   const [downtimeCategory, setDowntimeCategory] = useState<string>('');
   const [downtimeReason, setDowntimeReason] = useState<string>('');
+
+  // Apply URL params on mount / when they change (e.g. after iTouching import redirect)
+  useEffect(() => {
+    if (urlDate) { setStartDate(urlDate); setEndDate(urlDate); }
+    if (urlShift === 'DAY' || urlShift === 'NIGHT') setSelectedShift(urlShift);
+    if (urlDate || urlShift) {
+      // Clear params so manual navigation later isn't sticky
+      const next = new URLSearchParams(searchParams);
+      next.delete('date'); next.delete('shift');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlDate, urlShift]);
 
   const setPreset = (preset: string) => {
     const now = new Date();

@@ -535,7 +535,8 @@ export function Planner() {
 
               await refreshSessions();
               setShowIntouchImport(false);
-              navigate('/history');
+              // Jump to Dashboard pre-filtered to the imported date/shift so values show up
+              navigate(`/?date=${encodeURIComponent(importDate)}&shift=${encodeURIComponent(importShift)}`);
             }}
           />
           <PlanImport
