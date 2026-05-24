@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Clock, ClipboardPaste, Copy, FlaskConical, Hash } from 'lucide-react';
+import { Plus, Trash2, Package, AlertTriangle, Target, TrendingUp, Clock, ClipboardPaste, Copy } from 'lucide-react';
 import { SkuRow, createEmptySkuRow } from '@/types/planner';
 import { ProductSearch } from './ProductSearch';
 import { batchLookupProducts } from '@/hooks/useProductSearch';
@@ -104,72 +104,6 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
         </div>
       </div>
 
-      {/* Batch Number and Blender Size Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-        <div>
-          <label className="label text-xs flex items-center gap-1">
-            <Hash size={12} className="text-primary" />
-            Batch #
-          </label>
-          <input
-            type="text"
-            value={row.batchNumber}
-            onChange={e => onUpdate(row.id, 'batchNumber', e.target.value)}
-            placeholder="Batch number"
-            className="input-field text-sm"
-            maxLength={50}
-          />
-        </div>
-        <div>
-          <label className="label text-xs flex items-center gap-1">
-            <FlaskConical size={12} className="text-primary" />
-            Blender Size
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              value={row.blenderSize || ''}
-              onChange={e => onUpdate(row.id, 'blenderSize', parseFloat(e.target.value) || 0)}
-              placeholder="0"
-              min="0"
-              step="0.01"
-              className="input-field text-sm pr-8"
-              data-blender-input
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
-          </div>
-        </div>
-        <div>
-          <label className="label text-xs flex items-center gap-1">
-            Weight/Unit
-            {row.isFoundInDb && row.weightPerUnit > 0 && (
-              <span className="text-xs text-muted-foreground ml-1">(suggested)</span>
-            )}
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              value={row.weightPerUnit || ''}
-              onChange={e => onUpdate(row.id, 'weightPerUnit', parseFloat(e.target.value) || 0)}
-              placeholder="0"
-              min="0"
-              step="0.001"
-              className="input-field text-sm pr-8"
-              data-weight-input
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">kg</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Blender estimate hint */}
-      {row.blenderSize > 0 && row.weightPerUnit > 0 && (
-        <div className="mb-3 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-md text-xs text-primary font-medium flex items-center gap-1">
-          <FlaskConical size={12} />
-          → Estimated: {Math.floor(row.blenderSize / row.weightPerUnit).toLocaleString()} units
-        </div>
-      )}
-
       {/* SKU not in catalog warning */}
       {!row.isFoundInDb && row.sku.trim().length >= 2 && (
         <div className="flex items-center gap-2 mb-3 p-2 bg-warning/10 border border-warning/30 rounded-md">
@@ -179,6 +113,7 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
           </span>
         </div>
       )}
+
 
       {/* Target and Real Production Row */}
       <div className={`grid grid-cols-1 ${showTarget ? 'md:grid-cols-2' : ''} gap-3 pt-3 border-t border-border`}>
