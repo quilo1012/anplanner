@@ -1,25 +1,22 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileMenu } from './MobileMenu';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 export function Layout() {
-  const [collapsed] = useLocalStorage('sidebar-collapsed', false);
-
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] flex items-start justify-start">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
+    <div className="min-h-screen bg-[hsl(var(--background))] flex items-start">
+      {/* Desktop Sidebar (sits in flex flow on lg, so no extra margin needed) */}
+      <div className="hidden lg:block shrink-0">
         <Sidebar />
       </div>
-      
+
       {/* Mobile Menu */}
       <MobileMenu />
-      
+
       {/* Main Content */}
-      <main className={`flex-1 flex flex-col overflow-hidden pt-14 lg:pt-0 transition-all duration-300 ${collapsed ? 'lg:ml-16' : 'lg:ml-52'}`}>
+      <main className="flex-1 min-w-0 flex flex-col pt-14 lg:pt-0">
         <Outlet />
       </main>
-    </div>);
-
+    </div>
+  );
 }
