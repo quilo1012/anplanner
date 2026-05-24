@@ -269,21 +269,11 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             </div>
           </div>
 
-          {!isOperator && (
-          <div className="space-y-2 border-t pt-4">
-            <h4 className="font-medium text-sm text-foreground">Monitoring Photo</h4>
-            <PhotoUpload photo={monitoringPhoto} filename={photoFilename} onChange={handlePhotoChange} />
-          </div>
-          )}
-
           <div className="space-y-1 border-t pt-4">
             <Label className="text-xs">Comments / Observations</Label>
             <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
           </div>
 
-          <div className="space-y-2 border-t pt-4">
-            <StructuredDowntimeForm downtimes={structuredDowntimes} onChange={setStructuredDowntimes} downtimeThreshold={60} />
-          </div>
 
           <DialogFooter className="pt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
