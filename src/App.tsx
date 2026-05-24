@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 
 // Lazy load heavy pages
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
-const Downtime = lazy(() => import('@/pages/Downtime').then(m => ({ default: m.Downtime })));
+
 const Admin = lazy(() => import('@/pages/Admin').then(m => ({ default: m.Admin })));
 const WeeklyReport = lazy(() => import('@/pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
