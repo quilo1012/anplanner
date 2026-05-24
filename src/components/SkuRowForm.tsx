@@ -114,15 +114,6 @@ const MemoizedSkuRow = React.memo(function SkuRowItem({
         </div>
       )}
 
-      {/* SKU not in catalog warning */}
-      {!row.isFoundInDb && row.sku.trim().length >= 2 && (
-        <div className="flex items-center gap-2 mb-3 p-2 bg-warning/10 border border-warning/30 rounded-md">
-          <AlertTriangle size={14} className="text-warning shrink-0" />
-          <span className="text-sm text-foreground">
-            SKU not in catalog — add it via <strong>Products Database</strong>
-          </span>
-        </div>
-      )}
 
       {/* Target and Real Production Row */}
       <div className={`grid grid-cols-1 ${showTarget ? 'md:grid-cols-2' : ''} gap-3 pt-3 border-t border-border`}>
