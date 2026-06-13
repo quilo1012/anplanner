@@ -120,6 +120,9 @@ export function History() {
 
   const handlePrint = () => {
     if (filteredSessions.length === 0) return;
+    const escapeHtml = (val: unknown): string => String(val ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const sorted = [...filteredSessions].sort((a, b) => naturalLineSort(a.productionLine, b.productionLine));
     const totalProduction = sorted.reduce((sum, s) => sum + s.totalProduction, 0);
     const totalPlanned = sorted.reduce((sum, s) => sum + s.plannedQuantity, 0);
@@ -129,8 +132,8 @@ export function History() {
     const overallPerf = totalPlanned > 0 ? ((totalProduction / totalPlanned) * 100).toFixed(1) : '0';
 
     const lineRows = sorted.map((s, i) => `<tr class="${i % 2 === 1 ? 'zebra' : ''}">
-      <td class="font-medium">${s.productionLine}</td><td>${s.lineLeader}</td>
-      <td>${s.items.map(it => it.sku).join(', ')}</td>
+      <td class="font-medium">${escapeHtml(s.productionLine)}</td><td>${escapeHtml(s.lineLeader)}</td>
+      <td>${s.items.map(it => escapeHtml(it.sku)).join(', ')}</td>
       <td class="text-right">${s.plannedQuantity.toLocaleString()}</td>
       <td class="text-right">${s.totalProduction.toLocaleString()}</td>
       <td class="text-right ${s.performance >= 90 ? 'perf-green' : s.performance >= 75 ? 'perf-yellow' : 'perf-red'}">${s.performance.toFixed(1)}%</td>
@@ -138,13 +141,13 @@ export function History() {
       <td class="text-center">${s.staffActual}/${s.staffPlanned}</td></tr>`).join('');
 
     const itemRows = sorted.flatMap(s => s.items.map((item, j) => `<tr class="${j % 2 === 1 ? 'zebra' : ''}">
-      <td class="font-medium">${s.productionLine}</td><td class="font-mono">${item.sku}</td><td>${item.productName}</td>
+      <td class="font-medium">${escapeHtml(s.productionLine)}</td><td class="font-mono">${escapeHtml(item.sku)}</td><td>${escapeHtml(item.productName)}</td>
       <td class="text-right">${item.quantityTarget.toLocaleString()}</td><td class="text-right">${item.quantityActual.toLocaleString()}</td>
       <td class="text-right">${item.quantityTarget > 0 ? ((item.quantityActual / item.quantityTarget) * 100).toFixed(1) + '%' : '-'}</td></tr>`)).join('');
 
     const dtRows = sorted.flatMap(s => (s.structuredDowntimes || []).map((dt, j) => `<tr class="${j % 2 === 1 ? 'zebra' : ''}">
-      <td class="font-medium">${s.productionLine}</td><td>${dt.category}</td><td>${dt.reason}</td>
-      <td class="text-right">${formatDuration(dt.duration)}</td><td class="comment">${dt.comment || '-'}</td></tr>`)).join('');
+      <td class="font-medium">${escapeHtml(s.productionLine)}</td><td>${escapeHtml(dt.category)}</td><td>${escapeHtml(dt.reason)}</td>
+      <td class="text-right">${formatDuration(dt.duration)}</td><td class="comment">${escapeHtml(dt.comment || '-')}</td></tr>`)).join('');
 
     const pDate = filterFromDate || new Date().toISOString().split('T')[0];
     const pShift = filterShift || 'ALL';

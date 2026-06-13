@@ -40,6 +40,9 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
   const handlePrint = () => {
     const printContent = tableRef.current;
     if (!printContent) return;
+    const escapeHtml = (val: unknown): string => String(val ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`<!DOCTYPE html><html><head><title>Daily Summary Report</title>
@@ -60,7 +63,7 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
         .footer { margin-top: 1.5rem; font-size: 0.65rem; text-align: center; color: #999; }
       </style></head><body>
       <h1>APPLIED NUTRITION — Daily Summary Report</h1>
-      <div class="meta">Period: ${dateRange || 'N/A'} | Shift: ${shift || 'ALL'} | Generated: ${new Date().toLocaleString()}</div>
+      <div class="meta">Period: ${escapeHtml(dateRange || 'N/A')} | Shift: ${escapeHtml(shift || 'ALL')} | Generated: ${new Date().toLocaleString()}</div>
       ${printContent.innerHTML}
       <div class="footer">Applied Nutrition Shift Report System — Confidential</div>
       </body></html>`);
