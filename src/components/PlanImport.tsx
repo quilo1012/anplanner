@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import ExcelJS from 'exceljs';
 import { Upload, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +71,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
     setLoading(true);
 
     try {
+      const { default: ExcelJS } = await import('exceljs');
       const buffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(buffer);

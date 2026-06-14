@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import ExcelJS from 'exceljs';
 import { Upload, AlertCircle, CheckCircle2, X, Loader2, Link2, RefreshCw } from 'lucide-react';
 import { useShifts } from '@/contexts/ShiftContext';
 import { toast } from 'sonner';
@@ -105,6 +104,7 @@ export function ProductionImport({ open, onClose }: Props) {
     setLoading(true);
 
     try {
+      const { default: ExcelJS } = await import('exceljs');
       const buffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(buffer);

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
 import { Upload, FileSpreadsheet, X, Check, AlertTriangle } from 'lucide-react';
 import { ShiftFormData, ShiftType } from '@/types/shift';
 
@@ -125,8 +125,9 @@ export function ExcelUpload({ onImport, onClose }: ExcelUploadProps) {
     setFileName(file.name);
 
     try {
+      const { default: ExcelJSLib } = await import('exceljs');
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = new ExcelJS.Workbook();
+      const workbook = new ExcelJSLib.Workbook();
       await workbook.xlsx.load(arrayBuffer);
       
       const worksheet = workbook.worksheets[0];
