@@ -51,7 +51,7 @@ export async function exportHistoryPdf(
   doc.setTextColor(100);
   doc.text(
     `Date: ${new Date(reportDate).toLocaleDateString()}   |   Shift: ${shiftLabel}   |   Generated: ${new Date().toLocaleString()}`,
-    110,
+    40,
     headerY + 22
   );
   doc.setDrawColor(50);
