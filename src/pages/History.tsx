@@ -374,7 +374,8 @@ export function History() {
                   </thead>
                   <tbody>
                     {filteredSessions.map(session => {
-                      const hasDetails = session.comments || session.items.length > 0 || (session.structuredDowntimes && session.structuredDowntimes.length > 0);
+                      const qActions = qualityBySession[session.id] || [];
+                      const hasDetails = session.comments || session.items.length > 0 || (session.structuredDowntimes && session.structuredDowntimes.length > 0) || qActions.length > 0;
                       const isExpanded = expandedRows.has(session.id);
                       
                       return (
