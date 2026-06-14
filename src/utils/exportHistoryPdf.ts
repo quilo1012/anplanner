@@ -1,24 +1,15 @@
 import { ProductionSession, ShiftType } from '@/types/production';
 import { naturalLineSort } from './naturalLineSort';
 import { formatDuration } from './formatDuration';
+import { fetchQualityActionsForSessions } from './qualityActions';
+import { QualitySeverity } from '@/types/quality';
 
-const LOGO_URL = '/lovable-uploads/64131b92-9113-4e13-88d8-667e720cb54f.png';
-
-async function loadLogoDataUrl(): Promise<string | null> {
-  try {
-    const res = await fetch(LOGO_URL);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
+const SEVERITY_RGB: Record<QualitySeverity, [number, number, number]> = {
+  low: [59, 130, 246],
+  medium: [234, 179, 8],
+  high: [249, 115, 22],
+  critical: [239, 68, 68],
+};
 
 export async function exportHistoryPdf(
   sessions: ProductionSession[],
@@ -51,20 +42,16 @@ export async function exportHistoryPdf(
   const shiftLabel = opts.shift || 'ALL';
 
   // Header
-  const logo = await loadLogoDataUrl();
-  let headerY = 30;
-  if (logo) {
-    try { doc.addImage(logo, 'PNG', 40, 20, 60, 40); } catch { /* ignore */ }
-  }
+  const headerY = 30;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('PRODUCTION REPORT', 110, headerY + 5);
+  doc.text('PRODUCTION REPORT', 40, headerY + 5);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(
     `Date: ${new Date(reportDate).toLocaleDateString()}   |   Shift: ${shiftLabel}   |   Generated: ${new Date().toLocaleString()}`,
-    110,
+    40,
     headerY + 22
   );
   doc.setDrawColor(50);
@@ -183,6 +170,54 @@ export async function exportHistoryPdf(
       margin: { left: 40, right: 40 },
     });
   }
+
+  // Quality Issues by Line
+  const sessionIds = sorted.map(s => s.id).filter(Boolean);
+  const qaMap = await fetchQualityActionsForSessions(sessionIds);
+  const qaRows: Array<[string, string, string, string, string, string]> = [];
+  const qaSeverities: (QualitySeverity | undefined)[] = [];
+  sorted.forEach(s => {
+    (qaMap[s.id] || []).forEach(qa => {
+      qaRows.push([
+        s.productionLine,
+        s.lineLeader,
+        qa.name || '—',
+        qa.severity ? qa.severity.charAt(0).toUpperCase() + qa.severity.slice(1) : '—',
+        `-${qa.points}`,
+        qa.notes || '-',
+      ]);
+      qaSeverities.push(qa.severity);
+    });
+  });
+  if (qaRows.length > 0) {
+    if (cursorY > pageHeight - 100) { doc.addPage(); cursorY = 40; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    doc.text('Quality Issues by Line', 40, cursorY);
+    cursorY += 6;
+    autoTable(doc, {
+      startY: cursorY,
+      head: [['Line', 'Leader', 'Issue', 'Severity', 'Points', 'Notes']],
+      body: qaRows,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [40, 40, 40], textColor: 255 },
+      columnStyles: { 4: { halign: 'right' } },
+      margin: { left: 40, right: 40 },
+      didParseCell: (data: { section: string; column: { index: number }; row: { index: number }; cell: { styles: { fillColor?: number[]; textColor?: number[]; fontStyle?: string } } }) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const sev = qaSeverities[data.row.index];
+          if (sev) {
+            data.cell.styles.fillColor = SEVERITY_RGB[sev];
+            data.cell.styles.textColor = [255, 255, 255];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      },
+    });
+  }
+
+
 
   // Footer on every page
   const pageCount = doc.getNumberOfPages();

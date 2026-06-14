@@ -2,7 +2,6 @@ import { ProductionSession, ShiftType } from '@/types/production';
 import { DOWNTIME_CATEGORIES } from '@/types/downtime';
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import appliedLogo from '@/assets/applied-logo-mono.jpg';
 
 interface PrintReportProps {
   sessions: ProductionSession[];
@@ -41,15 +40,12 @@ export function PrintReport({ sessions, date, shift }: PrintReportProps) {
       <style>{`@media print { .print-report { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .print-report table { page-break-inside: avoid; } .no-print { display: none !important; } }`}</style>
       
       {/* Header */}
-      <div className="border-b-2 border-foreground pb-4 mb-6 print:border-black flex items-center gap-4">
-        <img src={appliedLogo} alt="Applied Nutrition" className="h-16 w-auto print:h-16" />
-        <div>
-          <h1 className="text-2xl font-bold">PRODUCTION REPORT</h1>
-          <div className="flex gap-8 mt-2 text-sm">
-            <span><strong>Date:</strong> {new Date(date).toLocaleDateString()}</span>
-            <span><strong>Shift:</strong> {shift}</span>
-            <span><strong>Generated:</strong> {new Date().toLocaleString()}</span>
-          </div>
+      <div className="border-b-2 border-foreground pb-4 mb-6 print:border-black">
+        <h1 className="text-2xl font-bold">PRODUCTION REPORT</h1>
+        <div className="flex gap-8 mt-2 text-sm">
+          <span><strong>Date:</strong> {new Date(date).toLocaleDateString()}</span>
+          <span><strong>Shift:</strong> {shift}</span>
+          <span><strong>Generated:</strong> {new Date().toLocaleString()}</span>
         </div>
       </div>
 
