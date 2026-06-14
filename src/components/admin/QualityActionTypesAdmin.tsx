@@ -16,7 +16,14 @@ export function QualityActionTypesAdmin() {
   const reset = () => { setForm({ name: '', points: 1, description: '', is_active: true, severity: 'medium' }); setIsAdding(false); setEditingId(null); };
 
   const startEdit = (t: QualityActionType) => {
-    setForm({ name: t.name, points: Number(t.points), description: t.description || '', is_active: t.is_active, severity: (t.severity || 'medium') as QualitySeverity });
+    const pts = typeof t.points === 'number' ? t.points : parseFloat(String(t.points ?? 0));
+    setForm({
+      name: t.name,
+      points: Number.isFinite(pts) ? pts : 0,
+      description: t.description || '',
+      is_active: t.is_active,
+      severity: (t.severity || 'medium') as QualitySeverity,
+    });
     setEditingId(t.id);
     setIsAdding(false);
   };
@@ -81,7 +88,7 @@ export function QualityActionTypesAdmin() {
       </div>
 
       {(isAdding || editingId) && (
-        <form onSubmit={submit} className="mb-6 p-4 bg-muted rounded-lg">
+        <form key={editingId ?? 'new'} onSubmit={submit} className="mb-6 p-4 bg-muted rounded-lg">
           <h3 className="font-medium mb-4">{editingId ? 'Edit Type' : 'Add New Type'}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <div className="sm:col-span-2">
