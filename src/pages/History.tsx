@@ -39,6 +39,7 @@ export function History() {
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const [deleteSessionState, setDeleteSessionState] = useState<ProductionSession | null>(null);
   const [qualityBySession, setQualityBySession] = useState<Record<string, QualityActionRow[]>>({});
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
