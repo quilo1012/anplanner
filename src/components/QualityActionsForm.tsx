@@ -51,6 +51,11 @@ export function QualityActionsForm({ rows, onChange }: Props) {
           {rows.map(r => (
             <li key={r.tempId} className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm">
               <span className="font-medium flex-1 truncate">{r.name}</span>
+              {r.severity && (
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${severityBadgeClass(r.severity)}`}>
+                  {severityLabel(r.severity)}
+                </span>
+              )}
               <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-semibold">
                 -{r.points} pts
               </span>
