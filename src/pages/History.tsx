@@ -14,6 +14,9 @@ import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
 import { getLineBorderClass } from '@/utils/lineColors';
 import { cn } from '@/lib/utils';
+import { fetchQualityActionsForSessions } from '@/utils/qualityActions';
+import { QualityActionRow } from '@/types/quality';
+import { ShieldAlert } from 'lucide-react';
 
 export function History() {
   const { sessions, refreshSessions } = useShifts();
