@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     const userName = profileData?.name || "";
 
     // Parse + validate request body
-    let body: any;
+    let body: Record<string, unknown>;
     try {
       body = await req.json();
     } catch {
