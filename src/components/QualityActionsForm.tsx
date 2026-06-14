@@ -26,6 +26,7 @@ export function QualityActionsForm({ rows, onChange }: Props) {
         action_type_id: t.id,
         name: t.name,
         points: Number(t.points) || 0,
+        severity: t.severity,
         notes: notes.trim(),
       },
     ]);
