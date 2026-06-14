@@ -403,6 +403,24 @@ export function ProductionImport({ open, onClose }: Props) {
             </div>
           ) : (
             <>
+              {warnedRows.length > 0 && (
+                <div className="flex items-start justify-between gap-3 p-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10">
+                  <div className="flex items-start gap-2 text-sm">
+                    <AlertCircle size={16} className="text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                    <span className="text-yellow-700 dark:text-yellow-300">
+                      {warnedRows.length} row(s) reference SKUs not found in the Products Database and will be <strong>skipped</strong> on import. Register the missing SKUs and re-run the import.
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); navigate('/products'); }}
+                    className="shrink-0"
+                  >
+                    Go to Products
+                  </Button>
+                </div>
+              )}
               <div className="flex gap-4 flex-wrap">
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle2 size={16} className="text-green-500" />
