@@ -49,7 +49,7 @@ export async function fetchQualityActionsForSessions(sessionIds: string[]) {
   const results = await Promise.all(chunks.map(c =>
     supabase
       .from('quality_actions')
-      .select('id, session_id, action_type_id, points, notes, quality_action_types(name)')
+      .select('id, session_id, action_type_id, points, notes, quality_action_types(name, severity)')
       .in('session_id', c)
   ));
   const map: Record<string, QualityActionRow[]> = {};
@@ -59,13 +59,14 @@ export async function fetchQualityActionsForSessions(sessionIds: string[]) {
       const sid = row.session_id as string | null;
       if (!sid) continue;
       if (!map[sid]) map[sid] = [];
-      const typeName = (row.quality_action_types as { name?: string } | null)?.name || '';
+      const t = row.quality_action_types as { name?: string; severity?: string } | null;
       map[sid].push({
         id: row.id,
         tempId: row.id,
         action_type_id: row.action_type_id,
-        name: typeName,
+        name: t?.name || '',
         points: Number(row.points) || 0,
+        severity: (t?.severity as QualityActionRow['severity']) || undefined,
         notes: row.notes || '',
       });
     }
