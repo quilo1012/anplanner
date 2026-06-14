@@ -525,7 +525,12 @@ export function ProductionImport({ open, onClose }: Props) {
         {rows.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
             <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Choose Different File</Button>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              {!leaderName.trim() && validRows.length > 0 && (
+                <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                  <AlertCircle size={14} /> Please enter the leader name to continue
+                </span>
+              )}
               <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Cancel</Button>
               <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !leaderName.trim()}>
                 {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
