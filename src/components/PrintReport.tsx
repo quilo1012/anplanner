@@ -2,7 +2,6 @@ import { ProductionSession, ShiftType } from '@/types/production';
 import { DOWNTIME_CATEGORIES } from '@/types/downtime';
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import appliedLogo from '@/assets/applied-logo-mono.jpg';
 
 interface PrintReportProps {
   sessions: ProductionSession[];
