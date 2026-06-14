@@ -171,6 +171,54 @@ export async function exportHistoryPdf(
     });
   }
 
+  // Quality Issues by Line
+  const sessionIds = sorted.map(s => s.id).filter(Boolean);
+  const qaMap = await fetchQualityActionsForSessions(sessionIds);
+  const qaRows: Array<[string, string, string, string, string, string]> = [];
+  const qaSeverities: (QualitySeverity | undefined)[] = [];
+  sorted.forEach(s => {
+    (qaMap[s.id] || []).forEach(qa => {
+      qaRows.push([
+        s.productionLine,
+        s.lineLeader,
+        qa.name || '—',
+        qa.severity ? qa.severity.charAt(0).toUpperCase() + qa.severity.slice(1) : '—',
+        `-${qa.points}`,
+        qa.notes || '-',
+      ]);
+      qaSeverities.push(qa.severity);
+    });
+  });
+  if (qaRows.length > 0) {
+    if (cursorY > pageHeight - 100) { doc.addPage(); cursorY = 40; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    doc.text('Quality Issues by Line', 40, cursorY);
+    cursorY += 6;
+    autoTable(doc, {
+      startY: cursorY,
+      head: [['Line', 'Leader', 'Issue', 'Severity', 'Points', 'Notes']],
+      body: qaRows,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [40, 40, 40], textColor: 255 },
+      columnStyles: { 4: { halign: 'right' } },
+      margin: { left: 40, right: 40 },
+      didParseCell: (data: { section: string; column: { index: number }; row: { index: number }; cell: { styles: { fillColor?: number[]; textColor?: number[]; fontStyle?: string } } }) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const sev = qaSeverities[data.row.index];
+          if (sev) {
+            data.cell.styles.fillColor = SEVERITY_RGB[sev];
+            data.cell.styles.textColor = [255, 255, 255];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      },
+    });
+  }
+
+
+
   // Footer on every page
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
