@@ -31,6 +31,7 @@ export function QualityActionTypesAdmin() {
       points: form.points,
       description: form.description.trim() || null,
       is_active: form.is_active,
+      severity: form.severity,
     };
     let error;
     if (editingId) {
