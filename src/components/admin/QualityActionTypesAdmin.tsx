@@ -93,6 +93,18 @@ export function QualityActionTypesAdmin() {
               <input type="number" min={0} step="0.5" value={form.points} onChange={e => setForm(f => ({ ...f, points: parseFloat(e.target.value) || 0 }))} className="input-field" required />
             </div>
             <div className="sm:col-span-3">
+              <label className="label">Severity</label>
+              <select
+                value={form.severity}
+                onChange={e => setForm(f => ({ ...f, severity: e.target.value as QualitySeverity }))}
+                className="select-field"
+              >
+                {SEVERITY_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-3">
               <label className="label">Description (optional)</label>
               <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="input-field" maxLength={300} />
             </div>
