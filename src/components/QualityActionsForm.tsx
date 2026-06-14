@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ShieldAlert, Plus, X } from 'lucide-react';
 import { useQualityActionTypes } from '@/hooks/useQualityActionTypes';
 import { QualityActionRow } from '@/types/quality';
+import { severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 
 interface Props {
   rows: QualityActionRow[];
