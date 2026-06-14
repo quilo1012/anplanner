@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldAlert, Plus, Edit, Trash2, Save, X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -6,16 +6,21 @@ import { useQualityActionTypes } from '@/hooks/useQualityActionTypes';
 import { QualityActionType, QualitySeverity } from '@/types/quality';
 import { SEVERITY_OPTIONS, severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 
+const EMPTY_FORM = { name: '', points: 1, description: '', is_active: true, severity: 'medium' as QualitySeverity };
+
 export function QualityActionTypesAdmin() {
   const { types, loading, refresh } = useQualityActionTypes(false);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ name: string; points: number; description: string; is_active: boolean; severity: QualitySeverity }>({ name: '', points: 1, description: '', is_active: true, severity: 'medium' });
+  const [form, setForm] = useState<{ name: string; points: number; description: string; is_active: boolean; severity: QualitySeverity }>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
 
-  const reset = () => { setForm({ name: '', points: 1, description: '', is_active: true, severity: 'medium' }); setIsAdding(false); setEditingId(null); };
-
-  const startEdit = (t: QualityActionType) => {
+  // Keep form in sync with the selected record. Runs whenever editingId or the
+  // underlying types list changes (so freshly-fetched data also populates).
+  useEffect(() => {
+    if (!editingId) return;
+    const t = types.find(x => x.id === editingId);
+    if (!t) return;
     const pts = typeof t.points === 'number' ? t.points : parseFloat(String(t.points ?? 0));
     setForm({
       name: t.name,
@@ -24,9 +29,16 @@ export function QualityActionTypesAdmin() {
       is_active: t.is_active,
       severity: (t.severity || 'medium') as QualitySeverity,
     });
-    setEditingId(t.id);
+  }, [editingId, types]);
+
+  const reset = () => { setForm(EMPTY_FORM); setIsAdding(false); setEditingId(null); };
+
+  const startEdit = (t: QualityActionType) => {
     setIsAdding(false);
+    setEditingId(t.id); // useEffect above populates the form
   };
+
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
