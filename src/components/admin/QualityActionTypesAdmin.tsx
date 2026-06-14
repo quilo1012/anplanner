@@ -16,7 +16,14 @@ export function QualityActionTypesAdmin() {
   const reset = () => { setForm({ name: '', points: 1, description: '', is_active: true, severity: 'medium' }); setIsAdding(false); setEditingId(null); };
 
   const startEdit = (t: QualityActionType) => {
-    setForm({ name: t.name, points: Number(t.points), description: t.description || '', is_active: t.is_active, severity: (t.severity || 'medium') as QualitySeverity });
+    const pts = typeof t.points === 'number' ? t.points : parseFloat(String(t.points ?? 0));
+    setForm({
+      name: t.name,
+      points: Number.isFinite(pts) ? pts : 0,
+      description: t.description || '',
+      is_active: t.is_active,
+      severity: (t.severity || 'medium') as QualitySeverity,
+    });
     setEditingId(t.id);
     setIsAdding(false);
   };
