@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SkuRowForm } from '@/components/SkuRowForm';
-import { PhotoUpload } from '@/components/PhotoUpload';
+
 import { ExcelUpload } from '@/components/ExcelUpload';
 import { IntouchImport, LineGroup } from '@/components/IntouchImport';
 import { normalizeLineName } from '@/utils/normalizeLineName';
@@ -33,8 +33,6 @@ interface PlannerFormState {
   lineLeader: string;
   skuRows: SkuRow[];
   observations: string;
-  monitoringPhoto?: string;
-  photoFilename?: string;
   staffPlanned: number;
   staffActual: number;
 }
@@ -46,8 +44,6 @@ const createInitialState = (): PlannerFormState => ({
   lineLeader: '',
   skuRows: [createEmptySkuRow()],
   observations: '',
-  monitoringPhoto: undefined,
-  photoFilename: undefined,
   staffPlanned: 0,
   staffActual: 0,
 });
@@ -120,8 +116,6 @@ export function Planner() {
               }))
             : [createEmptySkuRow()],
           observations: session.comments,
-          monitoringPhoto: session.monitoringPhoto,
-          photoFilename: session.photoFilename,
           staffPlanned: session.staffPlanned || 0,
           staffActual: session.staffActual || 0,
         });
@@ -150,9 +144,6 @@ export function Planner() {
     setFormState(prev => ({ ...prev, skuRows: rows }));
   };
 
-  const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
-    setFormState(prev => ({ ...prev, monitoringPhoto: photo, photoFilename: filename }));
-  };
 
   const handleExcelImport = async (entries: import('@/types/shift').ShiftFormData[]) => {
     // Excel import creates individual sessions per entry
@@ -270,8 +261,6 @@ export function Planner() {
           quantityActual: row.realProduction || 0,
         })),
         comments: formState.observations,
-        monitoringPhoto: formState.monitoringPhoto,
-        photoFilename: formState.photoFilename,
         staffPlanned: formState.staffPlanned,
         staffActual: formState.staffActual,
       };
@@ -484,9 +473,6 @@ export function Planner() {
                   <textarea id="observations" name="observations" value={formState.observations}
                     onChange={handleFieldChange} rows={3} placeholder="Additional notes about the shift..."
                     className="input-field resize-none" maxLength={500} disabled={!canReview} />
-                </div>
-                <div className="p-4 bg-muted rounded-lg">
-                  <PhotoUpload photo={formState.monitoringPhoto} filename={formState.photoFilename} onChange={handlePhotoChange} />
                 </div>
               </div>
             </div>
