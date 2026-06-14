@@ -415,6 +415,9 @@ export function Dashboard() {
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Trophy size={16} />Leader Board</h3>
                 <LeaderPerformanceBoard sessions={filteredSessions} currentDate={startDate} />
               </div>
+              <div className="card p-3">
+                <LeaderQualityBoard currentDate={startDate} />
+              </div>
             </div>
 
             {/* Section: Downtime */}
