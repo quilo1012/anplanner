@@ -25,12 +25,21 @@ interface ShiftContextType {
   saveDowntimesBatch: (sessionId: string, downtimes: StructuredDowntime[]) => Promise<OperationResult>;
   getSessionById: (id: string) => ProductionSession | undefined;
   refreshSessions: () => Promise<void>;
+  loadMoreHistory: () => Promise<void>;
+  hasMoreHistory: boolean;
+  isLoadingMore: boolean;
+  historyDaysLoaded: number;
   // Keep old names for compatibility during transition
   shifts: ProductionSession[];
   refreshShifts: () => Promise<void>;
 }
 
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
+
+const DEFAULT_HISTORY_DAYS = 90;
+const MAX_HISTORY_DAYS = 730;
+const HISTORY_INCREMENT_DAYS = 90;
+
 
 function mapDbShiftType(dbType: string): ShiftType {
   const upper = dbType?.toUpperCase();
