@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2, KeyRound } from 'l
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { QualityActionTypesAdmin } from '@/components/admin/QualityActionTypesAdmin';
 
 export function Admin() {
   const { users, user: currentUser, addUser, updateUser, deleteUser } = useAuth();
