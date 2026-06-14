@@ -433,9 +433,6 @@ export function Planner() {
               </div>
             )}
 
-            {canReview && (
-              <QualityActionsForm rows={qualityRows} onChange={setQualityRows} />
-            )}
 
             {/* Review Section */}
             <div className={`card p-4 sm:p-6 border-l-4 ${canReview ? 'border-l-primary' : 'border-l-muted'}`}>
