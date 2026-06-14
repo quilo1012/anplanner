@@ -3,19 +3,20 @@ import { ShieldAlert, Plus, Edit, Trash2, Save, X, Eye, EyeOff, Loader2 } from '
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQualityActionTypes } from '@/hooks/useQualityActionTypes';
-import { QualityActionType } from '@/types/quality';
+import { QualityActionType, QualitySeverity } from '@/types/quality';
+import { SEVERITY_OPTIONS, severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 
 export function QualityActionTypesAdmin() {
   const { types, loading, refresh } = useQualityActionTypes(false);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', points: 1, description: '', is_active: true });
+  const [form, setForm] = useState<{ name: string; points: number; description: string; is_active: boolean; severity: QualitySeverity }>({ name: '', points: 1, description: '', is_active: true, severity: 'medium' });
   const [submitting, setSubmitting] = useState(false);
 
-  const reset = () => { setForm({ name: '', points: 1, description: '', is_active: true }); setIsAdding(false); setEditingId(null); };
+  const reset = () => { setForm({ name: '', points: 1, description: '', is_active: true, severity: 'medium' }); setIsAdding(false); setEditingId(null); };
 
   const startEdit = (t: QualityActionType) => {
-    setForm({ name: t.name, points: Number(t.points), description: t.description || '', is_active: t.is_active });
+    setForm({ name: t.name, points: Number(t.points), description: t.description || '', is_active: t.is_active, severity: (t.severity || 'medium') as QualitySeverity });
     setEditingId(t.id);
     setIsAdding(false);
   };
@@ -30,6 +31,7 @@ export function QualityActionTypesAdmin() {
       points: form.points,
       description: form.description.trim() || null,
       is_active: form.is_active,
+      severity: form.severity,
     };
     let error;
     if (editingId) {
@@ -91,6 +93,18 @@ export function QualityActionTypesAdmin() {
               <input type="number" min={0} step="0.5" value={form.points} onChange={e => setForm(f => ({ ...f, points: parseFloat(e.target.value) || 0 }))} className="input-field" required />
             </div>
             <div className="sm:col-span-3">
+              <label className="label">Severity</label>
+              <select
+                value={form.severity}
+                onChange={e => setForm(f => ({ ...f, severity: e.target.value as QualitySeverity }))}
+                className="select-field"
+              >
+                {SEVERITY_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-3">
               <label className="label">Description (optional)</label>
               <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="input-field" maxLength={300} />
             </div>
@@ -117,6 +131,7 @@ export function QualityActionTypesAdmin() {
             <tr>
               <th>Name</th>
               <th className="text-right">Points</th>
+              <th>Severity</th>
               <th>Description</th>
               <th>Status</th>
               <th className="w-32">Actions</th>
@@ -124,13 +139,18 @@ export function QualityActionTypesAdmin() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
             ) : types.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No quality action types defined.</td></tr>
+              <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">No quality action types defined.</td></tr>
             ) : types.map(t => (
               <tr key={t.id} className={!t.is_active ? 'opacity-60' : ''}>
                 <td className="font-medium">{t.name}</td>
                 <td className="text-right font-mono">{t.points}</td>
+                <td>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityBadgeClass(t.severity)}`}>
+                    {severityLabel(t.severity)}
+                  </span>
+                </td>
                 <td className="text-sm text-muted-foreground">{t.description || '—'}</td>
                 <td>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${t.is_active ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>

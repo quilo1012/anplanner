@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ShieldAlert, Plus, X } from 'lucide-react';
 import { useQualityActionTypes } from '@/hooks/useQualityActionTypes';
 import { QualityActionRow } from '@/types/quality';
+import { severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 
 interface Props {
   rows: QualityActionRow[];
@@ -25,6 +26,7 @@ export function QualityActionsForm({ rows, onChange }: Props) {
         action_type_id: t.id,
         name: t.name,
         points: Number(t.points) || 0,
+        severity: t.severity,
         notes: notes.trim(),
       },
     ]);
@@ -49,6 +51,11 @@ export function QualityActionsForm({ rows, onChange }: Props) {
           {rows.map(r => (
             <li key={r.tempId} className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm">
               <span className="font-medium flex-1 truncate">{r.name}</span>
+              {r.severity && (
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${severityBadgeClass(r.severity)}`}>
+                  {severityLabel(r.severity)}
+                </span>
+              )}
               <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-semibold">
                 -{r.points} pts
               </span>
@@ -74,7 +81,7 @@ export function QualityActionsForm({ rows, onChange }: Props) {
           >
             <option value="">Select type...</option>
             {types.map(t => (
-              <option key={t.id} value={t.id}>{t.name} (-{t.points} pts)</option>
+              <option key={t.id} value={t.id}>{t.name} — {severityLabel(t.severity)} (-{t.points} pts)</option>
             ))}
           </select>
         </div>
