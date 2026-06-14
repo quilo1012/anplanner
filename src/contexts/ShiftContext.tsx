@@ -167,8 +167,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           staffActual: row.staff_actual || 0,
           plannedQuantity: plannedQty,
           comments: row.comments || '',
-          monitoringPhoto: row.monitoring_photo_url || undefined,
-          photoFilename: row.monitoring_photo_url ? row.monitoring_photo_url.split('/').pop() : undefined,
           items,
           structuredDowntimes: downtimes,
           totalProduction,
@@ -235,39 +233,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     };
   }, [authLoading, isAuthenticated, user?.id, refreshSessions]);
 
-  const sanitizeFilename = (filename: string): string => {
-    const lastDot = filename.lastIndexOf('.');
-    const name = lastDot > 0 ? filename.slice(0, lastDot) : filename;
-    const ext = lastDot > 0 ? filename.slice(lastDot) : '';
-    const safeName = name
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9._-]/g, '_')
-      .replace(/_+/g, '_').replace(/^_|_$/g, '')
-      .toLowerCase().slice(0, 100);
-    return safeName + ext.toLowerCase();
-  };
-
-  const uploadPhoto = async (base64Photo: string, filename: string): Promise<string | null> => {
-    try {
-      const base64Data = base64Photo.split(',')[1];
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/jpeg' });
-      const safeName = sanitizeFilename(filename);
-      const filePath = `${Date.now()}-${safeName}`;
-
-      const { data, error } = await supabase.storage
-        .from('monitoring-photos')
-        .upload(filePath, blob, { contentType: 'image/jpeg', upsert: false });
-
-      if (error) { console.error('Error uploading photo:', error); return null; }
-      return data.path;
-    } catch (error) { console.error('Error processing photo:', error); return null; }
-  };
 
   /**
    * Save a production session: upserts session + replaces items.
@@ -279,13 +244,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
 
     try {
-      // Upload photo if base64
-      let photoUrl: string | null = null;
-      if (data.monitoringPhoto && data.monitoringPhoto.startsWith('data:')) {
-        photoUrl = await uploadPhoto(data.monitoringPhoto, data.photoFilename || 'photo.jpg');
-      } else if (data.monitoringPhoto) {
-        photoUrl = data.monitoringPhoto; // Already a path
-      }
+      // monitoring photo removed
 
       const totalProduction = data.items.reduce((sum, i) => sum + i.quantityActual, 0);
       const performance = data.plannedQuantity > 0 ? (totalProduction / data.plannedQuantity) * 100 : 0;
