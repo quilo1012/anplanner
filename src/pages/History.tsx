@@ -464,6 +464,21 @@ export function History() {
                                       </div>
                                     </div>
                                   )}
+                                  {/* Quality Actions */}
+                                  {qActions.length > 0 && (
+                                    <div>
+                                      <h4 className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1"><ShieldAlert size={12} className="text-amber-500" /> Quality Issues</h4>
+                                      <div className="grid gap-1">
+                                        {qActions.map(q => (
+                                          <div key={q.tempId} className="flex items-center gap-3 text-xs bg-card p-2 rounded border border-border">
+                                            <span className="font-medium flex-1">{q.name}</span>
+                                            <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">-{q.points} pts</span>
+                                            {q.notes && <span className="text-muted-foreground italic">"{q.notes}"</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                   {/* Comments */}
                                   {session.comments && (
                                     <div className="text-xs text-muted-foreground">
