@@ -30,6 +30,7 @@ interface EditShiftDialogProps {
 
 export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOperator = false }: EditShiftDialogProps) {
   const { updateSession } = useShifts();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [date, setDate] = useState('');
