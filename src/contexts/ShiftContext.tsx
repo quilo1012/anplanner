@@ -259,7 +259,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         staff_actual: data.staffActual || 0,
         planned_quantity: data.plannedQuantity,
         comments: data.comments || null,
-        monitoring_photo_url: photoUrl,
+        
         created_by: user.id,
       };
 
@@ -333,8 +333,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
             staffActual: data.staffActual || 0,
             plannedQuantity: data.plannedQuantity,
             comments: data.comments || '',
-            monitoringPhoto: photoUrl || undefined,
-            photoFilename: data.photoFilename,
             items: data.items.map((i, idx) => ({ id: `temp-${idx}`, ...i })),
             structuredDowntimes: data.structuredDowntimes || [],
             totalProduction,
@@ -428,11 +426,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       }
 
       // === SUPERVISOR/ADMIN PATH: full update ===
-      let photoUrl: string | undefined = undefined;
-      if (data.monitoringPhoto && data.monitoringPhoto.startsWith('data:')) {
-        const uploaded = await uploadPhoto(data.monitoringPhoto, data.photoFilename || 'photo.jpg');
-        if (uploaded) photoUrl = uploaded;
-      }
 
       // Step 1: Update session record
       const { error: sessionError } = await supabase
@@ -448,7 +441,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           comments: data.comments || null,
           updated_by: user?.name || null,
           updated_at: new Date().toISOString(),
-          ...(photoUrl && { monitoring_photo_url: photoUrl }),
+          
         })
         .eq('id', id);
 
@@ -524,7 +517,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         staffActual: data.staffActual || 0,
         plannedQuantity: data.plannedQuantity,
         comments: data.comments || '',
-        ...(photoUrl && { monitoringPhoto: photoUrl }),
+        
         items: data.items.map((i, idx) => ({ id: `temp-${idx}`, ...i })),
         structuredDowntimes: data.structuredDowntimes || [],
         totalProduction,
