@@ -86,6 +86,12 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
       duration: dt.duration,
       comment: dt.comment || '',
     })));
+    // load quality actions
+    fetchQualityActionsForSessions([session.id]).then(map => {
+      setQualityRows(map[session.id] || []);
+    });
+
+
 
     // Then refresh from DB to pick up any newer changes
     const loadFreshData = async () => {
