@@ -21,9 +21,6 @@ import { Save, RotateCcw, FileSpreadsheet, Users, User, ClipboardCheck, Lock } f
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import { QualityActionsForm } from '@/components/QualityActionsForm';
-import { QualityActionRow } from '@/types/quality';
-import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
 
 
 interface PlannerFormState {
