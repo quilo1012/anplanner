@@ -68,7 +68,7 @@ export function Planner() {
   const [showIntouchImport, setShowIntouchImport] = useState(false);
   const [showPlanImport, setShowPlanImport] = useState(false);
   const [showProductionImport, setShowProductionImport] = useState(false);
-  const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
+  
   
 
   // Alert when user picks a low-score line for a product
