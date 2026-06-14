@@ -9,7 +9,7 @@ import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
-import { Edit, Trash2, Download, X, Image, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
+import { Edit, Trash2, Download, X, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
 import { getLineBorderClass } from '@/utils/lineColors';
@@ -422,7 +422,7 @@ export function History() {
                           {/* Expanded Row: Items + Downtimes + Comments */}
                           {isExpanded && (
                             <tr>
-                              <td colSpan={14} className="bg-muted/30 p-3">
+                              <td colSpan={13} className="bg-muted/30 p-3">
                                 <div className="space-y-3">
                                   {/* SKU Items */}
                                   {session.items.length > 0 && (
