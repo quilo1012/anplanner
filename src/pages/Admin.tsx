@@ -412,7 +412,6 @@ export function Admin() {
           {isAdmin && <QualityActionTypesAdmin />}
         </div>
       </div>
-      </div>
       <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
         <DialogContent>
           <DialogHeader>
