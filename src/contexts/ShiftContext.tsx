@@ -207,7 +207,20 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, authLoading, user?.id, user?.role, user?.name]);
+  }, [isAuthenticated, authLoading, user?.id, user?.role, user?.name, historyDaysLoaded]);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (!hasMoreHistory || isLoadingMore) return;
+    const next = Math.min(historyDaysLoaded + HISTORY_INCREMENT_DAYS, MAX_HISTORY_DAYS);
+    setIsLoadingMore(true);
+    try {
+      setHistoryDaysLoaded(next);
+      await refreshSessions(0, next);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMoreHistory, isLoadingMore, historyDaysLoaded, refreshSessions]);
+
 
   useEffect(() => {
     if (!authLoading) {
