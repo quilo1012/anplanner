@@ -3,6 +3,7 @@ import { format, parseISO, subDays } from 'date-fns';
 import { ShieldCheck, ShieldAlert, Calendar, AlertTriangle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 
 interface Props {
   currentDate: string;
