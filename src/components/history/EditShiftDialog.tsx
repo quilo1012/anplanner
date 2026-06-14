@@ -207,6 +207,20 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
         return;
       }
 
+      // Save quality actions (supervisor/admin only)
+      const qr = await saveQualityActionsForSession({
+        sessionId: session.id,
+        productionLine: productionLine.trim(),
+        lineLeader: lineLeader.trim(),
+        date,
+        shiftType,
+        rows: qualityRows,
+        recordedBy: user?.id ?? null,
+      });
+      if (!qr.success) {
+        toast.error(`Quality save failed: ${qr.error}`);
+      }
+
       toast.success('Session updated successfully');
       onOpenChange(false);
       onSuccess?.();
