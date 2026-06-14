@@ -25,12 +25,21 @@ interface ShiftContextType {
   saveDowntimesBatch: (sessionId: string, downtimes: StructuredDowntime[]) => Promise<OperationResult>;
   getSessionById: (id: string) => ProductionSession | undefined;
   refreshSessions: () => Promise<void>;
+  loadMoreHistory: () => Promise<void>;
+  hasMoreHistory: boolean;
+  isLoadingMore: boolean;
+  historyDaysLoaded: number;
   // Keep old names for compatibility during transition
   shifts: ProductionSession[];
   refreshShifts: () => Promise<void>;
 }
 
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
+
+const DEFAULT_HISTORY_DAYS = 90;
+const MAX_HISTORY_DAYS = 730;
+const HISTORY_INCREMENT_DAYS = 90;
+
 
 function mapDbShiftType(dbType: string): ShiftType {
   const upper = dbType?.toUpperCase();
@@ -61,9 +70,14 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<ProductionSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyDaysLoaded, setHistoryDaysLoaded] = useState(DEFAULT_HISTORY_DAYS);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const refreshSessions = useCallback(async (retryCount = 0) => {
+  const hasMoreHistory = historyDaysLoaded < MAX_HISTORY_DAYS;
+
+  const refreshSessions = useCallback(async (retryCount = 0, daysOverride?: number) => {
+
     if (authLoading || !user?.id) return;
     if (!isAuthenticated) {
       setSessions([]);
@@ -76,9 +90,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Step 1: Fetch sessions with 365-day lookback
+      const days = daysOverride ?? historyDaysLoaded;
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 365);
+      cutoff.setDate(cutoff.getDate() - days);
+
       let query = supabase
           .from('production_sessions')
           .select('*')
@@ -192,7 +207,20 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, authLoading, user?.id, user?.role, user?.name]);
+  }, [isAuthenticated, authLoading, user?.id, user?.role, user?.name, historyDaysLoaded]);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (!hasMoreHistory || isLoadingMore) return;
+    const next = Math.min(historyDaysLoaded + HISTORY_INCREMENT_DAYS, MAX_HISTORY_DAYS);
+    setIsLoadingMore(true);
+    try {
+      setHistoryDaysLoaded(next);
+      await refreshSessions(0, next);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMoreHistory, isLoadingMore, historyDaysLoaded, refreshSessions]);
+
 
   useEffect(() => {
     if (!authLoading) {
@@ -604,6 +632,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       saveDowntimesBatch,
       getSessionById,
       refreshSessions,
+      loadMoreHistory,
+      hasMoreHistory,
+      isLoadingMore,
+      historyDaysLoaded,
       // Backward compat aliases
       shifts: sessions,
       refreshShifts: refreshSessions,

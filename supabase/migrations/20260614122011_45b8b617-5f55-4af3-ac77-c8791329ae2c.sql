@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_production_sessions_date ON public.production_sessions (date DESC);
