@@ -207,10 +207,6 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
     });
   }
 
-  // Debug: log parsed groups
-  const lineGroups = new Map<string, number>();
-  rows.forEach(r => lineGroups.set(r.line, (lineGroups.get(r.line) || 0) + 1));
-  console.log('[iTouching Parser] Lines detected:', Object.fromEntries(lineGroups), `(lineColIdx: ${lineColIdx})`);
 
   // Parse downtimes from second worksheet or downtime-labeled sheet
   const downtimes: ParsedDowntime[] = [];

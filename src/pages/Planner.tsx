@@ -493,8 +493,7 @@ export function Planner() {
                 const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
                 const lineName = normalizeLineName(group.line);
                 
-                console.log(`[iTouching Import] Saving line "${lineName}" with ${group.rows.length} SKUs:`, 
-                  group.rows.map(r => `${r.sku} (target: ${r.quantityTarget})`));
+                
                 
                 const result = await saveSession({
                   date: importDate,

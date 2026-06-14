@@ -93,6 +93,7 @@ export function useProductCache() {
 
         globalLastFetched = new Date();
         globalIsLoaded = true;
+        // (debug log removed)
 
         console.log(`[ProductCache] Loaded ${globalProductCache.size} products`);
       } catch (err) {
