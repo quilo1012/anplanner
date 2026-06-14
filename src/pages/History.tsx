@@ -19,7 +19,7 @@ import { QualityActionRow } from '@/types/quality';
 import { ShieldAlert } from 'lucide-react';
 
 export function History() {
-  const { sessions, refreshSessions } = useShifts();
+  const { sessions, refreshSessions, loadMoreHistory, hasMoreHistory, isLoadingMore, historyDaysLoaded } = useShifts();
   const { hasRole, user } = useAuth();
   const isOperator = user?.role === 'operator';
   
