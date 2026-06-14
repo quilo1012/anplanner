@@ -15,6 +15,10 @@ import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
 import { Loader2, Save, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { QualityActionsForm } from '@/components/QualityActionsForm';
+import { QualityActionRow } from '@/types/quality';
+import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EditShiftDialogProps {
   session: ProductionSession | null;
