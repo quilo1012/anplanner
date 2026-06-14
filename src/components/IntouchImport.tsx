@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { SHIFT_TYPES, ShiftType } from '@/types/production';
 import { normalizeLineName } from '@/utils/normalizeLineName';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
 
 interface ParsedRow {
   line: string;
@@ -126,8 +126,9 @@ function isHeaderRow(row: ExcelJS.Row): boolean {
 }
 
 async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: ParsedDowntime[] }> {
+  const { default: ExcelJSLib } = await import('exceljs');
   const buffer = await file.arrayBuffer();
-  const wb = new ExcelJS.Workbook();
+  const wb = new ExcelJSLib.Workbook();
   await wb.xlsx.load(buffer);
   const ws = wb.worksheets[0];
   if (!ws || ws.rowCount < 2) return { rows: [], downtimes: [] };

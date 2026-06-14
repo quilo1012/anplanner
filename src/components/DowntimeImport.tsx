@@ -11,7 +11,7 @@ import { useShifts } from '@/contexts/ShiftContext';
 import { normalizeLineName } from '@/utils/normalizeLineName';
 import { formatDuration } from '@/utils/formatDuration';
 import { toast } from 'sonner';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
 
 interface ParsedDowntime {
   line: string;
@@ -72,8 +72,9 @@ function detectDowntimeColumns(headers: string[]): Record<number, keyof Omit<Par
 }
 
 async function parseDowntimeXlsx(file: File): Promise<ParsedDowntime[]> {
+  const { default: ExcelJSLib } = await import('exceljs');
   const buffer = await file.arrayBuffer();
-  const wb = new ExcelJS.Workbook();
+  const wb = new ExcelJSLib.Workbook();
   await wb.xlsx.load(buffer);
 
   // Find downtime sheet: named "downtime"/"parad", or first sheet, or second sheet
