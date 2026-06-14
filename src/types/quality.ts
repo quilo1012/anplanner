@@ -1,9 +1,12 @@
+export type QualitySeverity = 'low' | 'medium' | 'high' | 'critical';
+
 export interface QualityActionType {
   id: string;
   name: string;
   points: number;
   description: string | null;
   is_active: boolean;
+  severity: QualitySeverity;
 }
 
 export interface QualityActionRow {
