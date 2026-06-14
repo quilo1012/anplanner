@@ -15,6 +15,7 @@ export interface QualityActionRow {
   action_type_id: string;
   name: string;         // type name snapshot for display
   points: number;       // snapshot of type points
+  severity?: QualitySeverity;
   notes: string;
 }
 
