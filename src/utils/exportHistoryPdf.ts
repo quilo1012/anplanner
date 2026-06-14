@@ -42,14 +42,10 @@ export async function exportHistoryPdf(
   const shiftLabel = opts.shift || 'ALL';
 
   // Header
-  const logo = await loadLogoDataUrl();
-  let headerY = 30;
-  if (logo) {
-    try { doc.addImage(logo, 'PNG', 40, 20, 60, 40); } catch { /* ignore */ }
-  }
+  const headerY = 30;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('PRODUCTION REPORT', 110, headerY + 5);
+  doc.text('PRODUCTION REPORT', 40, headerY + 5);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100);
