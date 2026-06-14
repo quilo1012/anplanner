@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart, Package } from 'lucide-react';
+import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart, Package, ShieldAlert } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 
 type NavItem = {
@@ -41,6 +41,7 @@ const navGroups: NavGroup[] = [
     label: 'System',
     items: [
       { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+      { path: '/quality-action-types', label: 'Quality Action Types', icon: ShieldAlert, roles: ['admin'] },
     ],
   },
 ];
