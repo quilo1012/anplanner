@@ -9,7 +9,7 @@ import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
-import { Edit, Trash2, Download, X, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
+import { Edit, Trash2, Download, X, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package, FileText, Loader2 } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
 import { getLineBorderClass } from '@/utils/lineColors';
@@ -39,6 +39,7 @@ export function History() {
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const [deleteSessionState, setDeleteSessionState] = useState<ProductionSession | null>(null);
   const [qualityBySession, setQualityBySession] = useState<Record<string, QualityActionRow[]>>({});
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
@@ -130,6 +131,20 @@ export function History() {
   };
 
   const handleExport = () => exportSessionsToCsv(filteredSessions, 'session_history');
+
+  const handleExportPdf = async () => {
+    if (filteredSessions.length === 0 || isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      const { exportHistoryPdf } = await import('@/utils/exportHistoryPdf');
+      await exportHistoryPdf(filteredSessions, { fromDate: filterFromDate, shift: filterShift });
+    } catch (err) {
+      console.error('[exportHistoryPdf] failed', err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const handlePrint = () => {
     if (filteredSessions.length === 0) return;
@@ -297,8 +312,11 @@ export function History() {
               {hasFilters && (
                 <button onClick={clearFilters} className="btn-secondary text-xs py-2 px-2" title="Clear filters"><X size={14} /></button>
               )}
-              <button onClick={handlePrint} disabled={filteredSessions.length === 0} className="btn-secondary text-xs py-2"><Printer size={14} /></button>
-              <button onClick={handleExport} disabled={filteredSessions.length === 0} className="btn-success text-xs py-2"><Download size={14} /></button>
+              <button onClick={handlePrint} disabled={filteredSessions.length === 0} className="btn-secondary text-xs py-2" title="Print"><Printer size={14} /></button>
+              <button onClick={handleExportPdf} disabled={filteredSessions.length === 0 || isExportingPdf} className="btn-secondary text-xs py-2" title="Export PDF">
+                {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              </button>
+              <button onClick={handleExport} disabled={filteredSessions.length === 0} className="btn-success text-xs py-2" title="Export CSV"><Download size={14} /></button>
             </div>
           </div>
         </div>
