@@ -3,6 +3,7 @@ import { format, parseISO, subDays } from 'date-fns';
 import { ShieldCheck, ShieldAlert, Calendar, AlertTriangle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 
 interface Props {
   currentDate: string;
@@ -130,6 +131,16 @@ export function LeaderQualityBoard({ currentDate }: Props) {
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar size={14} />{dateDisplay}</div>
       </div>
 
+      {stats.some(l => l.totalPoints >= HIGH_PENALTY_THRESHOLD) && (
+        <div className="mb-3 p-2 rounded-lg border border-destructive/40 bg-destructive/10 flex items-start gap-2 text-xs text-destructive">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <div>
+            <strong>Threshold reached ({HIGH_PENALTY_THRESHOLD}+ pts):</strong>{' '}
+            {stats.filter(l => l.totalPoints >= HIGH_PENALTY_THRESHOLD).map(l => l.name).join(', ')}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-6 text-muted-foreground text-sm">Loading…</div>
       ) : stats.length > 0 ? (
@@ -148,6 +159,11 @@ export function LeaderQualityBoard({ currentDate }: Props) {
                   <><ShieldCheck size={14} /> Clean</>
                 ) : (
                   <><AlertTriangle size={14} /> -{leader.totalPoints} pts</>
+                )}
+                {leader.totalPoints >= HIGH_PENALTY_THRESHOLD && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground text-[10px] font-semibold uppercase tracking-wide">
+                    Alert
+                  </span>
                 )}
               </div>
             </div>
