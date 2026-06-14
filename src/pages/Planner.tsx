@@ -277,15 +277,31 @@ export function Planner() {
       };
 
       let result;
+      let savedSessionId: string | undefined;
       if (editId) {
         result = await updateSession(editId, sessionData);
+        savedSessionId = editId;
       } else {
-        result = await saveSession(sessionData);
+        const r = await saveSession(sessionData);
+        result = r;
+        savedSessionId = r.sessionId;
       }
 
       if (!result.success) {
         toast.error(`Save failed: ${result.error}`);
       } else {
+        if (canReview && savedSessionId) {
+          const qr = await saveQualityActionsForSession({
+            sessionId: savedSessionId,
+            productionLine: formState.productionLine.trim(),
+            lineLeader: formState.lineLeader.trim(),
+            date: formState.date,
+            shiftType: formState.shift,
+            rows: qualityRows,
+            recordedBy: user?.id ?? null,
+          });
+          if (!qr.success) toast.error(`Quality save failed: ${qr.error}`);
+        }
         toast.success(editId ? 'Session updated successfully!' : 'Production session saved!');
         navigate('/history');
       }
