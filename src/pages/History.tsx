@@ -132,6 +132,20 @@ export function History() {
 
   const handleExport = () => exportSessionsToCsv(filteredSessions, 'session_history');
 
+  const handleExportPdf = async () => {
+    if (filteredSessions.length === 0 || isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      const { exportHistoryPdf } = await import('@/utils/exportHistoryPdf');
+      await exportHistoryPdf(filteredSessions, { fromDate: filterFromDate, shift: filterShift });
+    } catch (err) {
+      console.error('[exportHistoryPdf] failed', err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handlePrint = () => {
     if (filteredSessions.length === 0) return;
     const escapeHtml = (val: unknown): string => String(val ?? '')
