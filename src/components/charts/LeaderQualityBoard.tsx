@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO, subDays } from 'date-fns';
-import { ShieldCheck, ShieldAlert, Calendar, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Calendar, AlertTriangle, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
+import { severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
+import { QualitySeverity } from '@/types/quality';
 
 interface Props {
   currentDate: string;
@@ -19,11 +22,26 @@ interface LeaderQualityStats {
   isClean: boolean;
 }
 
+interface HistoryRow {
+  id: string;
+  date: string | null;
+  shift_type: string | null;
+  production_line: string | null;
+  points: number;
+  notes: string | null;
+  type_name: string;
+  severity: QualitySeverity | null;
+}
+
 export function LeaderQualityBoard({ currentDate }: Props) {
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [periodFilter, setPeriodFilter] = useState<PeriodType>('day');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const { startDate, endDate } = useMemo(() => {
     const end = parseISO(currentDate);
@@ -50,6 +68,35 @@ export function LeaderQualityBoard({ currentDate }: Props) {
     return () => { cancel = true; };
   }, [startDate, endDate]);
 
+  useEffect(() => {
+    if (!selectedLeader) return;
+    let cancel = false;
+    setHistoryLoading(true);
+    supabase
+      .from('quality_actions')
+      .select('id, date, shift_type, production_line, points, notes, quality_action_types(name, severity)')
+      .eq('line_leader', selectedLeader)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (cancel) return;
+        if (!error && data) {
+          setHistory(data.map((r: any) => ({
+            id: r.id,
+            date: r.date,
+            shift_type: r.shift_type,
+            production_line: r.production_line,
+            points: Number(r.points) || 0,
+            notes: r.notes,
+            type_name: r.quality_action_types?.name || '—',
+            severity: (r.quality_action_types?.severity as QualitySeverity) || null,
+          })));
+        }
+        setHistoryLoading(false);
+      });
+    return () => { cancel = true; };
+  }, [selectedLeader]);
+
   const filtered = useMemo(() => {
     return rows.filter(r => {
       if (shiftFilter !== 'ALL') {
@@ -60,8 +107,6 @@ export function LeaderQualityBoard({ currentDate }: Props) {
     });
   }, [rows, shiftFilter]);
 
-  // Also include leaders who appear in sessions but have zero penalties? We focus on those with records.
-  // Caller may also need to know clean leaders; we surface only leaders that appear in quality_actions OR show empty.
   const stats: LeaderQualityStats[] = useMemo(() => {
     const map: Record<string, { points: number; count: number }> = {};
     for (const r of filtered) {
@@ -82,6 +127,11 @@ export function LeaderQualityBoard({ currentDate }: Props) {
     const cleanCount = stats.filter(l => l.isClean).length;
     return { totalPoints, totalOccurrences, cleanCount, totalLeaders: stats.length };
   }, [stats]);
+
+  const historySummary = useMemo(() => {
+    const totalPoints = history.reduce((s, r) => s + r.points, 0);
+    return { totalPoints, count: history.length };
+  }, [history]);
 
   const dateDisplay = useMemo(() => {
     const p = parseISO(currentDate);
@@ -146,7 +196,13 @@ export function LeaderQualityBoard({ currentDate }: Props) {
       ) : stats.length > 0 ? (
         <div className="space-y-2">
           {stats.map((leader, index) => (
-            <div key={leader.name} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50">
+            <button
+              key={leader.name}
+              type="button"
+              onClick={() => setSelectedLeader(leader.name)}
+              title="View full quality history"
+              className="w-full flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50 hover:bg-muted hover:border-border cursor-pointer transition-colors text-left group"
+            >
               <div className="flex items-center justify-center w-6 text-xs text-muted-foreground">{index + 1}</div>
               <div className="flex-1 min-w-0">
                 <span className="font-medium text-foreground text-sm truncate block">{leader.name}</span>
@@ -166,7 +222,8 @@ export function LeaderQualityBoard({ currentDate }: Props) {
                   </span>
                 )}
               </div>
-            </div>
+              <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+            </button>
           ))}
         </div>
       ) : (
@@ -184,6 +241,68 @@ export function LeaderQualityBoard({ currentDate }: Props) {
           <span>Clean: <strong className="text-success">{summary.cleanCount}/{summary.totalLeaders}</strong></span>
         </div>
       )}
+
+      <Dialog open={!!selectedLeader} onOpenChange={(o) => { if (!o) { setSelectedLeader(null); setHistory([]); } }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert size={18} className="text-amber-500" />
+              Quality history — {selectedLeader}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center gap-4 text-sm border-b border-border pb-3">
+            <span>Occurrences: <strong className="text-foreground">{historySummary.count}</strong></span>
+            <span className="text-border">|</span>
+            <span>Total penalty: <strong className={historySummary.totalPoints > 0 ? 'text-destructive' : 'text-success'}>
+              {historySummary.totalPoints > 0 ? `-${historySummary.totalPoints} pts` : '0 pts'}
+            </strong></span>
+          </div>
+
+          <div className="overflow-y-auto flex-1 -mx-6 px-6">
+            {historyLoading ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">Loading history…</div>
+            ) : history.length === 0 ? (
+              <div className="text-center py-10 flex flex-col items-center gap-2">
+                <CheckCircle2 size={40} className="text-success" />
+                <p className="font-medium text-foreground">Clean record</p>
+                <p className="text-sm text-muted-foreground">No quality occurrences on file for this leader.</p>
+              </div>
+            ) : (
+              <ul className="space-y-2 py-2">
+                {history.map(h => (
+                  <li key={h.id} className="p-3 rounded-lg border border-border bg-muted/30">
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <div className="flex flex-col text-xs text-muted-foreground min-w-[110px]">
+                        <span className="font-medium text-foreground">
+                          {h.date ? format(parseISO(h.date), 'MMM d, yyyy') : '—'}
+                        </span>
+                        <span>{(h.shift_type || '—').toUpperCase()} · {h.production_line || '—'}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm text-foreground">{h.type_name}</span>
+                          {h.severity && (
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${severityBadgeClass(h.severity)}`}>
+                              {severityLabel(h.severity)}
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded bg-destructive/10 text-destructive text-[10px] font-semibold tabular-nums">
+                            -{h.points} pts
+                          </span>
+                        </div>
+                        {h.notes && (
+                          <p className="text-xs text-muted-foreground italic mt-1">"{h.notes}"</p>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
