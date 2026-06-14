@@ -300,6 +300,14 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
           </div>
 
+          {!isOperator && (
+            <div className="border-t pt-4">
+              <QualityActionsForm rows={qualityRows} onChange={setQualityRows} />
+            </div>
+          )}
+
+
+
 
           <DialogFooter className="pt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
