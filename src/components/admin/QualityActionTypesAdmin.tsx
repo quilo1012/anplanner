@@ -3,16 +3,17 @@ import { ShieldAlert, Plus, Edit, Trash2, Save, X, Eye, EyeOff, Loader2 } from '
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQualityActionTypes } from '@/hooks/useQualityActionTypes';
-import { QualityActionType } from '@/types/quality';
+import { QualityActionType, QualitySeverity } from '@/types/quality';
+import { SEVERITY_OPTIONS, severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 
 export function QualityActionTypesAdmin() {
   const { types, loading, refresh } = useQualityActionTypes(false);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', points: 1, description: '', is_active: true });
+  const [form, setForm] = useState<{ name: string; points: number; description: string; is_active: boolean; severity: QualitySeverity }>({ name: '', points: 1, description: '', is_active: true, severity: 'medium' });
   const [submitting, setSubmitting] = useState(false);
 
-  const reset = () => { setForm({ name: '', points: 1, description: '', is_active: true }); setIsAdding(false); setEditingId(null); };
+  const reset = () => { setForm({ name: '', points: 1, description: '', is_active: true, severity: 'medium' }); setIsAdding(false); setEditingId(null); };
 
   const startEdit = (t: QualityActionType) => {
     setForm({ name: t.name, points: Number(t.points), description: t.description || '', is_active: t.is_active });
