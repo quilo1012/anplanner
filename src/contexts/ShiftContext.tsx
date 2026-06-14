@@ -90,9 +90,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Step 1: Fetch sessions with 365-day lookback
+      const days = daysOverride ?? historyDaysLoaded;
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 365);
+      cutoff.setDate(cutoff.getDate() - days);
+
       let query = supabase
           .from('production_sessions')
           .select('*')
