@@ -490,7 +490,24 @@ export function History() {
                   </tbody>
                 </table>
               </div>
+              <div className="flex flex-col items-center gap-2 py-4 text-sm text-muted-foreground">
+                <span>Showing the last {historyDaysLoaded} days</span>
+                {hasMoreHistory && (
+                  <button
+                    type="button"
+                    onClick={() => loadMoreHistory()}
+                    disabled={isLoadingMore}
+                    className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+                  >
+                    {isLoadingMore && (
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    )}
+                    {isLoadingMore ? 'Loading...' : 'Load more history'}
+                  </button>
+                )}
+              </div>
             </div>
+
           </>
         )}
 
