@@ -632,6 +632,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       saveDowntimesBatch,
       getSessionById,
       refreshSessions,
+      loadMoreHistory,
+      hasMoreHistory,
+      isLoadingMore,
+      historyDaysLoaded,
       // Backward compat aliases
       shifts: sessions,
       refreshShifts: refreshSessions,
