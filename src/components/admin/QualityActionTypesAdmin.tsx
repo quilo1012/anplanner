@@ -35,23 +35,40 @@ export function QualityActionTypesAdmin() {
     setSubmitting(true);
     const payload = {
       name: form.name.trim(),
-      points: form.points,
+      points: Number(form.points) || 0,
       description: form.description.trim() || null,
       is_active: form.is_active,
       severity: form.severity,
     };
-    let error;
-    if (editingId) {
-      ({ error } = await supabase.from('quality_action_types').update(payload).eq('id', editingId));
-    } else {
-      ({ error } = await supabase.from('quality_action_types').insert(payload));
+    try {
+      if (editingId) {
+        const { data, error } = await supabase
+          .from('quality_action_types')
+          .update(payload)
+          .eq('id', editingId)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('Update blocked (no rows affected — check admin permissions).');
+        toast.success('Type updated');
+      } else {
+        const { data, error } = await supabase
+          .from('quality_action_types')
+          .insert(payload)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('Insert blocked (no rows returned).');
+        toast.success('Type created');
+      }
+      reset();
+      refresh();
+    } catch (err: any) {
+      console.error('[QualityActionTypesAdmin] submit failed', err);
+      toast.error(err?.message || 'Failed to save type');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
-    if (error) return toast.error(error.message);
-    toast.success(editingId ? 'Type updated' : 'Type created');
-    reset();
-    refresh();
   };
+
 
   const toggleActive = async (t: QualityActionType) => {
     const { error } = await supabase.from('quality_action_types').update({ is_active: !t.is_active }).eq('id', t.id);
