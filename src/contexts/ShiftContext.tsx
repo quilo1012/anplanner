@@ -70,9 +70,14 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<ProductionSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyDaysLoaded, setHistoryDaysLoaded] = useState(DEFAULT_HISTORY_DAYS);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const refreshSessions = useCallback(async (retryCount = 0) => {
+  const hasMoreHistory = historyDaysLoaded < MAX_HISTORY_DAYS;
+
+  const refreshSessions = useCallback(async (retryCount = 0, daysOverride?: number) => {
+
     if (authLoading || !user?.id) return;
     if (!isAuthenticated) {
       setSessions([]);
