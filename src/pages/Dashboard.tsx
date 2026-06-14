@@ -12,6 +12,7 @@ import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
 import { LeaderPerformanceBoard } from '@/components/charts/LeaderPerformanceBoard';
+import { LeaderQualityBoard } from '@/components/charts/LeaderQualityBoard';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
@@ -413,6 +414,9 @@ export function Dashboard() {
               <div className="card p-3">
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Trophy size={16} />Leader Board</h3>
                 <LeaderPerformanceBoard sessions={filteredSessions} currentDate={startDate} />
+              </div>
+              <div className="card p-3">
+                <LeaderQualityBoard currentDate={startDate} />
               </div>
             </div>
 
