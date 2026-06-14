@@ -16,6 +16,7 @@ const Admin = lazy(() => import('@/pages/Admin').then(m => ({ default: m.Admin }
 const WeeklyReport = lazy(() => import('@/pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
 const Products = lazy(() => import('@/pages/Products').then(m => ({ default: m.Products })));
+const QualityActionTypesPage = lazy(() => import('@/pages/QualityActionTypes').then(m => ({ default: m.QualityActionTypes })));
 
 
 function PageLoader() {
@@ -54,6 +55,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <Suspense fallback={<PageLoader />}><Admin /></Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="quality-action-types"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <Suspense fallback={<PageLoader />}><QualityActionTypesPage /></Suspense>
                 </ProtectedRoute>
               }
             />
