@@ -430,6 +430,10 @@ export function Dashboard() {
               <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Performance Analytics</h2>
               <div className="flex-1 h-px bg-border" />
             </div>
+            <div className="card p-3 mb-3">
+              <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Factory size={16} />Line RAG Board (Plan vs Actual)</h3>
+              <LineRagBoard sessions={filteredSessions} />
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-3">
               <div className="card p-3">
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Package size={16} />Performance by SKU</h3>
