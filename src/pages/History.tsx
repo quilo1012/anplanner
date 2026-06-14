@@ -312,8 +312,11 @@ export function History() {
               {hasFilters && (
                 <button onClick={clearFilters} className="btn-secondary text-xs py-2 px-2" title="Clear filters"><X size={14} /></button>
               )}
-              <button onClick={handlePrint} disabled={filteredSessions.length === 0} className="btn-secondary text-xs py-2"><Printer size={14} /></button>
-              <button onClick={handleExport} disabled={filteredSessions.length === 0} className="btn-success text-xs py-2"><Download size={14} /></button>
+              <button onClick={handlePrint} disabled={filteredSessions.length === 0} className="btn-secondary text-xs py-2" title="Print"><Printer size={14} /></button>
+              <button onClick={handleExportPdf} disabled={filteredSessions.length === 0 || isExportingPdf} className="btn-secondary text-xs py-2" title="Export PDF">
+                {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              </button>
+              <button onClick={handleExport} disabled={filteredSessions.length === 0} className="btn-success text-xs py-2" title="Export CSV"><Download size={14} /></button>
             </div>
           </div>
         </div>
