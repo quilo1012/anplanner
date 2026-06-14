@@ -93,6 +93,15 @@ export function History() {
       return true;
     }).sort((a, b) => naturalLineSort(a.productionLine, b.productionLine));
   }, [sessions, filterFromDate, filterToDate, filterShift, filterLine, filterLeader, filterSku, searchQuery, isOperator, user?.name]);
+  // Load quality actions for visible sessions
+  useEffect(() => {
+    const ids = filteredSessions.map(s => s.id);
+    if (ids.length === 0) { setQualityBySession({}); return; }
+    let cancel = false;
+    fetchQualityActionsForSessions(ids).then(map => { if (!cancel) setQualityBySession(map); });
+    return () => { cancel = true; };
+  }, [filteredSessions]);
+
 
   // Handle ?edit=<sessionId> from URL — block operators from accessing other leaders' sessions
   useEffect(() => {
