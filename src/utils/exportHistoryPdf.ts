@@ -1,24 +1,15 @@
 import { ProductionSession, ShiftType } from '@/types/production';
 import { naturalLineSort } from './naturalLineSort';
 import { formatDuration } from './formatDuration';
+import { fetchQualityActionsForSessions } from './qualityActions';
+import { QualitySeverity } from '@/types/quality';
 
-const LOGO_URL = '/lovable-uploads/64131b92-9113-4e13-88d8-667e720cb54f.png';
-
-async function loadLogoDataUrl(): Promise<string | null> {
-  try {
-    const res = await fetch(LOGO_URL);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
+const SEVERITY_RGB: Record<QualitySeverity, [number, number, number]> = {
+  low: [59, 130, 246],
+  medium: [234, 179, 8],
+  high: [249, 115, 22],
+  critical: [239, 68, 68],
+};
 
 export async function exportHistoryPdf(
   sessions: ProductionSession[],
