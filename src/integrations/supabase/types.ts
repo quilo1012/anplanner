@@ -263,7 +263,6 @@ export type Database = {
           id: string
           is_archived: boolean
           line_leader: string
-          monitoring_photo_url: string | null
           planned_quantity: number | null
           production_line: string
           shift_type: string
@@ -280,7 +279,6 @@ export type Database = {
           id?: string
           is_archived?: boolean
           line_leader: string
-          monitoring_photo_url?: string | null
           planned_quantity?: number | null
           production_line: string
           shift_type: string
@@ -297,7 +295,6 @@ export type Database = {
           id?: string
           is_archived?: boolean
           line_leader?: string
-          monitoring_photo_url?: string | null
           planned_quantity?: number | null
           production_line?: string
           shift_type?: string

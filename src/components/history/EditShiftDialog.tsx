@@ -9,7 +9,7 @@ import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { StructuredDowntime } from '@/types/downtime';
 import { SkuRow } from '@/types/planner';
 import { useShifts } from '@/contexts/ShiftContext';
-import { PhotoUpload } from '@/components/PhotoUpload';
+
 import { SkuRowForm } from '@/components/SkuRowForm';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
 import { Loader2, Save, Target, TrendingUp } from 'lucide-react';
@@ -42,8 +42,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
   const [observations, setObservations] = useState('');
   const [lineTarget, setLineTarget] = useState(0);
   const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
-  const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
-  const [photoFilename, setPhotoFilename] = useState<string | undefined>();
   const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
   const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
 
@@ -63,8 +61,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     setStaffPlanned(session.staffPlanned);
     setStaffActual(session.staffActual);
     setObservations(session.comments);
-    setMonitoringPhoto(session.monitoringPhoto);
-    setPhotoFilename(session.photoFilename);
     setLineTarget(session.plannedQuantity);
 
     // Seed immediately from already-loaded session data so the form shows values right away
@@ -127,10 +123,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     loadFreshData();
   }, [session?.id, open]);
 
-  const handlePhotoChange = (photo: string | undefined, filename: string | undefined) => {
-    setMonitoringPhoto(photo);
-    setPhotoFilename(filename);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,7 +190,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
         })),
         comments: observations,
         structuredDowntimes,
-        monitoringPhoto, photoFilename,
+        
         staffPlanned, staffActual,
       });
 

@@ -4,12 +4,12 @@ import { toast } from 'sonner';
 import { Header } from '@/components/Header';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
-import { SecureImage } from '@/components/SecureImage';
+
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
-import { Edit, Trash2, Download, X, Image, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
+import { Edit, Trash2, Download, X, Calendar, Lock, Factory, Users, Printer, ChevronDown, ChevronUp, MessageSquare, Clock, Search, Package } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
 import { getLineBorderClass } from '@/utils/lineColors';
@@ -33,7 +33,7 @@ export function History() {
   const [filterLeader, setFilterLeader] = useState('');
   const [filterSku, setFilterSku] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
@@ -367,7 +367,7 @@ export function History() {
                       <th>Perf</th>
                       <th className="text-right">Downtime</th>
                        <th className="text-center">Staff</th>
-                       <th className="text-center">Photo</th>
+                       
                        {!isOperator && <th>Last edited by</th>}
                        {(canEdit || canDelete) && <th className="w-24">Actions</th>}
                     </tr>
@@ -400,11 +400,6 @@ export function History() {
                             <td className="text-center text-sm">
                               <span className={session.staffActual < session.staffPlanned ? 'text-destructive font-medium' : ''}>{session.staffActual}/{session.staffPlanned}</span>
                             </td>
-                             <td className="text-center">
-                               {session.monitoringPhoto ? (
-                                 <button onClick={() => setPreviewPhoto(session.monitoringPhoto!)} className="p-1 text-primary hover:bg-primary/10 rounded transition-colors" title="View photo"><Image size={14} /></button>
-                               ) : <span className="text-muted-foreground text-xs">-</span>}
-                             </td>
                              {!isOperator && (
                                <td className="text-xs whitespace-nowrap">
                                  {session.updatedBy ? (
@@ -427,7 +422,7 @@ export function History() {
                           {/* Expanded Row: Items + Downtimes + Comments */}
                           {isExpanded && (
                             <tr>
-                              <td colSpan={14} className="bg-muted/30 p-3">
+                              <td colSpan={13} className="bg-muted/30 p-3">
                                 <div className="space-y-3">
                                   {/* SKU Items */}
                                   {session.items.length > 0 && (
@@ -499,15 +494,6 @@ export function History() {
           </>
         )}
 
-        {/* Photo Preview */}
-        {previewPhoto && (
-          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewPhoto(null)}>
-            <div className="relative max-w-3xl max-h-[90vh]" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setPreviewPhoto(null)} className="absolute -top-10 right-0 text-white hover:text-gray-300"><X size={24} /></button>
-              <SecureImage src={previewPhoto} alt="Monitoring photo" className="max-h-[85vh] object-contain rounded-lg" />
-            </div>
-          </div>
-        )}
 
 
         {/* Edit Dialog */}
