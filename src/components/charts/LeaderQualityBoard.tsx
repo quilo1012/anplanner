@@ -160,6 +160,11 @@ export function LeaderQualityBoard({ currentDate }: Props) {
                 ) : (
                   <><AlertTriangle size={14} /> -{leader.totalPoints} pts</>
                 )}
+                {leader.totalPoints >= HIGH_PENALTY_THRESHOLD && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground text-[10px] font-semibold uppercase tracking-wide">
+                    Alert
+                  </span>
+                )}
               </div>
             </div>
           ))}
