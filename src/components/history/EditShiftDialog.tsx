@@ -45,6 +45,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
   const [monitoringPhoto, setMonitoringPhoto] = useState<string | undefined>();
   const [photoFilename, setPhotoFilename] = useState<string | undefined>();
   const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
+  const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
 
   const { totalProduction, performance } = useMemo(() => {
     const total = skuRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
