@@ -74,7 +74,7 @@ export function useLookupCache() {
         if (!sessionsRes.error && sessionsRes.data) {
           const linesSet = new Set<string>();
           const leadersSet = new Set<string>();
-          sessionsRes.data.forEach((s: any) => {
+          sessionsRes.data.forEach((s: { production_line?: string | null; line_leader?: string | null }) => {
             if (s.production_line) linesSet.add(s.production_line);
             if (s.line_leader) leadersSet.add(s.line_leader);
           });
@@ -84,13 +84,13 @@ export function useLookupCache() {
 
         if (!catsRes.error && catsRes.data && catsRes.data.length > 0) {
           globalCategories = catsRes.data
-            .map((c: any) => ({ value: c.name, label: c.label }))
-            .sort((a: any, b: any) => a.label.localeCompare(b.label));
+            .map((c: { name: string; label: string }) => ({ value: c.name, label: c.label }))
+            .sort((a, b) => a.label.localeCompare(b.label));
         }
 
         if (!reasonsRes.error && reasonsRes.data && reasonsRes.data.length > 0) {
           const grouped: Record<string, DowntimeReason[]> = {};
-          reasonsRes.data.forEach((r: any) => {
+          reasonsRes.data.forEach((r: { category_name: string; name: string; label: string }) => {
             const cat = r.category_name;
             if (!grouped[cat]) grouped[cat] = [];
             grouped[cat].push({ value: r.name, label: r.label });
