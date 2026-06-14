@@ -55,7 +55,7 @@ export function Sidebar() {
   const filteredGroups = navGroups
     .map(group => ({
       ...group,
-      items: group.items.filter(item => hasRole(item.roles as any)),
+      items: group.items.filter(item => hasRole(item.roles as Parameters<typeof hasRole>[0])),
     }))
     .filter(group => group.items.length > 0);
 

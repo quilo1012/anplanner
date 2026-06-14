@@ -50,11 +50,12 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ success: number; failed: number; skipped: number } | null>(null);
+  const skippedRowsRef = useRef(0);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parseCSV = (content: string): ParsedProduct[] => {
+  const parseCSV = (content: string): { products: ParsedProduct[]; skippedRows: number } => {
     // Remove BOM from content start
     const cleanContent = cleanString(content);
     
@@ -108,10 +109,10 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
     }
 
     if (skippedRows > 0) {
-      console.log(`Skipped ${skippedRows} rows due to missing/invalid data`);
+      console.warn(`Skipped ${skippedRows} rows due to missing/invalid data`);
     }
 
-    return Array.from(productMap.values());
+    return { products: Array.from(productMap.values()), skippedRows };
   };
 
   // Parse a single CSV line handling quoted values
@@ -160,7 +161,8 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
       setProgress(10);
       setProgressText('Parsing CSV...');
       
-      const products = parseCSV(content);
+      const { products, skippedRows } = parseCSV(content);
+      skippedRowsRef.current = skippedRows;
 
       if (products.length === 0) {
         throw new Error('No valid products found in CSV. Ensure columns for code/SKU and description/name exist with data.');
@@ -210,7 +212,7 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
 
       setProgress(100);
       setProgressText('Complete!');
-      setResult({ success: successCount, failed: failedCount, skipped: 0 });
+      setResult({ success: successCount, failed: failedCount, skipped: skippedRowsRef.current });
       
       if (successCount > 0 && onSuccess) {
         setTimeout(() => {
@@ -306,6 +308,11 @@ export function ProductCsvUpload({ onClose, onSuccess }: ProductCsvUploadProps) 
               {result.failed > 0 && (
                 <p className="text-sm text-destructive mt-1">
                   {result.failed} products failed
+                </p>
+              )}
+              {result.skipped > 0 && (
+                <p className="text-sm text-warning mt-1">
+                  {result.skipped} linhas ignoradas por dados ausentes/inválidos
                 </p>
               )}
             </div>

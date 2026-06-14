@@ -1,9 +1,14 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import { ProductionSession, ProductionItem, ProductionSessionFormData, ShiftType } from '@/types/production';
 import { StructuredDowntime } from '@/types/downtime';
 import { useAuth } from './AuthContext';
 import { createPerfTimer } from '@/utils/performanceLogger';
+
+type DbItem = Tables<'production_items'>;
+type DbDowntime = Tables<'structured_downtimes'>;
+type DbSession = Tables<'production_sessions'>;
 
 interface OperationResult {
   success: boolean;
@@ -102,8 +107,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // Step 2: Fetch items & downtimes scoped to session IDs (chunked)
       const sessionIds = sessionsRes.data.map(s => s.id);
       const chunkSize = 200;
-      let itemsData: any[] = [];
-      let downtimesData: any[] = [];
+      let itemsData: DbItem[] = [];
+      let downtimesData: DbDowntime[] = [];
 
       const chunks: string[][] = [];
       for (let i = 0; i < sessionIds.length; i += chunkSize) {
@@ -122,7 +127,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       // Group items and downtimes by session_id
       const itemsBySession: Record<string, ProductionItem[]> = {};
-      itemsData.forEach((item: any) => {
+      itemsData.forEach((item) => {
         if (!itemsBySession[item.session_id]) itemsBySession[item.session_id] = [];
         itemsBySession[item.session_id].push({
           id: item.id,
@@ -134,7 +139,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       });
 
       const downtimesBySession: Record<string, StructuredDowntime[]> = {};
-      downtimesData.forEach((dt: any) => {
+      downtimesData.forEach((dt) => {
         if (!downtimesBySession[dt.session_id]) downtimesBySession[dt.session_id] = [];
         downtimesBySession[dt.session_id].push({
           id: dt.id,
@@ -145,7 +150,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         });
       });
 
-      const mapped: ProductionSession[] = (sessionsRes.data || []).map((row: any) => {
+      const mapped: ProductionSession[] = (sessionsRes.data || []).map((row: DbSession) => {
         const items = itemsBySession[row.id] || [];
         const downtimes = downtimesBySession[row.id] || [];
         const totalProduction = items.reduce((sum, i) => sum + i.quantityActual, 0);
@@ -272,8 +277,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     if (!user) return { success: false, error: 'User not authenticated' };
     const timer = createPerfTimer('saveSession');
 
-    console.log(`[saveSession] Line: "${data.productionLine}", Items: ${data.items.length}`, 
-      data.items.map(i => `${i.sku} (target: ${i.quantityTarget})`));
 
     try {
       // Upload photo if base64
@@ -401,12 +404,12 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // === OPERATOR PATH: only update quantity_actual on existing items ===
       if (user.role === 'operator') {
         const updatePromises = (data.items || [])
-          .filter(item => (item as any).id)
+          .filter(item => (item as unknown as { id?: string }).id)
           .map(item =>
             supabase
               .from('production_items')
               .update({ quantity_actual: item.quantityActual || 0 })
-              .eq('id', (item as any).id)
+              .eq('id', (item as unknown as { id: string }).id)
               .eq('session_id', id)
               .select('id')
           );
@@ -452,7 +455,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         setSessions(prev => prev.map(s => {
           if (s.id !== id) return s;
           const updatedItems = s.items.map(existingItem => {
-            const match = data.items.find(i => (i as any).id === existingItem.id);
+            const match = data.items.find(i => (i as unknown as { id?: string }).id === existingItem.id);
             return match ? { ...existingItem, quantityActual: match.quantityActual } : existingItem;
           });
           const totalProduction = updatedItems.reduce((sum, i) => sum + i.quantityActual, 0);

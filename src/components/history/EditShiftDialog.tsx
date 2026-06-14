@@ -156,7 +156,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             productName: row.product,
             quantityTarget: row.productionTarget || 0,
             quantityActual: row.realProduction || 0,
-          } as any)),
+          })),
           comments: observations,
           staffPlanned: session.staffPlanned,
           staffActual: session.staffActual,

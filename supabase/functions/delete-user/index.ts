@@ -73,7 +73,7 @@ Deno.serve(async (req: Request) => {
       });
 
       // Handle zombie user: if email already exists, delete the old record and retry
-      if (createResult.error && (createResult.error as any).code === "email_exists") {
+      if (createResult.error && (createResult.error as { code?: string }).code === "email_exists") {
         console.log(`Zombie user detected for ${email}, cleaning up...`);
         
         // Find zombie auth user by email

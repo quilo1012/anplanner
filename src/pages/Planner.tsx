@@ -146,7 +146,7 @@ export function Planner() {
     setFormState(prev => ({ ...prev, monitoringPhoto: photo, photoFilename: filename }));
   };
 
-  const handleExcelImport = async (entries: any[]) => {
+  const handleExcelImport = async (entries: import('@/types/shift').ShiftFormData[]) => {
     // Excel import creates individual sessions per entry
     let hasError = false;
     for (const entry of entries) {
@@ -493,8 +493,7 @@ export function Planner() {
                 const totalPlanned = group.rows.reduce((sum, r) => sum + r.quantityTarget, 0);
                 const lineName = normalizeLineName(group.line);
                 
-                console.log(`[iTouching Import] Saving line "${lineName}" with ${group.rows.length} SKUs:`, 
-                  group.rows.map(r => `${r.sku} (target: ${r.quantityTarget})`));
+                
                 
                 const result = await saveSession({
                   date: importDate,

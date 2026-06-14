@@ -24,8 +24,8 @@ export function useOnlineUsers() {
         const state = channel.presenceState();
         const users: OnlineUser[] = [];
         const seen = new Set<string>();
-        Object.values(state).forEach((presences: any[]) => {
-          presences.forEach((p) => {
+        Object.values(state).forEach((presences) => {
+          (presences as unknown as Array<{ id: string; name: string; role: string }>).forEach((p) => {
             if (!seen.has(p.id)) {
               seen.add(p.id);
               users.push({ id: p.id, name: p.name, role: p.role });

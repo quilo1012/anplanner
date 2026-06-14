@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import ExcelJS from 'exceljs';
 import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -62,6 +61,7 @@ export function PlanTemplateExport() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
+      const { default: ExcelJS } = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Production Plan');
 

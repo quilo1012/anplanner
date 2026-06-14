@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { SHIFT_TYPES, ShiftType } from '@/types/production';
 import { normalizeLineName } from '@/utils/normalizeLineName';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
 
 interface ParsedRow {
   line: string;
@@ -77,7 +77,7 @@ const DOWNTIME_HEADER_MAP: Record<string, keyof Omit<ParsedDowntime, 'line' | 'v
   'notes': 'comment',
 };
 
-const MACHINE_PATTERN = /machine\s*[:\-]/i;
+const MACHINE_PATTERN = /machine\s*[:-]/i;
 
 function extractLineName(cellValue: string): string {
   const afterMachine = cellValue.replace(MACHINE_PATTERN, '').trim();
@@ -126,8 +126,9 @@ function isHeaderRow(row: ExcelJS.Row): boolean {
 }
 
 async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: ParsedDowntime[] }> {
+  const { default: ExcelJSLib } = await import('exceljs');
   const buffer = await file.arrayBuffer();
-  const wb = new ExcelJS.Workbook();
+  const wb = new ExcelJSLib.Workbook();
   await wb.xlsx.load(buffer);
   const ws = wb.worksheets[0];
   if (!ws || ws.rowCount < 2) return { rows: [], downtimes: [] };
@@ -194,7 +195,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       if (field === 'quantity') {
         parsed.quantity = typeof val === 'number' ? val : parseInt(String(val ?? '0')) || 0;
       } else {
-        (parsed as any)[field] = String(val ?? '').trim();
+        (parsed as Record<string, unknown>)[field] = String(val ?? '').trim();
       }
     });
 
@@ -207,10 +208,6 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
     });
   }
 
-  // Debug: log parsed groups
-  const lineGroups = new Map<string, number>();
-  rows.forEach(r => lineGroups.set(r.line, (lineGroups.get(r.line) || 0) + 1));
-  console.log('[iTouching Parser] Lines detected:', Object.fromEntries(lineGroups), `(lineColIdx: ${lineColIdx})`);
 
   // Parse downtimes from second worksheet or downtime-labeled sheet
   const downtimes: ParsedDowntime[] = [];
@@ -252,7 +249,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
           if (field === 'duration') {
             parsed.duration = typeof val === 'number' ? val : parseInt(String(val ?? '0')) || 0;
           } else {
-            (parsed as any)[field] = String(val ?? '').trim();
+            (parsed as Record<string, unknown>)[field] = String(val ?? '').trim();
           }
         });
 

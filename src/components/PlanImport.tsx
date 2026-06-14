@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import ExcelJS from 'exceljs';
 import { Upload, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +71,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
     setLoading(true);
 
     try {
+      const { default: ExcelJS } = await import('exceljs');
       const buffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(buffer);
@@ -101,7 +101,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
 
         // Parse date
         let dateStr = dateVal;
-        if (typeof vals[0] === 'object' && vals[0] !== null && 'toISOString' in (vals[0] as any)) {
+        if (typeof vals[0] === 'object' && vals[0] !== null && 'toISOString' in (vals[0] as object)) {
           dateStr = (vals[0] as Date).toISOString().split('T')[0];
         }
         if (!dateStr || isNaN(new Date(dateStr).getTime())) errors.push('Invalid date');
@@ -132,8 +132,8 @@ export function PlanImport({ open, onClose, onImported }: Props) {
 
       if (parsed.length === 0) toast.error('No data rows found in the file');
       setRows(parsed);
-    } catch (err: any) {
-      toast.error(`Failed to parse file: ${err.message}`);
+    } catch (err) {
+      toast.error(`Failed to parse file: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLoading(false);
     }
@@ -192,8 +192,8 @@ export function PlanImport({ open, onClose, onImported }: Props) {
       onImported();
       onClose();
       setRows([]);
-    } catch (err: any) {
-      toast.error(`Import failed: ${err.message}`);
+    } catch (err) {
+      toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }
