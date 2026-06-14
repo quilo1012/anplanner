@@ -81,7 +81,7 @@ export function QualityActionsForm({ rows, onChange }: Props) {
           >
             <option value="">Select type...</option>
             {types.map(t => (
-              <option key={t.id} value={t.id}>{t.name} (-{t.points} pts)</option>
+              <option key={t.id} value={t.id}>{t.name} — {severityLabel(t.severity)} (-{t.points} pts)</option>
             ))}
           </select>
         </div>
