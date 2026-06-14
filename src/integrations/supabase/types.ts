@@ -395,6 +395,96 @@ export type Database = {
         }
         Relationships: []
       }
+      quality_action_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          points: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          points?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          points?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quality_actions: {
+        Row: {
+          action_type_id: string
+          created_at: string
+          date: string | null
+          id: string
+          line_leader: string | null
+          notes: string | null
+          points: number
+          production_line: string | null
+          recorded_by: string | null
+          session_id: string | null
+          shift_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type_id: string
+          created_at?: string
+          date?: string | null
+          id?: string
+          line_leader?: string | null
+          notes?: string | null
+          points?: number
+          production_line?: string | null
+          recorded_by?: string | null
+          session_id?: string | null
+          shift_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type_id?: string
+          created_at?: string
+          date?: string | null
+          id?: string
+          line_leader?: string | null
+          notes?: string | null
+          points?: number
+          production_line?: string | null
+          recorded_by?: string | null
+          session_id?: string | null
+          shift_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_actions_action_type_id_fkey"
+            columns: ["action_type_id"]
+            isOneToOne: false
+            referencedRelation: "quality_action_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_actions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "production_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       structured_downtimes: {
         Row: {
           category: string
