@@ -404,12 +404,12 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // === OPERATOR PATH: only update quantity_actual on existing items ===
       if (user.role === 'operator') {
         const updatePromises = (data.items || [])
-          .filter(item => (item as { id?: string }).id)
+          .filter(item => (item as unknown as { id?: string }).id)
           .map(item =>
             supabase
               .from('production_items')
               .update({ quantity_actual: item.quantityActual || 0 })
-              .eq('id', (item as { id: string }).id)
+              .eq('id', (item as unknown as { id: string }).id)
               .eq('session_id', id)
               .select('id')
           );
@@ -455,7 +455,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         setSessions(prev => prev.map(s => {
           if (s.id !== id) return s;
           const updatedItems = s.items.map(existingItem => {
-            const match = data.items.find(i => (i as { id?: string }).id === existingItem.id);
+            const match = data.items.find(i => (i as unknown as { id?: string }).id === existingItem.id);
             return match ? { ...existingItem, quantityActual: match.quantityActual } : existingItem;
           });
           const totalProduction = updatedItems.reduce((sum, i) => sum + i.quantityActual, 0);
