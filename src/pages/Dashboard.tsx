@@ -12,6 +12,7 @@ import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
 import { LeaderPerformanceBoard } from '@/components/charts/LeaderPerformanceBoard';
+import { LeaderQualityBoard } from '@/components/charts/LeaderQualityBoard';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
