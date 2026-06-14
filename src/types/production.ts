@@ -21,8 +21,6 @@ export interface ProductionSession {
   staffActual: number;
   plannedQuantity: number;
   comments: string;
-  monitoringPhoto?: string;
-  photoFilename?: string;
   items: ProductionItem[];
   structuredDowntimes: StructuredDowntime[];
   // Computed
@@ -49,8 +47,6 @@ export interface ProductionSessionFormData {
   }>;
   comments: string;
   structuredDowntimes?: StructuredDowntime[];
-  monitoringPhoto?: string;
-  photoFilename?: string;
   staffPlanned: number;
   staffActual: number;
 }

@@ -43,8 +43,6 @@ export interface ShiftReport {
   downtimes: Downtime[];
   structuredDowntimes?: StructuredDowntime[];
   totalDowntime: number;
-  monitoringPhoto?: string;
-  photoFilename?: string;
   staffPlanned: number;
   staffActual: number;
   isArchived: boolean;
@@ -64,8 +62,6 @@ export interface ShiftFormData {
   observations: string;
   downtimes: Downtime[];
   structuredDowntimes?: StructuredDowntime[];
-  monitoringPhoto?: string;
-  photoFilename?: string;
   staffPlanned: number;
   staffActual: number;
 }
