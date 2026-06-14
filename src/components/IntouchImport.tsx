@@ -77,7 +77,7 @@ const DOWNTIME_HEADER_MAP: Record<string, keyof Omit<ParsedDowntime, 'line' | 'v
   'notes': 'comment',
 };
 
-const MACHINE_PATTERN = /machine\s*[:\-]/i;
+const MACHINE_PATTERN = /machine\s*[:-]/i;
 
 function extractLineName(cellValue: string): string {
   const afterMachine = cellValue.replace(MACHINE_PATTERN, '').trim();
@@ -195,7 +195,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
       if (field === 'quantity') {
         parsed.quantity = typeof val === 'number' ? val : parseInt(String(val ?? '0')) || 0;
       } else {
-        (parsed as any)[field] = String(val ?? '').trim();
+        (parsed as Record<string, unknown>)[field] = String(val ?? '').trim();
       }
     });
 
@@ -249,7 +249,7 @@ async function parseXlsx(file: File): Promise<{ rows: ParsedRow[]; downtimes: Pa
           if (field === 'duration') {
             parsed.duration = typeof val === 'number' ? val : parseInt(String(val ?? '0')) || 0;
           } else {
-            (parsed as any)[field] = String(val ?? '').trim();
+            (parsed as Record<string, unknown>)[field] = String(val ?? '').trim();
           }
         });
 

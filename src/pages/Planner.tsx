@@ -146,7 +146,7 @@ export function Planner() {
     setFormState(prev => ({ ...prev, monitoringPhoto: photo, photoFilename: filename }));
   };
 
-  const handleExcelImport = async (entries: any[]) => {
+  const handleExcelImport = async (entries: import('@/types/shift').ShiftFormData[]) => {
     // Excel import creates individual sessions per entry
     let hasError = false;
     for (const entry of entries) {

@@ -29,7 +29,7 @@ interface ImportRow {
 function parseDate(val: unknown): string {
   if (!val) return '';
   // ExcelJS Date object — swap day/month if ambiguous (European dd/mm preference)
-  if (val instanceof Date || (typeof val === 'object' && val !== null && 'toISOString' in (val as any))) {
+  if (val instanceof Date || (typeof val === 'object' && val !== null && 'toISOString' in (val as object))) {
     const d = val as Date;
     const year = d.getFullYear();
     const month = d.getMonth() + 1; // 0-indexed
@@ -45,7 +45,7 @@ function parseDate(val: unknown): string {
   // Already yyyy-mm-dd
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   // European format: d/m/yy or dd/mm/yyyy (with / or -)
-  const eurMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  const eurMatch = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
   if (eurMatch) {
     const day = parseInt(eurMatch[1]);
     const month = parseInt(eurMatch[2]);
@@ -190,8 +190,8 @@ export function ProductionImport({ open, onClose }: Props) {
 
       setPlanMap(newPlanMap);
       setRows(parsed);
-    } catch (err: any) {
-      toast.error(`Failed to parse file: ${err.message}`);
+    } catch (err) {
+      toast.error(`Failed to parse file: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLoading(false);
     }
@@ -235,7 +235,7 @@ export function ProductionImport({ open, onClose }: Props) {
 
       // Fetch existing items for those sessions
       const existingSessionIds = [...new Set([...(existingSessions || []).map(s => s.id)])];
-      let existingItemsMap = new Map<string, { id: string; sku: string; quantity_actual: number }[]>();
+      const existingItemsMap = new Map<string, { id: string; sku: string; quantity_actual: number }[]>();
       
       if (existingSessionIds.length > 0) {
         const { data: existingItems } = await supabase
@@ -360,8 +360,8 @@ export function ProductionImport({ open, onClose }: Props) {
       setPlanMap(new Map());
       setLeaderName('');
       navigate('/history');
-    } catch (err: any) {
-      toast.error(`Import failed: ${err.message}`);
+    } catch (err) {
+      toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }

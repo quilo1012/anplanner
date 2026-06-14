@@ -79,7 +79,7 @@ export function LeaderPerformanceChart({ shifts }: LeaderPerformanceChartProps) 
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
             }}
-            formatter={(value: number, name: string, props: any) => [
+            formatter={(value: number, _name: string, props: { payload: { shifts: number; fullName: string } }) => [
               `${value}% (${props.payload.shifts} shifts)`, 
               props.payload.fullName
             ]}

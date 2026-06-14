@@ -57,6 +57,6 @@ export function exportSessionsToCsv(sessions: ProductionSession[], filename: str
 }
 
 // Keep old export for backward compat
-export function exportToCsv(shifts: any[], filename: string): void {
+export function exportToCsv(shifts: Parameters<typeof exportSessionsToCsv>[0], filename: string): void {
   exportSessionsToCsv(shifts, filename);
 }

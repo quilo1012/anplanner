@@ -120,7 +120,7 @@ async function parseDowntimeXlsx(file: File): Promise<ParsedDowntime[]> {
       if (field === 'duration') {
         parsed.duration = typeof val === 'number' ? val : parseInt(String(val ?? '0')) || 0;
       } else {
-        (parsed as any)[field] = String(val ?? '').trim();
+        (parsed as Record<string, unknown>)[field] = String(val ?? '').trim();
       }
     });
 

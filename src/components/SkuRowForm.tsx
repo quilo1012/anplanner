@@ -274,7 +274,7 @@ export function SkuRowForm({
 
   const handleProductSelect = useCallback(async (rowId: string, sku: string, product?: { sku: string; name: string; weightPerUnit?: number }) => {
     // Weight comes directly from ProductSearch — no extra DB query needed
-    let weightPerUnit = product?.weightPerUnit || 0;
+    const weightPerUnit = product?.weightPerUnit || 0;
 
     // Try to fetch production target for this SKU + current line
     let targetData: { weight_per_unit: number; blender_capacity: number; expected_units_per_hour: number } | null = null;

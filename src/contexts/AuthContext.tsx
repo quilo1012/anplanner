@@ -365,9 +365,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error) {
       console.error('Update user error:', error);
-      return { success: false, error: error.message || 'An unexpected error occurred' };
+      return { success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred' };
     }
   };
 
@@ -390,9 +390,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await refreshUsers();
       return { success: true };
-    } catch (error: any) {
+    } catch (error) {
       console.error('Delete user error:', error);
-      return { success: false, error: error.message || 'An unexpected error occurred' };
+      return { success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred' };
     }
   };
 

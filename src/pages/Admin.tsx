@@ -44,8 +44,8 @@ export function Admin() {
       const { data, error } = await supabase.functions.invoke('delete-user', {
         body: { action: 'reset_password', userId: resetTarget.id, password: resetPassword },
       });
-      if (error || (data as any)?.error) {
-        const msg = (data as any)?.error || error?.message || 'Failed to reset password';
+      if (error || (data as { error?: string } | null)?.error) {
+        const msg = (data as { error?: string } | null)?.error || error?.message || 'Failed to reset password';
         toast.error(msg);
         setResetError(msg);
         return;
@@ -53,8 +53,8 @@ export function Admin() {
       toast.success('Password updated successfully');
       setResetTarget(null);
       setResetPassword('');
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to reset password';
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to reset password';
       toast.error(msg);
       setResetError(msg);
     } finally {

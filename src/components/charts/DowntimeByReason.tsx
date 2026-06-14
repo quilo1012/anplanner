@@ -50,7 +50,7 @@ export function DowntimeByReason({ sessions, filterCategory, filterReason }: Dow
         <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} tickFormatter={(val) => `${val}m`} />
         <YAxis dataKey="name" type="category" tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }} width={85} />
         <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-          formatter={(value: number, name: string, props: any) => [`${value} min`, props.payload.fullName]} />
+          formatter={(value: number, _name: string, props: { payload: { fullName: string } }) => [`${value} min`, props.payload.fullName]} />
         <Bar dataKey="minutes" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
