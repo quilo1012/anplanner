@@ -131,6 +131,7 @@ export function QualityActionTypesAdmin() {
             <tr>
               <th>Name</th>
               <th className="text-right">Points</th>
+              <th>Severity</th>
               <th>Description</th>
               <th>Status</th>
               <th className="w-32">Actions</th>
@@ -138,13 +139,18 @@ export function QualityActionTypesAdmin() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
             ) : types.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No quality action types defined.</td></tr>
+              <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">No quality action types defined.</td></tr>
             ) : types.map(t => (
               <tr key={t.id} className={!t.is_active ? 'opacity-60' : ''}>
                 <td className="font-medium">{t.name}</td>
                 <td className="text-right font-mono">{t.points}</td>
+                <td>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityBadgeClass(t.severity)}`}>
+                    {severityLabel(t.severity)}
+                  </span>
+                </td>
                 <td className="text-sm text-muted-foreground">{t.description || '—'}</td>
                 <td>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${t.is_active ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
