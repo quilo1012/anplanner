@@ -125,6 +125,10 @@ export function Planner() {
           staffPlanned: session.staffPlanned || 0,
           staffActual: session.staffActual || 0,
         });
+        // load existing quality actions
+        fetchQualityActionsForSessions([editId]).then(map => {
+          setQualityRows(map[editId] || []);
+        });
       }
     }
   }, [editId, getSessionById]);
