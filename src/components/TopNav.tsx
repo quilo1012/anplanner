@@ -21,11 +21,28 @@ const navItems: NavItem[] = [
   { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
 ];
 
+// Drawer debug: enable via `?drawerDebug=1` or `localStorage.drawerDebug = '1'`.
+const drawerDebug = (() => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return (
+      new URLSearchParams(window.location.search).get('drawerDebug') === '1' ||
+      window.localStorage.getItem('drawerDebug') === '1'
+    );
+  } catch {
+    return false;
+  }
+})();
+const dlog = (...a: unknown[]) => { if (drawerDebug) console.log('[drawer]', ...a); };
+
 export function TopNav() {
   const { user, logout, hasRole } = useAuth();
   const onlineUsers = useOnlineUsers();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const toggleBtnRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   // Auto-close mobile drawer whenever the route changes (safety net)
   useEffect(() => {
