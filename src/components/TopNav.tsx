@@ -260,9 +260,12 @@ export function TopNav() {
 
         {/* Mobile menu button */}
         <button
+          ref={toggleBtnRef}
           onClick={() => setMobileOpen(!mobileOpen)}
           className="lg:hidden p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-          aria-label="Toggle menu"
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-drawer"
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -276,7 +279,15 @@ export function TopNav() {
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
-          <div data-mobile-drawer className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar max-h-[calc(100vh-3rem)] overflow-y-auto overscroll-contain">
+          <div
+            id="mobile-drawer"
+            ref={drawerRef}
+            data-mobile-drawer
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main navigation"
+            className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar max-h-[calc(100vh-3rem)] overflow-y-auto overscroll-contain"
+          >
             <nav className="p-2 space-y-0.5">
               {items.map(item => (
                 <NavLink
