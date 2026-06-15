@@ -353,25 +353,29 @@ export function Dashboard() {
           <div className="flex gap-2">
             <div className="flex-1 space-y-1.5 min-w-0">
               {lineStats.length > 0 ? (
-                lineStats.map((line) => (
-                  <LineStatusCard
-                    key={`${line.line}-${line.date}-${line.shift}`}
-                    lineName={line.line}
-                    sku={line.currentSku}
-                    product={line.currentProduct}
-                    leader={line.currentLeader}
-                    shift={selectedShift}
-                    performance={line.avgPerformance}
-                    availability={line.availability}
-                    staffActual={line.staffActual}
-                    staffPlanned={line.staffPlanned}
-                    status={line.status as 'running' | 'stopped' | 'warning'}
-                    colorClass={line.colorClass}
-                    realProduction={line.realProduction}
-                    productionTarget={line.productionTarget}
-                    onClick={canEditSessions ? () => setEditSession(line.session) : undefined}
-                  />
-                ))
+                lineStats.map((line) => {
+                  const lq = leaderQuality[(line.currentLeader || '').trim().toLowerCase()];
+                  return (
+                    <LineStatusCard
+                      key={`${line.line}-${line.date}-${line.shift}`}
+                      lineName={line.line}
+                      sku={line.currentSku}
+                      product={line.currentProduct}
+                      leader={line.currentLeader}
+                      shift={selectedShift}
+                      performance={line.avgPerformance}
+                      availability={line.availability}
+                      staffActual={line.staffActual}
+                      staffPlanned={line.staffPlanned}
+                      status={line.status as 'running' | 'stopped' | 'warning'}
+                      colorClass={line.colorClass}
+                      realProduction={line.realProduction}
+                      productionTarget={line.productionTarget}
+                      leaderQuality={lq ?? { occurrences: 0, points: 0 }}
+                      onClick={canEditSessions ? () => setEditSession(line.session) : undefined}
+                    />
+                  );
+                })
               ) : (
                 <div className="card p-6 text-center">
                   <Factory size={40} className="mx-auto text-muted-foreground mb-3" />
