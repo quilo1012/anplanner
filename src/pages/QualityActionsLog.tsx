@@ -62,6 +62,7 @@ export function QualityActionsLog() {
     if (s) setEditSession(s);
   };
 
+  useEffect(() => {
     const ids = sessions.map(s => s.id);
     if (ids.length === 0) { setQaMap({}); return; }
     let cancel = false;
