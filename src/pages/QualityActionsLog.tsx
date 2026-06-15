@@ -204,6 +204,7 @@ export function QualityActionsLog() {
                     <th className="text-left px-3 py-2">Severity</th>
                     <th className="text-right px-3 py-2">Points</th>
                     <th className="text-left px-3 py-2">Notes</th>
+                    <th className="text-right px-3 py-2 w-12">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
