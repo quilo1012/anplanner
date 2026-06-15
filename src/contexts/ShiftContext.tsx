@@ -536,7 +536,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         comment: d.comment || null,
       }));
 
-      const insertPromises: Array<ReturnType<typeof runSupabaseQuery<{ data: { id: string }[] | null; error: unknown | null }>>> = [];
+      const insertPromises: Array<Promise<{ data: { id: string }[] | null; error: unknown | null }>> = [];
       if (itemsToInsert.length > 0) {
         insertPromises.push(runSupabaseQuery(supabase.from('production_items').insert(itemsToInsert).select('id'), 'Insert updated production items'));
       }
