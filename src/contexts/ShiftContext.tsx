@@ -456,7 +456,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // === SUPERVISOR/ADMIN PATH: full update ===
 
       // Step 1: Update session record
-      const { error: sessionError } = await supabase
+      const { error: sessionError, data: sessionUpdData } = await supabase
         .from('production_sessions')
         .update({
           production_line: data.productionLine.trim(),
@@ -469,14 +469,19 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           comments: data.comments || null,
           updated_by: user?.name || null,
           updated_at: new Date().toISOString(),
-          
         })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
 
       if (sessionError) {
         console.error('Error updating session:', sessionError);
         return { success: false, error: sessionError.message };
       }
+      if (!sessionUpdData || sessionUpdData.length === 0) {
+        console.error('Session update returned 0 rows — RLS likely blocked it');
+        return { success: false, error: 'Session update blocked by permissions (RLS).' };
+      }
+
 
       // Step 2: Delete old items and downtimes in PARALLEL
       const [deleteItemsRes, deleteDowntimesRes] = await Promise.all([
