@@ -407,6 +407,16 @@ function CalendarView({ entries, month, setMonth, selectedDay, setSelectedDay, c
                   <span className="text-muted-foreground">· {e.leader}</span>
                   <span className="text-muted-foreground">· {e.shift}</span>
                   <span className="text-destructive font-semibold ml-auto">-{e.points}</span>
+                  {canEditEntry(e) && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(e.sessionId)}
+                      className="p-1 text-primary hover:bg-primary/10 rounded"
+                      title="Edit shift"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
                   {e.notes && <span className="basis-full text-muted-foreground italic">{e.notes}</span>}
                 </div>
               ))}
