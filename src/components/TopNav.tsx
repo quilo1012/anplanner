@@ -117,33 +117,40 @@ export function TopNav() {
         </button>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu + overlay */}
       {mobileOpen && (
-        <div className="lg:hidden border-t border-sidebar-border bg-sidebar">
-          <nav className="p-2 space-y-0.5">
-            {items.map(item => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                onClick={() => setMobileOpen(false)}
-                className={linkClass}
-              >
-                <item.icon size={18} strokeWidth={2} />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-            {user && (
-              <button
-                onClick={() => { setMobileOpen(false); logout(); }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent transition-colors"
-              >
-                <LogOut size={18} />
-                Sign Out ({user.name})
-              </button>
-            )}
-          </nav>
-        </div>
+        <>
+          <div
+            className="lg:hidden fixed inset-0 top-12 z-30 bg-black/50"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar">
+            <nav className="p-2 space-y-0.5">
+              {items.map(item => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  onClick={() => setMobileOpen(false)}
+                  className={linkClass}
+                >
+                  <item.icon size={18} strokeWidth={2} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+              {user && (
+                <button
+                  onClick={() => { setMobileOpen(false); logout(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent transition-colors"
+                >
+                  <LogOut size={18} />
+                  Sign Out ({user.name})
+                </button>
+              )}
+            </nav>
+          </div>
+        </>
       )}
     </header>
   );
