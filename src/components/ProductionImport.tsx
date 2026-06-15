@@ -306,7 +306,9 @@ export function ProductionImport({ open, onClose }: Props) {
           }
 
           if (existingSessionId) {
-            // SYNC MODE: update quantity_actual on existing items, insert new SKUs
+            // SYNC MODE: update quantity_actual on existing items, insert new SKUs.
+            // NEVER touch quantity_target on existing items, and NEVER recompute the
+            // session's planned_quantity — those are owned by the Planner.
             const existingItems = existingItemsMap.get(existingSessionId) || [];
             const existingSkuMap = new Map(existingItems.map(i => [i.sku, i]));
 
@@ -321,13 +323,17 @@ export function ProductionImport({ open, onClose }: Props) {
                 if (error) throw new Error(`Update item ${sku} failed: ${error.message}`);
                 if (!data || data.length === 0) throw new Error(`Update item ${sku} blocked by RLS`);
               } else {
+                // New SKU not present in the existing shift.
+                // target = matching plan qty if any, else 0 (do NOT default to imported qty).
+                const planKey = `${first.work_centre}|${first.date}|${sku}|${first.shift_type}`;
+                const plannedQty = planMap.get(planKey);
                 const { error: insertErr, data: insertData } = await supabase
                   .from('production_items')
                   .insert({
                     session_id: existingSessionId,
                     sku,
                     product_name: agg.productName,
-                    quantity_target: agg.targetQty,
+                    quantity_target: plannedQty ?? 0,
                     quantity_actual: agg.actualQty,
                   })
                   .select('id');
@@ -336,25 +342,10 @@ export function ProductionImport({ open, onClose }: Props) {
               }
             }
 
-            // Update planned_quantity on the session
-            const { data: allItems, error: allItemsErr } = await supabase
-              .from('production_items')
-              .select('quantity_target')
-              .eq('session_id', existingSessionId);
-            if (allItemsErr) throw new Error(`Recompute planned failed: ${allItemsErr.message}`);
-            const newTotalPlanned = allItems?.reduce((s, i) => s + (i.quantity_target || 0), 0) || 0;
-
-            const leaderForLine = (lineLeaders[first.work_centre] || '').trim();
-            const { error: updateSessionErr, data: updatedSessionData } = await supabase
-              .from('production_sessions')
-              .update({ planned_quantity: newTotalPlanned, line_leader: leaderForLine, updated_at: new Date().toISOString() })
-              .eq('id', existingSessionId)
-              .select('id');
-            if (updateSessionErr) throw new Error(`Update session failed: ${updateSessionErr.message}`);
-            if (!updatedSessionData || updatedSessionData.length === 0) throw new Error('Update session blocked by RLS');
-
+            // Do NOT update planned_quantity — leave the Planner-defined value untouched.
             updatedCount++;
           } else {
+
             // CREATE MODE: new session via saveSession
             const items = [...skuAgg.entries()].map(([sku, agg]) => ({
               sku,
