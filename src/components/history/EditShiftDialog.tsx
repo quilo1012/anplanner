@@ -145,6 +145,11 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     }
 
     setIsSubmitting(true);
+    const safetyTimer = setTimeout(() => {
+      console.error('[EditShiftDialog] Safety timeout fired — save took >30s');
+      setIsSubmitting(false);
+      toast.error('Save timed out after 30s. Check the console/network tab for details.');
+    }, 30_000);
     try {
       // Operator path: only send item IDs + quantity_actual
       if (isOperator) {
@@ -200,17 +205,22 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
       }
 
       // Save quality actions (supervisor/admin only)
-      const qr = await saveQualityActionsForSession({
-        sessionId: session.id,
-        productionLine: productionLine.trim(),
-        lineLeader: lineLeader.trim(),
-        date,
-        shiftType,
-        rows: qualityRows,
-        recordedBy: user?.id ?? null,
-      });
-      if (!qr.success) {
-        toast.error(`Quality save failed: ${qr.error}`);
+      try {
+        const qr = await saveQualityActionsForSession({
+          sessionId: session.id,
+          productionLine: productionLine.trim(),
+          lineLeader: lineLeader.trim(),
+          date,
+          shiftType,
+          rows: qualityRows,
+          recordedBy: user?.id ?? null,
+        });
+        if (!qr.success) {
+          toast.error(`Quality save failed: ${qr.error}`);
+        }
+      } catch (qErr) {
+        console.error('Quality save threw:', qErr);
+        toast.error(`Quality save failed: ${qErr instanceof Error ? qErr.message : String(qErr)}`);
       }
 
       toast.success('Session updated successfully');
@@ -218,11 +228,13 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
       onSuccess?.();
     } catch (error) {
       console.error('Error updating session:', error);
-      toast.error('Failed to update session');
+      toast.error(`Failed to update session: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      clearTimeout(safetyTimer);
       setIsSubmitting(false);
     }
   };
+
 
   if (!session) return null;
 
