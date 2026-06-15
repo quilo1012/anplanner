@@ -396,12 +396,15 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         const updatePromises = (data.items || [])
           .filter(item => (item as unknown as { id?: string }).id)
           .map(item =>
-            supabase
-              .from('production_items')
-              .update({ quantity_actual: item.quantityActual || 0 })
-              .eq('id', (item as unknown as { id: string }).id)
-              .eq('session_id', id)
-              .select('id')
+            runSupabaseQuery(
+              supabase
+                .from('production_items')
+                .update({ quantity_actual: item.quantityActual || 0 })
+                .eq('id', (item as unknown as { id: string }).id)
+                .eq('session_id', id)
+                .select('id'),
+              `Update production item ${(item as unknown as { id: string }).id}`
+            )
           );
 
         if (updatePromises.length > 0) {
@@ -411,7 +414,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
             if (res.error) {
               console.error('Error updating item:', res.error);
               timer.end();
-              return { success: false, error: res.error.message };
+              return { success: false, error: formatSupabaseError(res.error) };
             }
             if (!res.data || res.data.length === 0) {
               failedCount++;
@@ -426,9 +429,14 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
         // Handle downtimes for operator
         if (data.structuredDowntimes) {
-          await supabase.from('structured_downtimes').delete().eq('session_id', id);
+          const deleteDowntimesRes = await runSupabaseQuery(
+            supabase.from('structured_downtimes').delete().eq('session_id', id),
+            'Clear operator downtimes'
+          );
+          if (deleteDowntimesRes.error) return { success: false, error: formatSupabaseError(deleteDowntimesRes.error) };
           if (data.structuredDowntimes.length > 0) {
-            await supabase.from('structured_downtimes').insert(
+            const insertDowntimesRes = await runSupabaseQuery(
+              supabase.from('structured_downtimes').insert(
               data.structuredDowntimes.map(dt => ({
                 session_id: id,
                 category: dt.category,
@@ -436,7 +444,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
                 duration: dt.duration,
                 comment: dt.comment || null,
               }))
+              ).select('id'),
+              'Insert operator downtimes'
             );
+            assertMutationSucceeded(insertDowntimesRes, 'Insert operator downtimes');
           }
         }
 
@@ -461,7 +472,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       // === SUPERVISOR/ADMIN PATH: full update ===
 
       // Step 1: Update session record
-      const { error: sessionError, data: sessionUpdData } = await supabase
+      const { error: sessionError, data: sessionUpdData } = await runSupabaseQuery(
+        supabase
         .from('production_sessions')
         .update({
           production_line: data.productionLine.trim(),
@@ -476,11 +488,13 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .select('id');
+        .select('id'),
+        'Update production session'
+      );
 
       if (sessionError) {
         console.error('Error updating session:', sessionError);
-        return { success: false, error: sessionError.message };
+            return { success: false, error: formatSupabaseError(sessionError) };
       }
       if (!sessionUpdData || sessionUpdData.length === 0) {
         console.error('Session update returned 0 rows — RLS likely blocked it');
