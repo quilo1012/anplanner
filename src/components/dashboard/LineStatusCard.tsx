@@ -20,6 +20,7 @@ interface LineStatusCardProps {
   colorClass: string;
   realProduction?: number;
   productionTarget?: number;
+  leaderQuality?: { occurrences: number; points: number };
   onClick?: () => void;
 }
 
