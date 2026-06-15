@@ -110,6 +110,74 @@ export function LeaderQualityBoard({ currentDate }: Props) {
     return () => { cancel = true; };
   }, [selectedLeader]);
 
+  // Monthly Scorecard fetch
+  useEffect(() => {
+    if (view !== 'monthly') return;
+    let cancel = false;
+    setMonthlyLoading(true);
+    (async () => {
+      const monthStart = startOfMonth(parseISO(`${monthValue}-01`));
+      const monthEnd = endOfMonth(monthStart);
+      const sd = format(monthStart, 'yyyy-MM-dd');
+      const ed = format(monthEnd, 'yyyy-MM-dd');
+
+      const [qaRes, sessionsRes] = await Promise.all([
+        supabase.from('quality_actions').select('line_leader, points').gte('date', sd).lte('date', ed),
+        supabase.from('production_sessions').select('id, line_leader').gte('date', sd).lte('date', ed),
+      ]);
+      if (cancel) return;
+
+      const sessions = sessionsRes.data || [];
+      const sessionIds = sessions.map((s: any) => s.id);
+
+      let itemsRes: any = { data: [] };
+      if (sessionIds.length > 0) {
+        itemsRes = await supabase
+          .from('production_items')
+          .select('session_id, quantity_actual')
+          .in('session_id', sessionIds);
+        if (cancel) return;
+      }
+
+      const sessionToLeader: Record<string, string> = {};
+      for (const s of sessions as any[]) {
+        const name = (s.line_leader || '').trim();
+        if (name) sessionToLeader[s.id] = name;
+      }
+
+      const map: Record<string, { points: number; occ: number; prod: number }> = {};
+      for (const s of sessions as any[]) {
+        const name = (s.line_leader || '').trim();
+        if (!name) continue;
+        if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
+      }
+      for (const qa of (qaRes.data || []) as any[]) {
+        const name = (qa.line_leader || '').trim();
+        if (!name) continue;
+        if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
+        map[name].points += Number(qa.points) || 0;
+        map[name].occ += 1;
+      }
+      for (const it of (itemsRes.data || []) as any[]) {
+        const leader = sessionToLeader[it.session_id];
+        if (!leader) continue;
+        map[leader].prod += Number(it.quantity_actual) || 0;
+      }
+
+      const result: MonthlyRow[] = Object.entries(map).map(([name, v]) => ({
+        name,
+        totalPoints: v.points,
+        occurrences: v.occ,
+        totalProduction: v.prod,
+        score: Math.max(0, 100 - v.points),
+      })).sort((a, b) => a.score - b.score || b.totalPoints - a.totalPoints);
+
+      setMonthlyRows(result);
+      setMonthlyLoading(false);
+    })();
+    return () => { cancel = true; };
+  }, [view, monthValue]);
+
   const filtered = useMemo(() => {
     return rows.filter(r => {
       if (shiftFilter !== 'ALL') {
