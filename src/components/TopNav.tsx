@@ -343,25 +343,29 @@ export function TopNav() {
 
         {/* User (desktop) */}
         {user && (
-          <div className="hidden lg:flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="hidden lg:flex items-center gap-2 shrink-0 px-2 py-1 rounded-md hover:bg-sidebar-accent transition-colors outline-none"
+              aria-label="User menu"
+            >
               <div className="w-7 h-7 rounded-full bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center text-xs font-bold">
                 {user.name.charAt(0).toUpperCase()}
               </div>
-              <div className="text-xs leading-tight">
+              <div className="text-xs leading-tight text-left">
                 <p className="font-medium">{user.name}</p>
                 <p className="text-sidebar-foreground/60">{ROLE_LABELS[user.role]}</p>
               </div>
-            </div>
-            <button
-              onClick={logout}
-              className="p-1.5 rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-              title="Sign Out"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
+              <ChevronDown size={14} strokeWidth={2} className="text-sidebar-foreground/70" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+              <DropdownMenuItem onClick={logout} className="cursor-pointer">
+                <LogOut size={16} className="mr-2" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
+
 
         {/* Mobile menu button */}
         <button
