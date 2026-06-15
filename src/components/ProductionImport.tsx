@@ -322,30 +322,34 @@ export function ProductionImport({ open, onClose }: Props) {
             for (const [sku, agg] of skuAgg) {
               const existingItem = existingSkuMap.get(sku);
               if (existingItem) {
-                const { error, data } = await supabase
-                  .from('production_items')
-                  .update({ quantity_actual: agg.actualQty })
-                  .eq('id', existingItem.id)
-                  .select('id');
-                if (error) throw new Error(`Update item ${sku} failed: ${error.message}`);
-                if (!data || data.length === 0) throw new Error(`Update item ${sku} blocked by RLS`);
+                const updateResult = await runSupabaseQuery(
+                  supabase
+                    .from('production_items')
+                    .update({ quantity_actual: agg.actualQty })
+                    .eq('id', existingItem.id)
+                    .select('id'),
+                  `Update imported item ${sku}`
+                );
+                assertMutationSucceeded(updateResult, `Update item ${sku}`);
               } else {
                 // New SKU not present in the existing shift.
                 // target = matching plan qty if any, else 0 (do NOT default to imported qty).
                 const planKey = `${first.work_centre}|${first.date}|${sku}|${first.shift_type}`;
                 const plannedQty = planMap.get(planKey);
-                const { error: insertErr, data: insertData } = await supabase
-                  .from('production_items')
-                  .insert({
-                    session_id: existingSessionId,
-                    sku,
-                    product_name: agg.productName,
-                    quantity_target: plannedQty ?? 0,
-                    quantity_actual: agg.actualQty,
-                  })
-                  .select('id');
-                if (insertErr) throw new Error(`Insert item ${sku} failed: ${insertErr.message}`);
-                if (!insertData || insertData.length === 0) throw new Error(`Insert item ${sku} blocked by RLS`);
+                const insertResult = await runSupabaseQuery(
+                  supabase
+                    .from('production_items')
+                    .insert({
+                      session_id: existingSessionId,
+                      sku,
+                      product_name: agg.productName,
+                      quantity_target: plannedQty ?? 0,
+                      quantity_actual: agg.actualQty,
+                    })
+                    .select('id'),
+                  `Insert imported item ${sku}`
+                );
+                assertMutationSucceeded(insertResult, `Insert item ${sku}`);
               }
             }
 
