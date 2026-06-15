@@ -5,6 +5,7 @@ import { ProductionSession, ProductionItem, ProductionSessionFormData, ShiftType
 import { StructuredDowntime } from '@/types/downtime';
 import { useAuth } from './AuthContext';
 import { createPerfTimer } from '@/utils/performanceLogger';
+import { assertMutationSucceeded, formatSupabaseError, runSupabaseQuery } from '@/utils/supabaseSafeQuery';
 
 type DbItem = Tables<'production_items'>;
 type DbDowntime = Tables<'structured_downtimes'>;
@@ -52,18 +53,6 @@ function mapDbShiftType(dbType: string): ShiftType {
 
 function mapShiftTypeToDb(shift: ShiftType): string {
   return shift.toLowerCase();
-}
-
-async function withTimeout<T>(promise: PromiseLike<T>, ms: number = 15000): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('Operation timed out')), ms);
-  });
-  try {
-    return await Promise.race([Promise.resolve(promise), timeout]);
-  } finally {
-    clearTimeout(timer!);
-  }
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
