@@ -213,7 +213,7 @@ export function ProductionImport({ open, onClose }: Props) {
     setSaving(true);
 
     // Safety net: guarantee the button never stays in "Importing..." state forever.
-    // If something hangs (network, RLS, etc.) for >90s, force-release the loading state
+    // If something hangs (network, RLS, etc.) for >30s, force-release the loading state
     // and surface a clear error toast.
     const safetyTimer = setTimeout(() => {
       console.error('[ProductionImport] Safety timeout fired — import took >30s');
@@ -404,7 +404,7 @@ export function ProductionImport({ open, onClose }: Props) {
       }
 
       try {
-        await refreshSessions();
+        await runSupabaseQuery(refreshSessions(), 'Refresh production history after import');
       } catch (refreshErr) {
         console.error('[ProductionImport] refreshSessions failed (non-fatal):', refreshErr);
       }
