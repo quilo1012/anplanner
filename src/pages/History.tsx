@@ -428,6 +428,9 @@ export function History() {
                 <table className="table">
                   <thead>
                     <tr>
+                      <th className="w-8 text-center">
+                        <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="h-4 w-4" title="Select all" />
+                      </th>
                       <th className="w-8"></th>
                       <th>Date</th>
                       <th>Shift</th>
