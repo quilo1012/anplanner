@@ -28,6 +28,7 @@ function ymd(d: Date) {
 
 interface LogEntry {
   id: string;
+  sessionId: string;
   date: string;
   shift: string;
   line: string;
