@@ -26,6 +26,7 @@ import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
 import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { aggregateLeaderQuality } from '@/utils/aggregateLeaderQuality';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
