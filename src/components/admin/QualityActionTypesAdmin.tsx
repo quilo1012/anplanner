@@ -12,13 +12,14 @@ const EMPTY_FORM = { name: '', points: 1, description: '', is_active: true, seve
 
 export function QualityActionTypesAdmin() {
   const { types, loading, refresh } = useQualityActionTypes(false);
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<{ name: string; points: number; description: string; is_active: boolean; severity: QualitySeverity }>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
 
-  // Keep form in sync with the selected record. Runs whenever editingId or the
-  // underlying types list changes (so freshly-fetched data also populates).
+  // Re-sync form when the underlying record changes (e.g. after refresh).
   useEffect(() => {
     if (!editingId) return;
     const t = types.find(x => x.id === editingId);
@@ -37,7 +38,16 @@ export function QualityActionTypesAdmin() {
 
   const startEdit = (t: QualityActionType) => {
     setIsAdding(false);
-    setEditingId(t.id); // useEffect above populates the form
+    // Populate synchronously so the inputs show the correct values on first render.
+    const pts = typeof t.points === 'number' ? t.points : parseFloat(String(t.points ?? 0));
+    setForm({
+      name: t.name,
+      points: Number.isFinite(pts) ? pts : 0,
+      description: t.description || '',
+      is_active: t.is_active,
+      severity: (t.severity || 'medium') as QualitySeverity,
+    });
+    setEditingId(t.id);
   };
 
 
@@ -46,7 +56,9 @@ export function QualityActionTypesAdmin() {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name is required');
     if (form.points < 0) return toast.error('Points must be ≥ 0');
+    if (!isAdmin) return toast.error('Only admins can create or edit quality action types.');
     setSubmitting(true);
+
     const payload = {
       name: form.name.trim(),
       points: Number(form.points) || 0,
