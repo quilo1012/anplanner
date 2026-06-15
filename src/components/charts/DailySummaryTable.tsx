@@ -34,7 +34,7 @@ const PRINT_SEV_COLORS: Record<string, string> = {
   critical: '#b91c1c',
 };
 
-export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTableProps) {
+export function DailySummaryTable({ sessions, dateRange, shift, onEditSession, canEditSession }: DailySummaryTableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   const qualityRef = useRef<HTMLDivElement>(null);
   const [qualityEntries, setQualityEntries] = useState<QualityEntry[]>([]);
