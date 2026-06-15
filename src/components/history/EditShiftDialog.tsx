@@ -217,6 +217,9 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
         });
         if (!qr.success) {
           toast.error(`Quality save failed: ${qr.error}`);
+        } else {
+          // Notify any open views (e.g. /quality-actions-log) to refetch
+          window.dispatchEvent(new CustomEvent('quality-actions-changed', { detail: { sessionId: session.id } }));
         }
       } catch (qErr) {
         console.error('Quality save threw:', qErr);
