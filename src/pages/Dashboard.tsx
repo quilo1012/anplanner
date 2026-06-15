@@ -46,10 +46,12 @@ export function Dashboard() {
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
   const [leaderQuality, setLeaderQuality] = useState<Record<string, { occurrences: number; points: number }>>({});
+  const [leaderQualityLoading, setLeaderQualityLoading] = useState(false);
 
   // Per-leader quality totals across the selected period+shift (all lines).
   useEffect(() => {
     let cancelled = false;
+    setLeaderQualityLoading(true);
     (async () => {
       const { data, error } = await supabase
         .from('quality_actions')
@@ -57,16 +59,15 @@ export function Dashboard() {
         .gte('date', startDate)
         .lte('date', endDate)
         .eq('shift_type', selectedShift);
-      if (cancelled || error || !data) { if (!cancelled) setLeaderQuality({}); return; }
-      const totals: Record<string, { occurrences: number; points: number }> = {};
-      for (const r of data) {
-        const key = (r.line_leader || '').trim().toLowerCase();
-        if (!key) continue;
-        if (!totals[key]) totals[key] = { occurrences: 0, points: 0 };
-        totals[key].occurrences += 1;
-        totals[key].points += Number(r.points) || 0;
+      if (cancelled) return;
+      if (error) {
+        toast.error(`Failed to load leader quality totals: ${error.message}`);
+        setLeaderQuality({});
+        setLeaderQualityLoading(false);
+        return;
       }
-      setLeaderQuality(totals);
+      setLeaderQuality(aggregateLeaderQuality(data ?? []));
+      setLeaderQualityLoading(false);
     })();
     return () => { cancelled = true; };
   }, [startDate, endDate, selectedShift, sessions]);
