@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
@@ -21,76 +21,175 @@ const navItems: NavItem[] = [
   { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
 ];
 
+// Drawer debug: enable via `?drawerDebug=1` or `localStorage.drawerDebug = '1'`.
+const drawerDebug = (() => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return (
+      new URLSearchParams(window.location.search).get('drawerDebug') === '1' ||
+      window.localStorage.getItem('drawerDebug') === '1'
+    );
+  } catch {
+    return false;
+  }
+})();
+const dlog = (...a: unknown[]) => { if (drawerDebug) console.log('[drawer]', ...a); };
+
 export function TopNav() {
   const { user, logout, hasRole } = useAuth();
   const onlineUsers = useOnlineUsers();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const toggleBtnRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   // Auto-close mobile drawer whenever the route changes (safety net)
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // Lock body scroll & prevent iOS overscroll/bounce while the mobile drawer is open
+  // Lock body scroll & prevent iOS overscroll/bounce while the mobile drawer is open.
+  // Uses position:fixed body-freeze (the most reliable cross-iOS technique) with
+  // scroll restoration on close, plus touchmove/gesture prevention as defense in depth.
   useEffect(() => {
-    if (mobileOpen) {
-      const prevBodyOverflow = document.body.style.overflow;
-      const prevBodyOverscroll = document.body.style.overscrollBehavior;
-      const prevHtmlOverflow = document.documentElement.style.overflow;
-      const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
-      document.body.style.overflow = 'hidden';
-      document.body.style.overscrollBehavior = 'none';
-      document.documentElement.style.overflow = 'hidden';
-      document.documentElement.style.overscrollBehavior = 'none';
-      // Track where each touch started so multi-finger / drift gestures
-      // that begin outside the drawer are blocked even if they cross into it.
-      const touchOriginInDrawer = new Map<number, boolean>();
-      const isInsideDrawer = (target: EventTarget | null) =>
-        !!(target instanceof Element && target.closest('[data-mobile-drawer]'));
+    if (!mobileOpen) return;
 
-      const onTouchStart = (e: TouchEvent) => {
-        for (const t of Array.from(e.changedTouches)) {
-          touchOriginInDrawer.set(t.identifier, isInsideDrawer(t.target));
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const html = document.documentElement;
+    const prev = {
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+    };
+
+    // position:fixed freeze — survives iOS Safari quirks where overflow:hidden alone fails.
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    html.style.overflow = 'hidden';
+    html.style.overscrollBehavior = 'none';
+    dlog('lock', { scrollY });
+
+    const touchOriginInDrawer = new Map<number, boolean>();
+    const isInsideDrawer = (target: EventTarget | null) =>
+      !!(target instanceof Element && target.closest('[data-mobile-drawer]'));
+
+    const onTouchStart = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) {
+        const inside = isInsideDrawer(t.target);
+        touchOriginInDrawer.set(t.identifier, inside);
+        if (drawerDebug) {
+          const el = t.target as Element | null;
+          dlog('touchstart', { id: t.identifier, inside, tag: el?.tagName, cls: el?.className });
         }
-      };
-      const onTouchEnd = (e: TouchEvent) => {
-        for (const t of Array.from(e.changedTouches)) touchOriginInDrawer.delete(t.identifier);
-      };
-      const onTouchMove = (e: TouchEvent) => {
-        // If ANY active touch started outside the drawer, block the gesture.
-        for (const t of Array.from(e.touches)) {
-          if (touchOriginInDrawer.get(t.identifier) === false) {
-            e.preventDefault();
-            return;
-          }
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) touchOriginInDrawer.delete(t.identifier);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      for (const t of Array.from(e.touches)) {
+        if (touchOriginInDrawer.get(t.identifier) === false) {
+          e.preventDefault();
+          dlog('blocked touchmove (origin outside)', { id: t.identifier });
+          return;
         }
-        // Fallback when touchstart wasn't observed (e.g. event began before lock).
-        if (!isInsideDrawer(e.target)) e.preventDefault();
-      };
-      // Block iOS pinch-zoom gestures while drawer is open.
-      const onGesture = (e: Event) => e.preventDefault();
+      }
+      if (!isInsideDrawer(e.target)) {
+        e.preventDefault();
+        dlog('blocked touchmove (target outside)');
+      }
+    };
+    const onGesture = (e: Event) => { e.preventDefault(); dlog('blocked gesture', e.type); };
 
-      document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
-      document.addEventListener('touchend', onTouchEnd, { passive: true, capture: true });
-      document.addEventListener('touchcancel', onTouchEnd, { passive: true, capture: true });
-      document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
-      document.addEventListener('gesturestart', onGesture, { passive: false });
-      document.addEventListener('gesturechange', onGesture, { passive: false });
+    document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
+    document.addEventListener('touchend', onTouchEnd, { passive: true, capture: true });
+    document.addEventListener('touchcancel', onTouchEnd, { passive: true, capture: true });
+    document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
+    document.addEventListener('gesturestart', onGesture, { passive: false });
+    document.addEventListener('gesturechange', onGesture, { passive: false });
 
-      return () => {
-        document.body.style.overflow = prevBodyOverflow;
-        document.body.style.overscrollBehavior = prevBodyOverscroll;
-        document.documentElement.style.overflow = prevHtmlOverflow;
-        document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
-        document.removeEventListener('touchstart', onTouchStart, { capture: true } as any);
-        document.removeEventListener('touchend', onTouchEnd, { capture: true } as any);
-        document.removeEventListener('touchcancel', onTouchEnd, { capture: true } as any);
-        document.removeEventListener('touchmove', onTouchMove, { capture: true } as any);
-        document.removeEventListener('gesturestart', onGesture);
-        document.removeEventListener('gesturechange', onGesture);
-      };
-    }
+    return () => {
+      body.style.position = prev.bodyPosition;
+      body.style.top = prev.bodyTop;
+      body.style.left = prev.bodyLeft;
+      body.style.right = prev.bodyRight;
+      body.style.width = prev.bodyWidth;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+      html.style.overflow = prev.htmlOverflow;
+      html.style.overscrollBehavior = prev.htmlOverscroll;
+      // Restore scroll position synchronously so the page doesn't jump.
+      window.scrollTo(0, scrollY);
+      dlog('unlock', { restoredScrollY: scrollY });
+
+      document.removeEventListener('touchstart', onTouchStart, { capture: true } as any);
+      document.removeEventListener('touchend', onTouchEnd, { capture: true } as any);
+      document.removeEventListener('touchcancel', onTouchEnd, { capture: true } as any);
+      document.removeEventListener('touchmove', onTouchMove, { capture: true } as any);
+      document.removeEventListener('gesturestart', onGesture);
+      document.removeEventListener('gesturechange', onGesture);
+    };
+  }, [mobileOpen]);
+
+  // Focus management: trap Tab within the drawer, close on Escape, restore focus on close.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+
+    // Move focus into the drawer.
+    const focusFirst = () => {
+      const root = drawerRef.current;
+      if (!root) return;
+      const first = root.querySelector<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      first?.focus();
+    };
+    const raf = requestAnimationFrame(focusFirst);
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const root = drawerRef.current;
+      if (!root) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('keydown', onKey);
+      // Restore focus to the trigger (or whatever was focused before).
+      const restoreTo = previouslyFocusedRef.current ?? toggleBtnRef.current;
+      restoreTo?.focus?.();
+    };
   }, [mobileOpen]);
 
   const items = navItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
@@ -161,9 +260,12 @@ export function TopNav() {
 
         {/* Mobile menu button */}
         <button
+          ref={toggleBtnRef}
           onClick={() => setMobileOpen(!mobileOpen)}
           className="lg:hidden p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-          aria-label="Toggle menu"
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-drawer"
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -177,7 +279,15 @@ export function TopNav() {
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
-          <div data-mobile-drawer className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar max-h-[calc(100vh-3rem)] overflow-y-auto overscroll-contain">
+          <div
+            id="mobile-drawer"
+            ref={drawerRef}
+            data-mobile-drawer
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main navigation"
+            className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar max-h-[calc(100vh-3rem)] overflow-y-auto overscroll-contain"
+          >
             <nav className="p-2 space-y-0.5">
               {items.map(item => (
                 <NavLink
