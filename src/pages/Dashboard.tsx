@@ -45,6 +45,31 @@ export function Dashboard() {
   const [showCharts, setShowCharts] = useState(true);
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
+  const [leaderQuality, setLeaderQuality] = useState<Record<string, { occurrences: number; points: number }>>({});
+
+  // Per-leader quality totals across the selected period+shift (all lines).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('quality_actions')
+        .select('line_leader, points, shift_type, date')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .eq('shift_type', selectedShift);
+      if (cancelled || error || !data) { if (!cancelled) setLeaderQuality({}); return; }
+      const totals: Record<string, { occurrences: number; points: number }> = {};
+      for (const r of data) {
+        const key = (r.line_leader || '').trim().toLowerCase();
+        if (!key) continue;
+        if (!totals[key]) totals[key] = { occurrences: 0, points: 0 };
+        totals[key].occurrences += 1;
+        totals[key].points += Number(r.points) || 0;
+      }
+      setLeaderQuality(totals);
+    })();
+    return () => { cancelled = true; };
+  }, [startDate, endDate, selectedShift, sessions]);
 
 
   // Apply URL params on mount / when they change (e.g. after iTouching import redirect)
@@ -328,25 +353,29 @@ export function Dashboard() {
           <div className="flex gap-2">
             <div className="flex-1 space-y-1.5 min-w-0">
               {lineStats.length > 0 ? (
-                lineStats.map((line) => (
-                  <LineStatusCard
-                    key={`${line.line}-${line.date}-${line.shift}`}
-                    lineName={line.line}
-                    sku={line.currentSku}
-                    product={line.currentProduct}
-                    leader={line.currentLeader}
-                    shift={selectedShift}
-                    performance={line.avgPerformance}
-                    availability={line.availability}
-                    staffActual={line.staffActual}
-                    staffPlanned={line.staffPlanned}
-                    status={line.status as 'running' | 'stopped' | 'warning'}
-                    colorClass={line.colorClass}
-                    realProduction={line.realProduction}
-                    productionTarget={line.productionTarget}
-                    onClick={canEditSessions ? () => setEditSession(line.session) : undefined}
-                  />
-                ))
+                lineStats.map((line) => {
+                  const lq = leaderQuality[(line.currentLeader || '').trim().toLowerCase()];
+                  return (
+                    <LineStatusCard
+                      key={`${line.line}-${line.date}-${line.shift}`}
+                      lineName={line.line}
+                      sku={line.currentSku}
+                      product={line.currentProduct}
+                      leader={line.currentLeader}
+                      shift={selectedShift}
+                      performance={line.avgPerformance}
+                      availability={line.availability}
+                      staffActual={line.staffActual}
+                      staffPlanned={line.staffPlanned}
+                      status={line.status as 'running' | 'stopped' | 'warning'}
+                      colorClass={line.colorClass}
+                      realProduction={line.realProduction}
+                      productionTarget={line.productionTarget}
+                      leaderQuality={lq ?? { occurrences: 0, points: 0 }}
+                      onClick={canEditSessions ? () => setEditSession(line.session) : undefined}
+                    />
+                  );
+                })
               ) : (
                 <div className="card p-6 text-center">
                   <Factory size={40} className="mx-auto text-muted-foreground mb-3" />
