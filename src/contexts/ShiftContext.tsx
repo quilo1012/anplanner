@@ -504,8 +504,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       // Step 2: Delete old items and downtimes in PARALLEL
       const [deleteItemsRes, deleteDowntimesRes] = await Promise.all([
-        supabase.from('production_items').delete().eq('session_id', id),
-        supabase.from('structured_downtimes').delete().eq('session_id', id),
+        runSupabaseQuery(supabase.from('production_items').delete().eq('session_id', id), 'Delete old production items'),
+        runSupabaseQuery(supabase.from('structured_downtimes').delete().eq('session_id', id), 'Delete old downtimes'),
       ]);
 
       if (deleteItemsRes.error) {
@@ -538,18 +538,20 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       const insertPromises: Promise<{ error: unknown }>[] = [];
       if (itemsToInsert.length > 0) {
-        insertPromises.push(supabase.from('production_items').insert(itemsToInsert).select('id') as unknown as Promise<{ error: unknown }>);
+        insertPromises.push(runSupabaseQuery(supabase.from('production_items').insert(itemsToInsert).select('id'), 'Insert updated production items'));
       }
       if (downtimesToInsert.length > 0) {
-        insertPromises.push(supabase.from('structured_downtimes').insert(downtimesToInsert).select('id') as unknown as Promise<{ error: unknown }>);
+        insertPromises.push(runSupabaseQuery(supabase.from('structured_downtimes').insert(downtimesToInsert).select('id'), 'Insert updated downtimes'));
       }
 
       if (insertPromises.length > 0) {
         const insertResults = await Promise.all(insertPromises);
-        for (const res of insertResults as { error: { message: string } | null }[]) {
-          if (res.error) {
-            console.error('Error inserting data:', res.error);
-            return { success: false, error: res.error.message };
+        for (const res of insertResults) {
+          try {
+            assertMutationSucceeded(res, 'Insert updated session data');
+          } catch (err) {
+            console.error('Error inserting data:', err);
+            return { success: false, error: err instanceof Error ? err.message : String(err) };
           }
         }
       }
@@ -589,10 +591,13 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
   const deleteSession = async (id: string): Promise<OperationResult> => {
     try {
-      const { error } = await supabase.from('production_sessions').delete().eq('id', id);
+      const { error } = await runSupabaseQuery(
+        supabase.from('production_sessions').delete().eq('id', id),
+        'Delete production session'
+      );
       if (error) {
         console.error('Error deleting session:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: formatSupabaseError(error) };
       }
       setSessions(prev => prev.filter(s => s.id !== id));
       return { success: true };
@@ -608,7 +613,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   ): Promise<OperationResult> => {
     const timer = createPerfTimer('saveDowntimesBatch');
     try {
-      await supabase.from('structured_downtimes').delete().eq('session_id', sessionId);
+      const deleteRes = await runSupabaseQuery(
+        supabase.from('structured_downtimes').delete().eq('session_id', sessionId),
+        'Clear downtimes batch'
+      );
+      if (deleteRes.error) return { success: false, error: formatSupabaseError(deleteRes.error) };
 
       if (downtimes.length > 0) {
         const toInsert = downtimes.map(d => ({
@@ -619,12 +628,16 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           comment: d.comment || null,
         }));
 
-        const { error: insertError } = await supabase.from('structured_downtimes').insert(toInsert);
+        const { error: insertError, data: insertData } = await runSupabaseQuery(
+          supabase.from('structured_downtimes').insert(toInsert).select('id'),
+          'Insert downtimes batch'
+        );
 
         if (insertError) {
           console.error('Error inserting downtimes:', insertError);
-          return { success: false, error: insertError.message };
+          return { success: false, error: formatSupabaseError(insertError) };
         }
+        if (!insertData || insertData.length === 0) return { success: false, error: 'Insert downtimes batch returned no rows — check permissions/RLS.' };
       }
 
       // Optimistic local update
