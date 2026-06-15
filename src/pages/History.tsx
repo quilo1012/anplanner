@@ -455,7 +455,10 @@ export function History() {
                       
                       return (
                         <React.Fragment key={session.id}>
-                          <tr className={cn("hover:bg-muted/50 border-l-4", getLineBorderClass(session.productionLine))}>
+                          <tr className={cn("hover:bg-muted/50 border-l-4", getLineBorderClass(session.productionLine), selectedIds.has(session.id) && "bg-primary/5")}>
+                            <td className="text-center">
+                              <input type="checkbox" checked={selectedIds.has(session.id)} onChange={() => toggleSelect(session.id)} className="h-4 w-4" />
+                            </td>
                             <td className="text-center">
                               <button onClick={() => toggleRow(session.id)} className={`p-1 hover:bg-muted rounded transition-colors ${hasDetails ? '' : 'opacity-30'}`} disabled={!hasDetails}>
                                 {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
