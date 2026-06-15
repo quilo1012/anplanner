@@ -40,6 +40,7 @@ export function LineStatusCard({
   realProduction = 0,
   productionTarget = 0,
   leaderQuality,
+  leaderQualityLoading = false,
   onClick,
 }: LineStatusCardProps) {
   // Target comparison
