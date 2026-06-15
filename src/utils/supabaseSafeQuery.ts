@@ -11,7 +11,7 @@ type AbortableQuery<T> = PromiseLike<T> & {
 
 export type SupabaseMutationResult<T = unknown> = {
   data: T | null;
-  error: SupabaseErrorLike | null;
+  error: unknown | null;
 };
 
 export function formatSupabaseError(error: unknown): string {
