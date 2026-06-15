@@ -73,6 +73,7 @@ export function QualityActionsLog() {
       for (const r of rows) {
         out.push({
           id: r.id || r.tempId,
+          sessionId: s.id,
           date: s.date,
           shift: s.shift,
           line: s.productionLine,
