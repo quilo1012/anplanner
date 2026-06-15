@@ -441,7 +441,16 @@ export function Dashboard() {
 
             {/* Daily Summary Table */}
             <div className="card p-3 mb-3 dashboard-section">
-              <DailySummaryTable sessions={filteredSessions} dateRange={`${formatDate(startDate)} — ${formatDate(endDate)}`} shift={selectedShift} />
+              <DailySummaryTable
+                sessions={filteredSessions}
+                dateRange={`${formatDate(startDate)} — ${formatDate(endDate)}`}
+                shift={selectedShift}
+                onEditSession={(s) => setEditSession(s)}
+                canEditSession={(s) =>
+                  !isOperator ||
+                  (!!user?.name && s.lineLeader.trim().toLowerCase() === user.name.trim().toLowerCase())
+                }
+              />
             </div>
           </>
         )}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ProductionSession, ShiftType } from '@/types/production';
-import { Printer, Table, ShieldAlert } from 'lucide-react';
+import { Printer, Table, ShieldAlert, Pencil } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
 import { getLineBorderClass } from '@/utils/lineColors';
@@ -13,6 +13,8 @@ interface DailySummaryTableProps {
   sessions: ProductionSession[];
   dateRange?: string;
   shift?: ShiftType;
+  onEditSession?: (session: ProductionSession) => void;
+  canEditSession?: (session: ProductionSession) => boolean;
 }
 
 interface QualityEntry {
@@ -32,7 +34,7 @@ const PRINT_SEV_COLORS: Record<string, string> = {
   critical: '#b91c1c',
 };
 
-export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTableProps) {
+export function DailySummaryTable({ sessions, dateRange, shift, onEditSession, canEditSession }: DailySummaryTableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   const qualityRef = useRef<HTMLDivElement>(null);
   const [qualityEntries, setQualityEntries] = useState<QualityEntry[]>([]);
@@ -76,6 +78,7 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
 
   const summaryData = useMemo(() => {
     return sessions.map(s => ({
+      session: s,
       date: s.date, shift: s.shift, line: s.productionLine, leader: s.lineLeader,
       skuCount: s.items.length, totalPlanned: s.plannedQuantity, totalActual: s.totalProduction,
       totalDowntime: s.totalDowntime,
@@ -166,21 +169,38 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
       </div>
       <div ref={tableRef} className="overflow-x-auto">
         <table className="table text-sm">
-          <thead><tr><th>Date</th><th>Shift</th><th>Line</th><th>Leader</th><th className="text-center">SKUs</th><th className="text-right">Planned</th><th className="text-right">Actual</th><th className="text-right">Downtime</th><th className="text-center">Perf.</th></tr></thead>
+          <thead><tr><th>Date</th><th>Shift</th><th>Line</th><th>Leader</th><th className="text-center">SKUs</th><th className="text-right">Planned</th><th className="text-right">Actual</th><th className="text-right">Downtime</th><th className="text-center">Perf.</th>{onEditSession && <th className="text-center no-print w-12">Actions</th>}</tr></thead>
           <tbody>
-            {summaryData.map((row, idx) => (
-              <tr key={idx} className={cn("border-l-4", getLineBorderClass(row.line))}>
-                <td className="whitespace-nowrap">{new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-                <td><span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{row.shift}</span></td>
-                <td className="font-medium">{row.line}</td>
-                <td>{row.leader}</td>
-                <td className="text-center">{row.skuCount}</td>
-                <td className="text-right">{row.totalPlanned.toLocaleString()}</td>
-                <td className="text-right font-medium">{row.totalActual.toLocaleString()}</td>
-                <td className="text-right">{formatDuration(row.totalDowntime)}</td>
-                <td className="text-center"><span className={getPerformanceClass(row.performance)}>{row.performance}%</span></td>
-              </tr>
-            ))}
+            {summaryData.map((row, idx) => {
+              const editable = onEditSession && (canEditSession ? canEditSession(row.session) : true);
+              return (
+                <tr key={idx} className={cn("border-l-4", getLineBorderClass(row.line))}>
+                  <td className="whitespace-nowrap">{new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                  <td><span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{row.shift}</span></td>
+                  <td className="font-medium">{row.line}</td>
+                  <td>{row.leader}</td>
+                  <td className="text-center">{row.skuCount}</td>
+                  <td className="text-right">{row.totalPlanned.toLocaleString()}</td>
+                  <td className="text-right font-medium">{row.totalActual.toLocaleString()}</td>
+                  <td className="text-right">{formatDuration(row.totalDowntime)}</td>
+                  <td className="text-center"><span className={getPerformanceClass(row.performance)}>{row.performance}%</span></td>
+                  {onEditSession && (
+                    <td className="text-center no-print">
+                      {editable && (
+                        <button
+                          onClick={() => onEditSession(row.session)}
+                          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                          title="Edit shift"
+                          aria-label={`Edit shift ${row.line} ${row.date}`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
           {totals && (
             <tfoot>
@@ -190,6 +210,7 @@ export function DailySummaryTable({ sessions, dateRange, shift }: DailySummaryTa
                 <td className="text-right">{totals.totalActual.toLocaleString()}</td>
                 <td className="text-right">{formatDuration(totals.totalDowntime)}</td>
                 <td className="text-center"><span className={getPerformanceClass(totals.avgPerformance)}>{totals.avgPerformance}%</span></td>
+                {onEditSession && <td className="no-print" />}
               </tr>
             </tfoot>
           )}

@@ -2,25 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
-  FileBarChart, Package, ShieldAlert, Menu, X, Circle,
+  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown,
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import { cn } from '@/lib/utils';
 import { recordDrawerSession, type DrawerLockMethod } from '@/utils/drawerTelemetry';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 
 type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; roles: string[] };
 
-const navItems: NavItem[] = [
+// Direct links shown in the desktop top bar
+const directItems: NavItem[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
   { path: '/products', label: 'Products', icon: Package, roles: ['supervisor', 'admin'] },
+];
+
+// Grouped dropdowns
+const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-  { path: '/quality-actions-log', label: 'Quality Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
-  { path: '/quality-action-types', label: 'Quality Types', icon: ShieldAlert, roles: ['admin'] },
-  { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+  { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
 ];
+
+const systemItems: NavItem[] = [
+  { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+  { path: '/quality-action-types', label: 'Quality Action Types', icon: ShieldAlert, roles: ['admin'] },
+];
+
+// Flat list used by the mobile drawer (unchanged behavior)
+const navItems: NavItem[] = [...directItems, ...reportsItems, ...systemItems];
 
 // Drawer debug: enable via `?drawerDebug=1` or `localStorage.drawerDebug = '1'`.
 const drawerDebug = (() => {
@@ -217,6 +231,9 @@ export function TopNav() {
   }, [mobileOpen]);
 
   const items = navItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleDirect = directItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleReports = reportsItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleSystem = systemItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -225,6 +242,17 @@ export function TopNav() {
         ? 'bg-sidebar-primary text-sidebar-primary-foreground'
         : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
     );
+
+  const groupTriggerClass = (active: boolean) =>
+    cn(
+      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap outline-none',
+      active
+        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+        : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+    );
+
+  const isGroupActive = (group: NavItem[]) =>
+    group.some(g => location.pathname === g.path || (g.path !== '/' && location.pathname.startsWith(g.path)));
 
   return (
     <header className="sticky top-0 z-40 bg-sidebar text-sidebar-foreground border-b border-sidebar-border print:hidden">
@@ -240,14 +268,67 @@ export function TopNav() {
         </div>
 
         {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
-          {items.map(item => (
+        <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0 justify-center">
+          {visibleDirect.map(item => (
             <NavLink key={item.path} to={item.path} end={item.path === '/'} className={linkClass}>
               <item.icon size={16} strokeWidth={2} />
               <span>{item.label}</span>
             </NavLink>
           ))}
+
+          {visibleReports.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleReports))}>
+                <FileBarChart size={16} strokeWidth={2} />
+                <span>Reports</span>
+                <ChevronDown size={14} strokeWidth={2} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+                {visibleReports.map(item => (
+                  <DropdownMenuItem key={item.path} asChild>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-2 cursor-pointer w-full',
+                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <item.icon size={16} strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {visibleSystem.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleSystem))}>
+                <Settings size={16} strokeWidth={2} />
+                <span>System</span>
+                <ChevronDown size={14} strokeWidth={2} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+                {visibleSystem.map(item => (
+                  <DropdownMenuItem key={item.path} asChild>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-2 cursor-pointer w-full',
+                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <item.icon size={16} strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </nav>
+
 
         {/* Spacer for mobile */}
         <div className="flex-1 lg:hidden" />
@@ -262,25 +343,29 @@ export function TopNav() {
 
         {/* User (desktop) */}
         {user && (
-          <div className="hidden lg:flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="hidden lg:flex items-center gap-2 shrink-0 px-2 py-1 rounded-md hover:bg-sidebar-accent transition-colors outline-none"
+              aria-label="User menu"
+            >
               <div className="w-7 h-7 rounded-full bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center text-xs font-bold">
                 {user.name.charAt(0).toUpperCase()}
               </div>
-              <div className="text-xs leading-tight">
+              <div className="text-xs leading-tight text-left">
                 <p className="font-medium">{user.name}</p>
                 <p className="text-sidebar-foreground/60">{ROLE_LABELS[user.role]}</p>
               </div>
-            </div>
-            <button
-              onClick={logout}
-              className="p-1.5 rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-              title="Sign Out"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
+              <ChevronDown size={14} strokeWidth={2} className="text-sidebar-foreground/70" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+              <DropdownMenuItem onClick={logout} className="cursor-pointer">
+                <LogOut size={16} className="mr-2" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
+
 
         {/* Mobile menu button */}
         <button
