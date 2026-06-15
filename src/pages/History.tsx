@@ -361,6 +361,24 @@ export function History() {
           </div>
         )}
 
+        {selectedIds.size > 0 && (
+          <div className="mb-3 p-2 sm:p-3 card flex flex-wrap items-center gap-2 sm:gap-3 border-primary/40 bg-primary/5">
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <div className="flex-1" />
+            <button onClick={handleExportSelected} className="btn-success text-xs py-1.5 px-2 inline-flex items-center gap-1">
+              <Download size={14} /> Export selected
+            </button>
+            {canDelete && (
+              <button onClick={() => setBulkDeleteOpen(true)} className="text-xs py-1.5 px-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 inline-flex items-center gap-1">
+                <Trash2 size={14} /> Delete selected
+              </button>
+            )}
+            <button onClick={clearSelection} className="btn-secondary text-xs py-1.5 px-2 inline-flex items-center gap-1" title="Clear selection">
+              <X size={14} /> Clear
+            </button>
+          </div>
+        )}
+
         {filteredSessions.length === 0 ? (
           <div className="card p-8 sm:p-12 text-center">
             <div className="text-4xl sm:text-6xl mb-4">📋</div>
