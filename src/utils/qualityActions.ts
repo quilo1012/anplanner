@@ -61,27 +61,52 @@ export async function fetchQualityActionsForSessions(sessionIds: string[]) {
   const results = await Promise.all(chunks.map(c =>
     supabase
       .from('quality_actions')
-      .select('id, session_id, action_type_id, points, notes, quality_action_types(name, severity)')
+      .select('id, session_id, action_type_id, points, notes')
       .in('session_id', c)
   ));
-  const map: Record<string, QualityActionRow[]> = {};
-  for (const res of results) {
-    if (res.error) continue;
-    for (const row of res.data || []) {
-      const sid = row.session_id as string | null;
-      if (!sid) continue;
-      if (!map[sid]) map[sid] = [];
-      const t = row.quality_action_types as { name?: string; severity?: string } | null;
-      map[sid].push({
-        id: row.id,
-        tempId: row.id,
-        action_type_id: row.action_type_id,
-        name: t?.name || '',
-        points: Number(row.points) || 0,
-        severity: (t?.severity as QualityActionRow['severity']) || undefined,
-        notes: row.notes || '',
-      });
+
+  const rows = results.flatMap(res => {
+    if (res.error) {
+      console.error('[fetchQualityActionsForSessions] quality_actions fetch failed', res.error);
+      return [];
     }
+    return res.data || [];
+  });
+
+  const typeIds = Array.from(new Set(rows.map(row => row.action_type_id).filter(Boolean)));
+  const typeById: Record<string, { name?: string; severity?: string }> = {};
+
+  for (let i = 0; i < typeIds.length; i += chunkSize) {
+    const { data, error } = await supabase
+      .from('quality_action_types')
+      .select('id, name, severity')
+      .in('id', typeIds.slice(i, i + chunkSize));
+
+    if (error) {
+      console.error('[fetchQualityActionsForSessions] quality_action_types fetch failed; showing rows with Unknown type fallback', error);
+      continue;
+    }
+
+    for (const type of data || []) {
+      typeById[type.id] = { name: type.name, severity: type.severity };
+    }
+  }
+
+  const map: Record<string, QualityActionRow[]> = {};
+  for (const row of rows) {
+    const sid = row.session_id as string | null;
+    if (!sid) continue;
+    if (!map[sid]) map[sid] = [];
+    const t = typeById[row.action_type_id];
+    map[sid].push({
+      id: row.id,
+      tempId: row.id,
+      action_type_id: row.action_type_id,
+      name: t?.name || 'Unknown type',
+      points: Number(row.points) || 0,
+      severity: (t?.severity as QualityActionRow['severity']) || undefined,
+      notes: row.notes || '',
+    });
   }
   return map;
 }
