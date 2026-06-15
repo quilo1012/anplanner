@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Header } from '@/components/Header';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
+import { BulkDeleteConfirmDialog } from '@/components/history/BulkDeleteConfirmDialog';
 
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +41,8 @@ export function History() {
   const [deleteSessionState, setDeleteSessionState] = useState<ProductionSession | null>(null);
   const [qualityBySession, setQualityBySession] = useState<Record<string, QualityActionRow[]>>({});
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
@@ -253,6 +256,36 @@ export function History() {
 
   const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader || filterSku || searchQuery;
 
+  // Prune selection to only include currently filtered sessions
+  useEffect(() => {
+    const visible = new Set(filteredSessions.map(s => s.id));
+    setSelectedIds(prev => {
+      const next = new Set<string>();
+      prev.forEach(id => { if (visible.has(id)) next.add(id); });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filteredSessions]);
+
+  const allFilteredSelected = filteredSessions.length > 0 && filteredSessions.every(s => selectedIds.has(s.id));
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      if (allFilteredSelected) return new Set();
+      const next = new Set(prev);
+      filteredSessions.forEach(s => next.add(s.id));
+      return next;
+    });
+  };
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+  const selectedSessions = useMemo(() => filteredSessions.filter(s => selectedIds.has(s.id)), [filteredSessions, selectedIds]);
+  const handleExportSelected = () => exportSessionsToCsv(selectedSessions, 'session_history_selected');
+
   const handleDialogSuccess = () => { /* updateSession already triggers refreshSessions internally */ };
 
   return (
@@ -328,6 +361,24 @@ export function History() {
           </div>
         )}
 
+        {selectedIds.size > 0 && (
+          <div className="mb-3 p-2 sm:p-3 card flex flex-wrap items-center gap-2 sm:gap-3 border-primary/40 bg-primary/5">
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <div className="flex-1" />
+            <button onClick={handleExportSelected} className="btn-success text-xs py-1.5 px-2 inline-flex items-center gap-1">
+              <Download size={14} /> Export selected
+            </button>
+            {canDelete && (
+              <button onClick={() => setBulkDeleteOpen(true)} className="text-xs py-1.5 px-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 inline-flex items-center gap-1">
+                <Trash2 size={14} /> Delete selected
+              </button>
+            )}
+            <button onClick={clearSelection} className="btn-secondary text-xs py-1.5 px-2 inline-flex items-center gap-1" title="Clear selection">
+              <X size={14} /> Clear
+            </button>
+          </div>
+        )}
+
         {filteredSessions.length === 0 ? (
           <div className="card p-8 sm:p-12 text-center">
             <div className="text-4xl sm:text-6xl mb-4">📋</div>
@@ -340,9 +391,12 @@ export function History() {
               {filteredSessions.map(session => (
                 <div key={session.id} className="card p-4">
                   <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="font-medium">{formatDate(session.date)}</p>
-                      <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{session.shift}</span>
+                    <div className="flex items-start gap-2">
+                      <input type="checkbox" checked={selectedIds.has(session.id)} onChange={() => toggleSelect(session.id)} className="mt-1 h-4 w-4" />
+                      <div>
+                        <p className="font-medium">{formatDate(session.date)}</p>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{session.shift}</span>
+                      </div>
                     </div>
                     <span className={getPerformanceClass(session.performance)}>{session.performance.toFixed(0)}%</span>
                   </div>
@@ -374,6 +428,9 @@ export function History() {
                 <table className="table">
                   <thead>
                     <tr>
+                      <th className="w-8 text-center">
+                        <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="h-4 w-4" title="Select all" />
+                      </th>
                       <th className="w-8"></th>
                       <th>Date</th>
                       <th>Shift</th>
@@ -398,7 +455,10 @@ export function History() {
                       
                       return (
                         <React.Fragment key={session.id}>
-                          <tr className={cn("hover:bg-muted/50 border-l-4", getLineBorderClass(session.productionLine))}>
+                          <tr className={cn("hover:bg-muted/50 border-l-4", getLineBorderClass(session.productionLine), selectedIds.has(session.id) && "bg-primary/5")}>
+                            <td className="text-center">
+                              <input type="checkbox" checked={selectedIds.has(session.id)} onChange={() => toggleSelect(session.id)} className="h-4 w-4" />
+                            </td>
                             <td className="text-center">
                               <button onClick={() => toggleRow(session.id)} className={`p-1 hover:bg-muted rounded transition-colors ${hasDetails ? '' : 'opacity-30'}`} disabled={!hasDetails}>
                                 {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -440,7 +500,7 @@ export function History() {
                           {/* Expanded Row: Items + Downtimes + Comments */}
                           {isExpanded && (
                             <tr>
-                              <td colSpan={13} className="bg-muted/30 p-3">
+                              <td colSpan={14} className="bg-muted/30 p-3">
                                 <div className="space-y-3">
                                   {/* SKU Items */}
                                   {session.items.length > 0 && (
@@ -546,6 +606,19 @@ export function History() {
           open={!!deleteSessionState}
           onOpenChange={(open) => { if (!open) setDeleteSessionState(null); }}
           onSuccess={handleDialogSuccess}
+        />
+
+        <BulkDeleteConfirmDialog
+          sessions={selectedSessions}
+          open={bulkDeleteOpen}
+          onOpenChange={setBulkDeleteOpen}
+          onComplete={(deleted) => {
+            setSelectedIds(prev => {
+              const next = new Set(prev);
+              deleted.forEach(id => next.delete(id));
+              return next;
+            });
+          }}
         />
       </div>
     </>
