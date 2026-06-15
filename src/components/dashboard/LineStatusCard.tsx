@@ -20,6 +20,7 @@ interface LineStatusCardProps {
   colorClass: string;
   realProduction?: number;
   productionTarget?: number;
+  onClick?: () => void;
 }
 
 export function LineStatusCard({
@@ -36,6 +37,7 @@ export function LineStatusCard({
   colorClass,
   realProduction = 0,
   productionTarget = 0,
+  onClick,
 }: LineStatusCardProps) {
   // Target comparison
   const hasTargetData = productionTarget > 0;
@@ -48,11 +50,19 @@ export function LineStatusCard({
   
 
   return (
-    <div className={cn(
-      "bg-card border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all",
-      "border-l-4",
-      borderStyle
-    )}>
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      className={cn(
+        "bg-card border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all",
+        "border-l-4",
+        borderStyle,
+        onClick && "cursor-pointer hover:ring-1 hover:ring-primary/40 focus:outline-none focus:ring-2 focus:ring-primary"
+      )}
+      title={onClick ? 'Click to edit shift' : undefined}
+    >
       <div className="flex items-stretch">
         {/* Line Header Badge */}
         <div className={cn(
