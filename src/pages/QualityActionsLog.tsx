@@ -49,8 +49,16 @@ export function QualityActionsLog() {
     const ids = sessions.map(s => s.id);
     if (ids.length === 0) { setQaMap({}); return; }
     let cancel = false;
-    fetchQualityActionsForSessions(ids).then(m => { if (!cancel) setQaMap(m); });
-    return () => { cancel = true; };
+    const load = () => {
+      fetchQualityActionsForSessions(ids).then(m => { if (!cancel) setQaMap(m); });
+    };
+    load();
+    const onChanged = () => load();
+    window.addEventListener('quality-actions-changed', onChanged);
+    return () => {
+      cancel = true;
+      window.removeEventListener('quality-actions-changed', onChanged);
+    };
   }, [sessions]);
 
   const allEntries: LogEntry[] = useMemo(() => {
