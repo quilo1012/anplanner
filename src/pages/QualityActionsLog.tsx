@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { fetchQualityActionsForSessions } from '@/utils/qualityActions';
 import { QualityActionRow, QualitySeverity } from '@/types/quality';
 import { severityBadgeClass, severityLabel, SEVERITY_OPTIONS } from '@/utils/qualitySeverity';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon } from 'lucide-react';
+import { EditShiftDialog } from '@/components/history/EditShiftDialog';
+import { ProductionSession } from '@/types/production';
+import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil } from 'lucide-react';
 
 const SEVERITY_DOT: Record<string, string> = {
   low: 'bg-blue-500',
