@@ -5,8 +5,10 @@ import { toast } from 'sonner';
 import { useQualityActionTypes } from '@/hooks/useQualityActionTypes';
 import { QualityActionType, QualitySeverity } from '@/types/quality';
 import { SEVERITY_OPTIONS, severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
+import { useAuth } from '@/contexts/AuthContext';
 
 const EMPTY_FORM = { name: '', points: 1, description: '', is_active: true, severity: 'medium' as QualitySeverity };
+
 
 export function QualityActionTypesAdmin() {
   const { types, loading, refresh } = useQualityActionTypes(false);
