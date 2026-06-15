@@ -43,19 +43,52 @@ export function TopNav() {
       document.body.style.overscrollBehavior = 'none';
       document.documentElement.style.overflow = 'hidden';
       document.documentElement.style.overscrollBehavior = 'none';
-      const preventTouch = (e: TouchEvent) => {
-        const target = e.target as HTMLElement | null;
-        if (!target?.closest('[data-mobile-drawer]')) {
-          e.preventDefault();
+      // Track where each touch started so multi-finger / drift gestures
+      // that begin outside the drawer are blocked even if they cross into it.
+      const touchOriginInDrawer = new Map<number, boolean>();
+      const isInsideDrawer = (target: EventTarget | null) =>
+        !!(target instanceof Element && target.closest('[data-mobile-drawer]'));
+
+      const onTouchStart = (e: TouchEvent) => {
+        for (const t of Array.from(e.changedTouches)) {
+          touchOriginInDrawer.set(t.identifier, isInsideDrawer(t.target));
         }
       };
-      document.addEventListener('touchmove', preventTouch, { passive: false });
+      const onTouchEnd = (e: TouchEvent) => {
+        for (const t of Array.from(e.changedTouches)) touchOriginInDrawer.delete(t.identifier);
+      };
+      const onTouchMove = (e: TouchEvent) => {
+        // If ANY active touch started outside the drawer, block the gesture.
+        for (const t of Array.from(e.touches)) {
+          if (touchOriginInDrawer.get(t.identifier) === false) {
+            e.preventDefault();
+            return;
+          }
+        }
+        // Fallback when touchstart wasn't observed (e.g. event began before lock).
+        if (!isInsideDrawer(e.target)) e.preventDefault();
+      };
+      // Block iOS pinch-zoom gestures while drawer is open.
+      const onGesture = (e: Event) => e.preventDefault();
+
+      document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
+      document.addEventListener('touchend', onTouchEnd, { passive: true, capture: true });
+      document.addEventListener('touchcancel', onTouchEnd, { passive: true, capture: true });
+      document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
+      document.addEventListener('gesturestart', onGesture, { passive: false });
+      document.addEventListener('gesturechange', onGesture, { passive: false });
+
       return () => {
         document.body.style.overflow = prevBodyOverflow;
         document.body.style.overscrollBehavior = prevBodyOverscroll;
         document.documentElement.style.overflow = prevHtmlOverflow;
         document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
-        document.removeEventListener('touchmove', preventTouch);
+        document.removeEventListener('touchstart', onTouchStart, { capture: true } as any);
+        document.removeEventListener('touchend', onTouchEnd, { capture: true } as any);
+        document.removeEventListener('touchcancel', onTouchEnd, { capture: true } as any);
+        document.removeEventListener('touchmove', onTouchMove, { capture: true } as any);
+        document.removeEventListener('gesturestart', onGesture);
+        document.removeEventListener('gesturechange', onGesture);
       };
     }
   }, [mobileOpen]);
