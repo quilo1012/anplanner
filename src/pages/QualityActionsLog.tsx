@@ -281,9 +281,11 @@ interface CalendarViewProps {
   setMonth: (d: Date) => void;
   selectedDay: string | null;
   setSelectedDay: (d: string | null) => void;
+  canEditEntry: (e: LogEntry) => boolean;
+  onEdit: (sessionId: string) => void;
 }
 
-function CalendarView({ entries, month, setMonth, selectedDay, setSelectedDay }: CalendarViewProps) {
+function CalendarView({ entries, month, setMonth, selectedDay, setSelectedDay, canEditEntry, onEdit }: CalendarViewProps) {
   const todayStr = ymd(new Date());
   const year = month.getFullYear();
   const monthIdx = month.getMonth();
