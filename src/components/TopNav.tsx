@@ -32,12 +32,31 @@ export function TopNav() {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // Lock body scroll while the mobile drawer is open
+  // Lock body scroll & prevent iOS overscroll/bounce while the mobile drawer is open
   useEffect(() => {
     if (mobileOpen) {
-      const prev = document.body.style.overflow;
+      const prevBodyOverflow = document.body.style.overflow;
+      const prevBodyOverscroll = document.body.style.overscrollBehavior;
+      const prevHtmlOverflow = document.documentElement.style.overflow;
+      const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
       document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = prev; };
+      document.body.style.overscrollBehavior = 'none';
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.overscrollBehavior = 'none';
+      const preventTouch = (e: TouchEvent) => {
+        const target = e.target as HTMLElement | null;
+        if (!target?.closest('[data-mobile-drawer]')) {
+          e.preventDefault();
+        }
+      };
+      document.addEventListener('touchmove', preventTouch, { passive: false });
+      return () => {
+        document.body.style.overflow = prevBodyOverflow;
+        document.body.style.overscrollBehavior = prevBodyOverscroll;
+        document.documentElement.style.overflow = prevHtmlOverflow;
+        document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+        document.removeEventListener('touchmove', preventTouch);
+      };
     }
   }, [mobileOpen]);
 
