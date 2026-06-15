@@ -41,6 +41,9 @@ export function QualityActionsLog() {
   const [filterLeader, setFilterLeader] = useState('');
   const [filterLine, setFilterLine] = useState('');
   const [filterSeverity, setFilterSeverity] = useState<QualitySeverity | ''>('');
+  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const [calMonth, setCalMonth] = useState<Date>(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   useEffect(() => {
     const ids = sessions.map(s => s.id);
