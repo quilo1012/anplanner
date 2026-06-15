@@ -78,6 +78,7 @@ export function DailySummaryTable({ sessions, dateRange, shift, onEditSession, c
 
   const summaryData = useMemo(() => {
     return sessions.map(s => ({
+      session: s,
       date: s.date, shift: s.shift, line: s.productionLine, leader: s.lineLeader,
       skuCount: s.items.length, totalPlanned: s.plannedQuantity, totalActual: s.totalProduction,
       totalDowntime: s.totalDowntime,
