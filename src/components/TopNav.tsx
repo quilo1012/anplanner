@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
-  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown,
+  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown, Trophy,
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
@@ -26,6 +26,7 @@ const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
   { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
+  { path: '/leader-quality', label: 'Leader Quality Board', icon: Trophy, roles: ['supervisor', 'admin'] },
 ];
 
 const systemItems: NavItem[] = [

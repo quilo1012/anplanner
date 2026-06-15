@@ -18,6 +18,7 @@ const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Pla
 const Products = lazy(() => import('@/pages/Products').then(m => ({ default: m.Products })));
 const QualityActionTypesPage = lazy(() => import('@/pages/QualityActionTypes').then(m => ({ default: m.QualityActionTypes })));
 const QualityActionsLog = lazy(() => import('@/pages/QualityActionsLog').then(m => ({ default: m.QualityActionsLog })));
+const LeaderQualityDashboard = lazy(() => import('@/pages/LeaderQualityDashboard').then(m => ({ default: m.LeaderQualityDashboard })));
 
 
 function PageLoader() {
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><History /></ProtectedRoute>} />
             <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><WeeklyReport /></Suspense></ProtectedRoute>} />
             <Route path="quality-actions-log" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><QualityActionsLog /></Suspense></ProtectedRoute>} />
+            <Route path="leader-quality" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><LeaderQualityDashboard /></Suspense></ProtectedRoute>} />
             
             <Route
               path="admin"
