@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ProductionSession, ShiftType } from '@/types/production';
-import { Printer, Table, ShieldAlert } from 'lucide-react';
+import { Printer, Table, ShieldAlert, Pencil } from 'lucide-react';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
 import { getLineBorderClass } from '@/utils/lineColors';
@@ -13,6 +13,8 @@ interface DailySummaryTableProps {
   sessions: ProductionSession[];
   dateRange?: string;
   shift?: ShiftType;
+  onEditSession?: (session: ProductionSession) => void;
+  canEditSession?: (session: ProductionSession) => boolean;
 }
 
 interface QualityEntry {
