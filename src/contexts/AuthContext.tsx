@@ -194,12 +194,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // supabase-js can deadlock the next client request if async database
           // work runs directly inside this callback.
           setTimeout(async () => {
-            const userData = await fetchUserData(session.user);
-            if (isMounted && userData) {
-              setUser(userData);
-              if (userData.role === 'admin') {
-                await refreshUsers();
+            try {
+              const userData = await fetchUserData(session.user);
+              if (isMounted && userData) {
+                setUser(userData);
+                if (userData.role === 'admin') {
+                  await refreshUsers();
+                }
               }
+            } catch (error) {
+              console.error('Error handling auth state change:', error);
             }
           }, 0);
         } else {
