@@ -153,6 +153,7 @@ export function Dashboard() {
       const firstProduct = session.items[0]?.productName || '-';
       
       return {
+        session,
         line: session.productionLine,
         date: session.date,
         shift: session.shift,
@@ -172,6 +173,7 @@ export function Dashboard() {
       };
     }).sort((a, b) => naturalLineSort(a.line, b.line));
   }, [filteredSessions]);
+
 
   const trendAlerts = useMemo(() => {
     const alerts: { productionLine: string; consecutiveCount: number; avgPerformance: number }[] = [];
@@ -342,6 +344,7 @@ export function Dashboard() {
                     colorClass={line.colorClass}
                     realProduction={line.realProduction}
                     productionTarget={line.productionTarget}
+                    onClick={canEditSessions ? () => setEditSession(line.session) : undefined}
                   />
                 ))
               ) : (
@@ -443,6 +446,15 @@ export function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Edit Shift Dialog (from Dashboard) */}
+      <EditShiftDialog
+        session={editSession}
+        open={!!editSession}
+        onOpenChange={(open) => { if (!open) setEditSession(null); }}
+        isOperator={isOperator}
+      />
     </>
   );
 }
+
