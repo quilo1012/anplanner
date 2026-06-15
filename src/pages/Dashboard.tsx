@@ -374,6 +374,7 @@ export function Dashboard() {
                       realProduction={line.realProduction}
                       productionTarget={line.productionTarget}
                       leaderQuality={lq ?? { occurrences: 0, points: 0 }}
+                      leaderQualityLoading={leaderQualityLoading}
                       onClick={canEditSessions ? () => setEditSession(line.session) : undefined}
                     />
                   );
