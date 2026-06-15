@@ -235,92 +235,158 @@ export function LeaderQualityBoard({ currentDate }: Props) {
   return (
     <div>
       <div className="space-y-2 mb-3">
-        <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-          <ShieldCheck size={16} className="text-amber-500" />Leader Quality Board
-        </h3>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Shift:</span>
-            <Select value={shiftFilter} onValueChange={(v) => setShiftFilter(v as typeof shiftFilter)}>
-              <SelectTrigger className="w-20 h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="DAY">Day</SelectItem>
-                <SelectItem value="NIGHT">Night</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+            <ShieldCheck size={16} className="text-amber-500" />Leader Quality Board
+          </h3>
           <div className="flex rounded-lg border border-border overflow-hidden">
-            {(['day', 'week', '15days', 'month'] as const).map((period) => (
-              <button key={period} onClick={() => setPeriodFilter(period)}
-                className={`px-2 py-1 text-xs font-medium transition-colors ${periodFilter === period ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
-                {periodLabels[period]}
-              </button>
-            ))}
+            <button onClick={() => setView('period')}
+              className={`px-2 py-1 text-xs font-medium transition-colors ${view === 'period' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
+              Period
+            </button>
+            <button onClick={() => setView('monthly')}
+              className={`px-2 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${view === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
+              <Trophy size={12} /> Monthly Scorecard
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar size={14} />{dateDisplay}</div>
+        {view === 'period' ? (
+          <>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Shift:</span>
+                <Select value={shiftFilter} onValueChange={(v) => setShiftFilter(v as typeof shiftFilter)}>
+                  <SelectTrigger className="w-20 h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="DAY">Day</SelectItem>
+                    <SelectItem value="NIGHT">Night</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {(['day', 'week', '15days', 'month'] as const).map((period) => (
+                  <button key={period} onClick={() => setPeriodFilter(period)}
+                    className={`px-2 py-1 text-xs font-medium transition-colors ${periodFilter === period ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
+                    {periodLabels[period]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar size={14} />{dateDisplay}</div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Calendar size={14} />
+            <input
+              type="month"
+              value={monthValue}
+              onChange={(e) => setMonthValue(e.target.value)}
+              className="bg-card border border-border rounded px-2 py-1 text-xs text-foreground"
+            />
+            <span>Score resets each month (starts at 100)</span>
+          </div>
+        )}
       </div>
 
-      {stats.some(l => l.totalPoints >= HIGH_PENALTY_THRESHOLD) && (
-        <div className="mb-3 p-2 rounded-lg border border-destructive/40 bg-destructive/10 flex items-start gap-2 text-xs text-destructive">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          <div>
-            <strong>Threshold reached ({HIGH_PENALTY_THRESHOLD}+ pts):</strong>{' '}
-            {stats.filter(l => l.totalPoints >= HIGH_PENALTY_THRESHOLD).map(l => l.name).join(', ')}
-          </div>
-        </div>
-      )}
+      {view === 'period' ? (
+        <>
+          {stats.some(l => l.totalPoints >= HIGH_PENALTY_THRESHOLD) && (
+            <div className="mb-3 p-2 rounded-lg border border-destructive/40 bg-destructive/10 flex items-start gap-2 text-xs text-destructive">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <div>
+                <strong>Threshold reached ({HIGH_PENALTY_THRESHOLD}+ pts):</strong>{' '}
+                {stats.filter(l => l.totalPoints >= HIGH_PENALTY_THRESHOLD).map(l => l.name).join(', ')}
+              </div>
+            </div>
+          )}
 
-      {loading ? (
-        <div className="text-center py-6 text-muted-foreground text-sm">Loading…</div>
-      ) : stats.length > 0 ? (
-        <div className="space-y-2">
-          {stats.map((leader, index) => (
-            <button
-              key={leader.name}
-              type="button"
-              onClick={() => setSelectedLeader(leader.name)}
-              title="View full quality history"
-              className="w-full flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50 hover:bg-muted hover:border-border cursor-pointer transition-colors text-left group"
-            >
-              <div className="flex items-center justify-center w-6 text-xs text-muted-foreground">{index + 1}</div>
-              <div className="flex-1 min-w-0">
-                <span className="font-medium text-foreground text-sm truncate block">{leader.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {leader.occurrences} {leader.occurrences === 1 ? 'occurrence' : 'occurrences'}
-                </span>
-              </div>
-              <div className={`flex items-center gap-1 font-bold text-sm tabular-nums ${severityClass(leader.totalPoints)}`}>
-                {leader.isClean ? (
-                  <><ShieldCheck size={14} /> Clean</>
-                ) : (
-                  <><AlertTriangle size={14} /> -{leader.totalPoints} pts</>
-                )}
-                {leader.totalPoints >= HIGH_PENALTY_THRESHOLD && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground text-[10px] font-semibold uppercase tracking-wide">
-                    Alert
-                  </span>
-                )}
-              </div>
-              <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-            </button>
-          ))}
-        </div>
+          {loading ? (
+            <div className="text-center py-6 text-muted-foreground text-sm">Loading…</div>
+          ) : stats.length > 0 ? (
+            <div className="space-y-2">
+              {stats.map((leader, index) => (
+                <button
+                  key={leader.name}
+                  type="button"
+                  onClick={() => setSelectedLeader(leader.name)}
+                  title="View full quality history"
+                  className="w-full flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50 hover:bg-muted hover:border-border cursor-pointer transition-colors text-left group"
+                >
+                  <div className="flex items-center justify-center w-6 text-xs text-muted-foreground">{index + 1}</div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-foreground text-sm truncate block">{leader.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {leader.occurrences} {leader.occurrences === 1 ? 'occurrence' : 'occurrences'}
+                    </span>
+                  </div>
+                  <div className={`flex items-center gap-1 font-bold text-sm tabular-nums ${severityClass(leader.totalPoints)}`}>
+                    {leader.isClean ? (
+                      <><ShieldCheck size={14} /> Clean</>
+                    ) : (
+                      <><AlertTriangle size={14} /> -{leader.totalPoints} pts</>
+                    )}
+                    {leader.totalPoints >= HIGH_PENALTY_THRESHOLD && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground text-[10px] font-semibold uppercase tracking-wide">
+                        Alert
+                      </span>
+                    )}
+                  </div>
+                  <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground text-sm flex flex-col items-center gap-1">
+              <ShieldCheck size={20} className="text-success" />No quality issues recorded for selected period
+            </div>
+          )}
+
+          {stats.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border flex items-center justify-center gap-4 text-xs text-muted-foreground flex-wrap">
+              <span>Total: <strong className="text-foreground">-{summary.totalPoints} pts</strong></span>
+              <span className="text-border">|</span>
+              <span>Occurrences: <strong className="text-foreground">{summary.totalOccurrences}</strong></span>
+              <span className="text-border">|</span>
+              <span>Clean: <strong className="text-success">{summary.cleanCount}/{summary.totalLeaders}</strong></span>
+            </div>
+          )}
+        </>
       ) : (
-        <div className="text-center py-6 text-muted-foreground text-sm flex flex-col items-center gap-1">
-          <ShieldCheck size={20} className="text-success" />No quality issues recorded for selected period
-        </div>
-      )}
-
-      {stats.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-border flex items-center justify-center gap-4 text-xs text-muted-foreground flex-wrap">
-          <span>Total: <strong className="text-foreground">-{summary.totalPoints} pts</strong></span>
-          <span className="text-border">|</span>
-          <span>Occurrences: <strong className="text-foreground">{summary.totalOccurrences}</strong></span>
-          <span className="text-border">|</span>
-          <span>Clean: <strong className="text-success">{summary.cleanCount}/{summary.totalLeaders}</strong></span>
-        </div>
+        <>
+          {monthlyLoading ? (
+            <div className="text-center py-6 text-muted-foreground text-sm">Loading…</div>
+          ) : monthlyRows.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground text-sm">No data for this month</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="text-left font-medium py-2 px-2">#</th>
+                    <th className="text-left font-medium py-2 px-2">Leader</th>
+                    <th className="text-left font-medium py-2 px-2">Score</th>
+                    <th className="text-right font-medium py-2 px-2">Occurrences</th>
+                    <th className="text-right font-medium py-2 px-2">Total Production</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyRows.map((r, i) => (
+                    <tr key={r.name} className="border-b border-border/50 hover:bg-muted/30">
+                      <td className="py-2 px-2 text-muted-foreground">{i + 1}</td>
+                      <td className="py-2 px-2 font-medium text-foreground">{r.name}</td>
+                      <td className={`py-2 px-2 font-bold tabular-nums ${severityClass(r.totalPoints)}`}>
+                        {r.occurrences === 0 ? 'Score: 100' : `Score: ${r.score}/100`}
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums text-foreground">{r.occurrences}</td>
+                      <td className="py-2 px-2 text-right tabular-nums text-foreground">{r.totalProduction.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       <Dialog open={!!selectedLeader} onOpenChange={(o) => { if (!o) { setSelectedLeader(null); setHistory([]); } }}>
