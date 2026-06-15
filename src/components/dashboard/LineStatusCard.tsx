@@ -21,6 +21,7 @@ interface LineStatusCardProps {
   realProduction?: number;
   productionTarget?: number;
   leaderQuality?: { occurrences: number; points: number };
+  leaderQualityLoading?: boolean;
   onClick?: () => void;
 }
 
