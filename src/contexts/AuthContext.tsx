@@ -180,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Set up auth state listener for subsequent changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!isMounted) return;
 
         // Skip events during initialization to prevent race conditions
@@ -190,13 +190,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === 'INITIAL_SESSION') return;
 
         if (session?.user) {
-          const userData = await fetchUserData(session.user);
-          if (isMounted && userData) {
-            setUser(userData);
-            if (userData.role === 'admin') {
-              await refreshUsers();
+          // Do not await Supabase/PostgREST calls inside onAuthStateChange.
+          // supabase-js can deadlock the next client request if async database
+          // work runs directly inside this callback.
+          setTimeout(async () => {
+            try {
+              const userData = await fetchUserData(session.user);
+              if (isMounted && userData) {
+                setUser(userData);
+                if (userData.role === 'admin') {
+                  await refreshUsers();
+                }
+              }
+            } catch (error) {
+              console.error('Error handling auth state change:', error);
             }
-          }
+          }, 0);
         } else {
           if (isMounted) {
             setUser(null);
