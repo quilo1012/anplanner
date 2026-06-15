@@ -137,48 +137,80 @@ export function QualityActionsLog() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="card p-10 flex flex-col items-center gap-2 text-center">
-            <CheckCircle2 size={40} className="text-success" />
-            <p className="text-sm text-muted-foreground">No quality issues recorded for these filters</p>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs text-muted-foreground">
+            {filtered.length} occurrence(s) · -{totalPoints} pts
           </div>
-        ) : (
-          <div className="card overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="text-left px-3 py-2">Date</th>
-                  <th className="text-left px-3 py-2">Shift</th>
-                  <th className="text-left px-3 py-2">Line</th>
-                  <th className="text-left px-3 py-2">Leader</th>
-                  <th className="text-left px-3 py-2">Issue</th>
-                  <th className="text-left px-3 py-2">Severity</th>
-                  <th className="text-right px-3 py-2">Points</th>
-                  <th className="text-left px-3 py-2">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((e, i) => (
-                  <tr key={e.id} className={i % 2 ? 'bg-muted/20' : ''}>
-                    <td className="px-3 py-2 whitespace-nowrap">{e.date}</td>
-                    <td className="px-3 py-2">{e.shift}</td>
-                    <td className="px-3 py-2">{e.line}</td>
-                    <td className="px-3 py-2">{e.leader}</td>
-                    <td className="px-3 py-2">{e.name || '—'}</td>
-                    <td className="px-3 py-2">
-                      {e.severity ? (
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${severityBadgeClass(e.severity)}`}>
-                          {severityLabel(e.severity)}
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-destructive font-semibold">-{e.points}</td>
-                    <td className="px-3 py-2 text-muted-foreground italic">{e.notes || '—'}</td>
+          <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={`px-3 py-1.5 inline-flex items-center gap-1 ${view === 'list' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+            >
+              <List size={12} /> List
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('calendar')}
+              className={`px-3 py-1.5 inline-flex items-center gap-1 border-l border-border ${view === 'calendar' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+            >
+              <CalendarIcon size={12} /> Calendar
+            </button>
+          </div>
+        </div>
+
+        {view === 'list' ? (
+          filtered.length === 0 ? (
+            <div className="card p-10 flex flex-col items-center gap-2 text-center">
+              <CheckCircle2 size={40} className="text-success" />
+              <p className="text-sm text-muted-foreground">No quality issues recorded for these filters</p>
+            </div>
+          ) : (
+            <div className="card overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="text-left px-3 py-2">Date</th>
+                    <th className="text-left px-3 py-2">Shift</th>
+                    <th className="text-left px-3 py-2">Line</th>
+                    <th className="text-left px-3 py-2">Leader</th>
+                    <th className="text-left px-3 py-2">Issue</th>
+                    <th className="text-left px-3 py-2">Severity</th>
+                    <th className="text-right px-3 py-2">Points</th>
+                    <th className="text-left px-3 py-2">Notes</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((e, i) => (
+                    <tr key={e.id} className={i % 2 ? 'bg-muted/20' : ''}>
+                      <td className="px-3 py-2 whitespace-nowrap">{e.date}</td>
+                      <td className="px-3 py-2">{e.shift}</td>
+                      <td className="px-3 py-2">{e.line}</td>
+                      <td className="px-3 py-2">{e.leader}</td>
+                      <td className="px-3 py-2">{e.name || '—'}</td>
+                      <td className="px-3 py-2">
+                        {e.severity ? (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${severityBadgeClass(e.severity)}`}>
+                            {severityLabel(e.severity)}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-destructive font-semibold">-{e.points}</td>
+                      <td className="px-3 py-2 text-muted-foreground italic">{e.notes || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          <CalendarView
+            entries={filtered}
+            month={calMonth}
+            setMonth={setCalMonth}
+            selectedDay={selectedDay}
+            setSelectedDay={setSelectedDay}
+          />
         )}
 
         <div className="flex flex-col items-center gap-2 py-4 text-sm text-muted-foreground">
