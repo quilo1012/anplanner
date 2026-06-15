@@ -231,6 +231,9 @@ export function TopNav() {
   }, [mobileOpen]);
 
   const items = navItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleDirect = directItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleReports = reportsItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleSystem = systemItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -239,6 +242,17 @@ export function TopNav() {
         ? 'bg-sidebar-primary text-sidebar-primary-foreground'
         : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
     );
+
+  const groupTriggerClass = (active: boolean) =>
+    cn(
+      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap outline-none',
+      active
+        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+        : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+    );
+
+  const isGroupActive = (group: NavItem[]) =>
+    group.some(g => location.pathname === g.path || (g.path !== '/' && location.pathname.startsWith(g.path)));
 
   return (
     <header className="sticky top-0 z-40 bg-sidebar text-sidebar-foreground border-b border-sidebar-border print:hidden">
@@ -254,14 +268,67 @@ export function TopNav() {
         </div>
 
         {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
-          {items.map(item => (
+        <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0 justify-center">
+          {visibleDirect.map(item => (
             <NavLink key={item.path} to={item.path} end={item.path === '/'} className={linkClass}>
               <item.icon size={16} strokeWidth={2} />
               <span>{item.label}</span>
             </NavLink>
           ))}
+
+          {visibleReports.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleReports))}>
+                <FileBarChart size={16} strokeWidth={2} />
+                <span>Reports</span>
+                <ChevronDown size={14} strokeWidth={2} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+                {visibleReports.map(item => (
+                  <DropdownMenuItem key={item.path} asChild>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-2 cursor-pointer w-full',
+                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <item.icon size={16} strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {visibleSystem.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleSystem))}>
+                <Settings size={16} strokeWidth={2} />
+                <span>System</span>
+                <ChevronDown size={14} strokeWidth={2} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+                {visibleSystem.map(item => (
+                  <DropdownMenuItem key={item.path} asChild>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-2 cursor-pointer w-full',
+                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <item.icon size={16} strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </nav>
+
 
         {/* Spacer for mobile */}
         <div className="flex-1 lg:hidden" />
