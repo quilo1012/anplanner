@@ -1,12 +1,20 @@
 import { useState, useMemo, useEffect } from 'react';
-import { format, parseISO, subDays } from 'date-fns';
-import { ShieldCheck, ShieldAlert, Calendar, AlertTriangle, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { format, parseISO, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { ShieldCheck, ShieldAlert, Calendar, AlertTriangle, ChevronRight, CheckCircle2, Trophy } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 import { QualitySeverity } from '@/types/quality';
+
+interface MonthlyRow {
+  name: string;
+  score: number;
+  totalPoints: number;
+  occurrences: number;
+  totalProduction: number;
+}
 
 interface Props {
   currentDate: string;
