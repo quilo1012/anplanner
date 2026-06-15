@@ -77,7 +77,7 @@ export function LineRagBoard({ sessions }: LineRagBoardProps) {
                   <td className="font-medium">{r.line}</td>
                   <td className="text-right tabular-nums">{r.plan.toLocaleString()}</td>
                   <td className="text-right tabular-nums">{r.actual.toLocaleString()}</td>
-                  <td className={`text-right tabular-nums font-medium ${r.variance >= 0 ? 'text-success' : r.variance >= -10 ? 'text-warning' : 'text-destructive'}`}>
+                  <td className={`text-right tabular-nums font-medium ${r.rag === 'green' ? 'text-success' : r.rag === 'amber' ? 'text-warning' : 'text-destructive'}`}>
                     {r.variance > 0 ? '+' : ''}{r.variance}%
                   </td>
                   <td className="text-right tabular-nums">{formatDuration(r.downtime)}</td>
