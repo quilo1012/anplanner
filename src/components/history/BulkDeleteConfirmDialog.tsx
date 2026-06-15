@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ProductionSession } from '@/types/production';
 import { useShifts } from '@/contexts/ShiftContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,11 +25,19 @@ interface Props {
 
 export function BulkDeleteConfirmDialog({ sessions, open, onOpenChange, onComplete }: Props) {
   const { deleteSession } = useShifts();
+  const { hasRole } = useAuth();
+  const canDelete = hasRole(['supervisor', 'admin']);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
+    if (!canDelete) {
+      toast.error("You don't have permission to delete shifts. Supervisor or Admin role required.");
+      onOpenChange(false);
+      return;
+    }
     if (sessions.length === 0) return;
     setIsDeleting(true);
+
     const deleted: string[] = [];
     const failed: { id: string; error: string }[] = [];
     for (const s of sessions) {
