@@ -95,7 +95,13 @@ export function LineStatusCard({
                     <User size={10} />
                     {leader}
                   </span>
-                  {leaderQuality && (
+                  {leaderQualityLoading && (
+                    <span
+                      aria-label="Loading quality record"
+                      className="inline-block h-3.5 w-12 rounded bg-muted animate-pulse"
+                    />
+                  )}
+                  {!leaderQualityLoading && leaderQuality && (
                     <TooltipProvider delayDuration={200}>
                       <Tooltip>
                         <TooltipTrigger asChild>
