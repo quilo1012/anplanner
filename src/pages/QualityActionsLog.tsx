@@ -271,6 +271,14 @@ export function QualityActionsLog() {
           )}
         </div>
       </div>
+
+      <EditShiftDialog
+        session={editSession}
+        open={!!editSession}
+        onOpenChange={(open) => { if (!open) setEditSession(null); }}
+        onSuccess={() => { /* ShiftContext refreshes; quality-actions-changed event refreshes qaMap */ }}
+        isOperator={isOperator}
+      />
     </>
   );
 }
