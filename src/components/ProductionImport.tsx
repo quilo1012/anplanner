@@ -96,7 +96,7 @@ export function ProductionImport({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [planMap, setPlanMap] = useState<Map<string, number>>(new Map());
-  const [leaderName, setLeaderName] = useState('');
+  const [lineLeaders, setLineLeaders] = useState<Record<string, string>>({});
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -202,10 +202,13 @@ export function ProductionImport({ open, onClose }: Props) {
   // Only rows with no errors AND no warnings (i.e. SKU exists in catalog) are eligible to save
   const validRows = rows.filter(r => r.errors.length === 0 && r.warnings.length === 0);
   const matchedRows = validRows.filter(r => r.plannedQty !== undefined);
+  const distinctLines = [...new Set(validRows.map(r => r.work_centre))].sort();
+  const missingLeaderLines = distinctLines.filter(l => !lineLeaders[l]?.trim());
+  const allLeadersFilled = distinctLines.length > 0 && missingLeaderLines.length === 0;
 
   const handleConfirm = async () => {
     if (validRows.length === 0) { toast.error('No valid rows to import'); return; }
-    if (!leaderName.trim()) { toast.error('Leader name is required'); return; }
+    if (!allLeadersFilled) { toast.error(`Leader name required for: ${missingLeaderLines.join(', ')}`); return; }
     setSaving(true);
 
     // Safety net: guarantee the button never stays in "Importing..." state forever.
@@ -341,9 +344,10 @@ export function ProductionImport({ open, onClose }: Props) {
             if (allItemsErr) throw new Error(`Recompute planned failed: ${allItemsErr.message}`);
             const newTotalPlanned = allItems?.reduce((s, i) => s + (i.quantity_target || 0), 0) || 0;
 
+            const leaderForLine = (lineLeaders[first.work_centre] || '').trim();
             const { error: updateSessionErr, data: updatedSessionData } = await supabase
               .from('production_sessions')
-              .update({ planned_quantity: newTotalPlanned, line_leader: leaderName.trim(), updated_at: new Date().toISOString() })
+              .update({ planned_quantity: newTotalPlanned, line_leader: leaderForLine, updated_at: new Date().toISOString() })
               .eq('id', existingSessionId)
               .select('id');
             if (updateSessionErr) throw new Error(`Update session failed: ${updateSessionErr.message}`);
@@ -365,7 +369,7 @@ export function ProductionImport({ open, onClose }: Props) {
               date: first.date,
               shift: first.shift_type as 'DAY' | 'NIGHT',
               productionLine: first.work_centre,
-              lineLeader: leaderName.trim(),
+              lineLeader: (lineLeaders[first.work_centre] || '').trim(),
               plannedQuantity: totalPlanned,
               items,
               comments: '',
@@ -405,7 +409,7 @@ export function ProductionImport({ open, onClose }: Props) {
       onClose();
       setRows([]);
       setPlanMap(new Map());
-      setLeaderName('');
+      setLineLeaders({});
       if (failures.length === 0) navigate('/history');
     } catch (err) {
       console.error('[ProductionImport] Import failed:', err);
