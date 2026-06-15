@@ -17,6 +17,7 @@ import { DailyProductionSummary } from '@/components/charts/DailyProductionSumma
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
+import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy } from 'lucide-react';
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
@@ -42,6 +43,9 @@ export function Dashboard() {
   const [selectedLine, setSelectedLine] = useState<string>('');
   const [selectedLeader, setSelectedLeader] = useState<string>('');
   const [showCharts, setShowCharts] = useState(true);
+  const [editSession, setEditSession] = useState<ProductionSession | null>(null);
+  const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
+
 
   // Apply URL params on mount / when they change (e.g. after iTouching import redirect)
   useEffect(() => {
