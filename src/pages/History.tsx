@@ -256,6 +256,36 @@ export function History() {
 
   const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader || filterSku || searchQuery;
 
+  // Prune selection to only include currently filtered sessions
+  useEffect(() => {
+    const visible = new Set(filteredSessions.map(s => s.id));
+    setSelectedIds(prev => {
+      const next = new Set<string>();
+      prev.forEach(id => { if (visible.has(id)) next.add(id); });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filteredSessions]);
+
+  const allFilteredSelected = filteredSessions.length > 0 && filteredSessions.every(s => selectedIds.has(s.id));
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      if (allFilteredSelected) return new Set();
+      const next = new Set(prev);
+      filteredSessions.forEach(s => next.add(s.id));
+      return next;
+    });
+  };
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+  const selectedSessions = useMemo(() => filteredSessions.filter(s => selectedIds.has(s.id)), [filteredSessions, selectedIds]);
+  const handleExportSelected = () => exportSessionsToCsv(selectedSessions, 'session_history_selected');
+
   const handleDialogSuccess = () => { /* updateSession already triggers refreshSessions internally */ };
 
   return (
