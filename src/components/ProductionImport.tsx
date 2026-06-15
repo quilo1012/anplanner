@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeLineName } from '@/utils/normalizeLineName';
 import { normalizeSku, isValidSku } from '@/utils/normalizeSku';
+import { assertMutationSucceeded, formatSupabaseError, runSupabaseQuery } from '@/utils/supabaseSafeQuery';
 
 interface ImportRow {
   rowNum: number;
@@ -236,15 +237,18 @@ export function ProductionImport({ open, onClose }: Props) {
       const dates = [...new Set(validRows.map(r => r.date))];
       const lines = [...new Set(validRows.map(r => r.work_centre))];
 
-      const { data: existingSessions, error: sessionsFetchErr } = await supabase
-        .from('production_sessions')
-        .select('id, production_line, date, shift_type')
-        .in('date', dates)
-        .in('production_line', lines);
+      const { data: existingSessions, error: sessionsFetchErr } = await runSupabaseQuery(
+        supabase
+          .from('production_sessions')
+          .select('id, production_line, date, shift_type')
+          .in('date', dates)
+          .in('production_line', lines),
+        'Load existing production sessions'
+      );
 
       if (sessionsFetchErr) {
         console.error('[ProductionImport] Failed to fetch existing sessions:', sessionsFetchErr);
-        throw new Error(`Failed to load existing sessions: ${sessionsFetchErr.message}`);
+          throw new Error(`Failed to load existing sessions: ${formatSupabaseError(sessionsFetchErr)}`);
       }
 
       // Build lookup: "line|date|shift" → session id
@@ -259,14 +263,17 @@ export function ProductionImport({ open, onClose }: Props) {
       const existingItemsMap = new Map<string, { id: string; sku: string; quantity_actual: number }[]>();
 
       if (existingSessionIds.length > 0) {
-        const { data: existingItems, error: itemsFetchErr } = await supabase
-          .from('production_items')
-          .select('id, session_id, sku, quantity_actual')
-          .in('session_id', existingSessionIds);
+        const { data: existingItems, error: itemsFetchErr } = await runSupabaseQuery(
+          supabase
+            .from('production_items')
+            .select('id, session_id, sku, quantity_actual')
+            .in('session_id', existingSessionIds),
+          'Load existing production items'
+        );
 
         if (itemsFetchErr) {
           console.error('[ProductionImport] Failed to fetch existing items:', itemsFetchErr);
-          throw new Error(`Failed to load existing items: ${itemsFetchErr.message}`);
+          throw new Error(`Failed to load existing items: ${formatSupabaseError(itemsFetchErr)}`);
         }
 
         existingItems?.forEach(item => {
