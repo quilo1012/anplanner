@@ -14,16 +14,27 @@ import {
 
 type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; roles: string[] };
 
-const navItems: NavItem[] = [
+// Direct links shown in the desktop top bar
+const directItems: NavItem[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
   { path: '/products', label: 'Products', icon: Package, roles: ['supervisor', 'admin'] },
+];
+
+// Grouped dropdowns
+const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-  { path: '/quality-actions-log', label: 'Quality Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
-  { path: '/quality-action-types', label: 'Quality Types', icon: ShieldAlert, roles: ['admin'] },
-  { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+  { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
 ];
+
+const systemItems: NavItem[] = [
+  { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+  { path: '/quality-action-types', label: 'Quality Action Types', icon: ShieldAlert, roles: ['admin'] },
+];
+
+// Flat list used by the mobile drawer (unchanged behavior)
+const navItems: NavItem[] = [...directItems, ...reportsItems, ...systemItems];
 
 // Drawer debug: enable via `?drawerDebug=1` or `localStorage.drawerDebug = '1'`.
 const drawerDebug = (() => {
