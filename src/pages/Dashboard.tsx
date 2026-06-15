@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
 import { PerformanceTrendChart } from '@/components/PerformanceTrendChart';
-import { DowntimeTrendChart } from '@/components/charts/DowntimeTrendChart';
 import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
@@ -16,12 +15,9 @@ import { LeaderQualityBoard } from '@/components/charts/LeaderQualityBoard';
 import { LineRagBoard } from '@/components/charts/LineRagBoard';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
-import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
-import { DowntimeByReason } from '@/components/charts/DowntimeByReason';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
-import { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from '@/types/downtime';
-import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy, List } from 'lucide-react';
+import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy } from 'lucide-react';
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import appliedLogo from '@/assets/applied-logo-mono.jpg';
@@ -46,8 +42,6 @@ export function Dashboard() {
   const [selectedLine, setSelectedLine] = useState<string>('');
   const [selectedLeader, setSelectedLeader] = useState<string>('');
   const [showCharts, setShowCharts] = useState(true);
-  const [downtimeCategory, setDowntimeCategory] = useState<string>('');
-  const [downtimeReason, setDowntimeReason] = useState<string>('');
 
   // Apply URL params on mount / when they change (e.g. after iTouching import redirect)
   useEffect(() => {
@@ -126,26 +120,6 @@ export function Dashboard() {
     });
   }, [sessions, startDate, endDate, selectedShift, selectedLine, selectedLeader, isOperator, user?.name]);
 
-  // Available downtime reasons based on selected category
-  const availableReasons = useMemo(() => {
-    if (!downtimeCategory) return [];
-    return DOWNTIME_REASONS_BY_CATEGORY[downtimeCategory] || [];
-  }, [downtimeCategory]);
-
-  // Downtime history entries
-  const downtimeHistory = useMemo(() => {
-    const entries: { date: string; shift: ShiftType; line: string; category: string; reason: string; duration: number; comment?: string }[] = [];
-    filteredSessions.forEach(s => {
-      if (s.structuredDowntimes) {
-        s.structuredDowntimes.forEach(dt => {
-          if (downtimeCategory && dt.category !== downtimeCategory) return;
-          if (downtimeReason && dt.reason !== downtimeReason) return;
-          entries.push({ date: s.date, shift: s.shift, line: s.productionLine, category: dt.category, reason: dt.reason, duration: dt.duration, comment: dt.comment });
-        });
-      }
-    });
-    return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [filteredSessions, downtimeCategory, downtimeReason]);
 
   const stats = useMemo(() => {
     const totalSessions = filteredSessions.length;
@@ -221,18 +195,12 @@ export function Dashboard() {
   }, [filteredSessions]);
 
   const handlePrint = () => window.print();
-  const clearFilters = () => { setSelectedLine(''); setSelectedLeader(''); setDowntimeCategory(''); setDowntimeReason(''); };
-  const hasOptionalFilters = selectedLine || selectedLeader || downtimeCategory || downtimeReason;
+  const clearFilters = () => { setSelectedLine(''); setSelectedLeader(''); };
+  const hasOptionalFilters = selectedLine || selectedLeader;
 
   const dateRangeLabel = startDate === endDate
     ? formatDate(startDate)
     : `${formatDate(startDate)} — ${formatDate(endDate)}`;
-
-  const getCategoryLabel = (val: string) => DOWNTIME_CATEGORIES.find(c => c.value === val)?.label || val;
-  const getReasonLabel = (cat: string, val: string) => {
-    const reasons = DOWNTIME_REASONS_BY_CATEGORY[cat];
-    return reasons?.find(r => r.value === val)?.label || val;
-  };
 
   if (isLoading) {
     return (
@@ -292,16 +260,6 @@ export function Dashboard() {
               <option value="">All Leaders</option>
               {uniqueLeaders.map(leader => <option key={leader} value={leader}>{leader}</option>)}
             </select>
-            <select value={downtimeCategory} onChange={(e) => { setDowntimeCategory(e.target.value); setDowntimeReason(''); }} className="select-field text-sm py-1.5 px-2 w-auto min-w-[120px]">
-              <option value="">All DT Categories</option>
-              {DOWNTIME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            {downtimeCategory && availableReasons.length > 0 && (
-              <select value={downtimeReason} onChange={(e) => setDowntimeReason(e.target.value)} className="select-field text-sm py-1.5 px-2 w-auto min-w-[120px]">
-                <option value="">All Reasons</option>
-                {availableReasons.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-              </select>
-            )}
             {hasOptionalFilters && (
               <button onClick={clearFilters} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Clear filters">
                 <X size={16} />
@@ -456,55 +414,6 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Section: Downtime */}
-            <div className="flex items-center gap-2 mb-2">
-              <Clock size={16} className="text-primary" />
-              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Downtime Analytics</h2>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-2">
-              <div className="card p-3">
-                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Clock size={16} />Downtime by Category</h3>
-                <DowntimeByCategory sessions={filteredSessions} filterCategory={downtimeCategory} />
-              </div>
-              <div className="card p-3">
-                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><AlertTriangle size={16} />Downtime by Reason</h3>
-                <DowntimeByReason sessions={filteredSessions} filterCategory={downtimeCategory} filterReason={downtimeReason} />
-              </div>
-              <div className="card p-3">
-                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Activity size={16} />Downtime Trend</h3>
-                <DowntimeTrendChart sessions={filteredSessions} />
-              </div>
-            </div>
-
-            {/* Downtime History Table */}
-            {downtimeHistory.length > 0 && (
-              <div className="card p-3 mb-3">
-                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><List size={16} />Downtime History ({downtimeHistory.length} entries)</h3>
-                <div className="overflow-x-auto">
-                  <table className="table text-sm">
-                    <thead>
-                      <tr>
-                        <th>Date</th><th>Shift</th><th>Line</th><th>Category</th><th>Reason</th><th className="text-right">Duration</th><th>Comment</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {downtimeHistory.map((dt, idx) => (
-                        <tr key={idx}>
-                          <td className="whitespace-nowrap">{new Date(dt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-                          <td><span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{dt.shift}</span></td>
-                          <td className="font-medium">{dt.line}</td>
-                          <td>{getCategoryLabel(dt.category)}</td>
-                          <td>{getReasonLabel(dt.category, dt.reason)}</td>
-                          <td className="text-right font-medium">{formatDuration(dt.duration)}</td>
-                          <td className="text-muted-foreground text-xs max-w-[150px] truncate">{dt.comment || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
 
             {/* Section: Trends */}
             <div className="flex items-center gap-2 mb-2">
