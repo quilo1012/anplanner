@@ -212,10 +212,10 @@ export function ProductionImport({ open, onClose }: Props) {
     // If something hangs (network, RLS, etc.) for >90s, force-release the loading state
     // and surface a clear error toast.
     const safetyTimer = setTimeout(() => {
-      console.error('[ProductionImport] Safety timeout fired — import took >90s');
+      console.error('[ProductionImport] Safety timeout fired — import took >30s');
       setSaving(false);
-      toast.error('Import timed out after 90s. Check the console/network tab for details.');
-    }, 90_000);
+      toast.error('Import timed out after 30s. Check the console/network tab for details.');
+    }, 30_000);
 
     try {
       console.log('[ProductionImport] Starting import of', validRows.length, 'row(s)');
