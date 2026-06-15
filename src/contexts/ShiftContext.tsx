@@ -517,23 +517,24 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         comment: d.comment || null,
       }));
 
-      const insertPromises = [];
+      const insertPromises: Promise<{ error: unknown }>[] = [];
       if (itemsToInsert.length > 0) {
-        insertPromises.push(Promise.resolve(supabase.from('production_items').insert(itemsToInsert).select()));
+        insertPromises.push(supabase.from('production_items').insert(itemsToInsert).select('id') as unknown as Promise<{ error: unknown }>);
       }
       if (downtimesToInsert.length > 0) {
-        insertPromises.push(Promise.resolve(supabase.from('structured_downtimes').insert(downtimesToInsert).select()));
+        insertPromises.push(supabase.from('structured_downtimes').insert(downtimesToInsert).select('id') as unknown as Promise<{ error: unknown }>);
       }
 
       if (insertPromises.length > 0) {
         const insertResults = await Promise.all(insertPromises);
-        for (const res of insertResults) {
+        for (const res of insertResults as { error: { message: string } | null }[]) {
           if (res.error) {
             console.error('Error inserting data:', res.error);
             return { success: false, error: res.error.message };
           }
         }
       }
+
 
       // Step 4: Optimistic local state update
       const totalProduction = data.items.reduce((sum, i) => sum + i.quantityActual, 0);
