@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
   FileBarChart, Package, ShieldAlert, Menu, X, Circle,
@@ -25,6 +25,21 @@ export function TopNav() {
   const { user, logout, hasRole } = useAuth();
   const onlineUsers = useOnlineUsers();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  // Auto-close mobile drawer whenever the route changes (safety net)
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll while the mobile drawer is open
+  useEffect(() => {
+    if (mobileOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [mobileOpen]);
 
   const items = navItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
 
