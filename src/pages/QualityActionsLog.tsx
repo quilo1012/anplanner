@@ -41,6 +41,8 @@ interface LogEntry {
 
 export function QualityActionsLog() {
   const { sessions, loadMoreHistory, hasMoreHistory, isLoadingMore, historyDaysLoaded } = useShifts();
+  const { user, hasRole } = useAuth();
+  const isOperator = user?.role === 'operator';
   const [qaMap, setQaMap] = useState<Record<string, QualityActionRow[]>>({});
   const [filterLeader, setFilterLeader] = useState('');
   const [filterLine, setFilterLine] = useState('');
@@ -48,8 +50,18 @@ export function QualityActionsLog() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [calMonth, setCalMonth] = useState<Date>(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [editSession, setEditSession] = useState<ProductionSession | null>(null);
 
-  useEffect(() => {
+  const canEditEntry = (e: LogEntry): boolean => {
+    if (hasRole(['supervisor', 'admin'])) return true;
+    if (isOperator && user?.name && e.leader.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+    return false;
+  };
+  const openEdit = (sessionId: string) => {
+    const s = sessions.find(x => x.id === sessionId);
+    if (s) setEditSession(s);
+  };
+
     const ids = sessions.map(s => s.id);
     if (ids.length === 0) { setQaMap({}); return; }
     let cancel = false;
