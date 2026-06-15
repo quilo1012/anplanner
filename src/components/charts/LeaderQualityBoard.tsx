@@ -42,6 +42,7 @@ interface HistoryRow {
 }
 
 export function LeaderQualityBoard({ currentDate }: Props) {
+  const [view, setView] = useState<'period' | 'monthly'>('period');
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [periodFilter, setPeriodFilter] = useState<PeriodType>('day');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
@@ -50,6 +51,10 @@ export function LeaderQualityBoard({ currentDate }: Props) {
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  const [monthValue, setMonthValue] = useState<string>(() => format(parseISO(currentDate), 'yyyy-MM'));
+  const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>([]);
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
 
   const { startDate, endDate } = useMemo(() => {
     const end = parseISO(currentDate);
