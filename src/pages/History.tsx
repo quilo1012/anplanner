@@ -41,6 +41,8 @@ export function History() {
   const [deleteSessionState, setDeleteSessionState] = useState<ProductionSession | null>(null);
   const [qualityBySession, setQualityBySession] = useState<Record<string, QualityActionRow[]>>({});
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
