@@ -3,6 +3,7 @@ import { Save, Loader2, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { DEFAULT_RAG_THRESHOLDS } from '@/hooks/useRagThresholds';
+import { assertMutationSucceeded, formatSupabaseError, runSupabaseQuery } from '@/utils/supabaseSafeQuery';
 
 export function RagThresholdsCard() {
   const [green, setGreen] = useState<number>(DEFAULT_RAG_THRESHOLDS.greenThreshold);
@@ -39,22 +40,29 @@ export function RagThresholdsCard() {
       return;
     }
     setSaving(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const { error: upsertError } = await supabase
-      .from('app_settings')
-      .upsert({
-        key: 'rag_thresholds',
-        value: { greenThreshold: green, redThreshold: red },
-        updated_by: userData.user?.id ?? null,
-      }, { onConflict: 'key' })
-      .select('key');
-    setSaving(false);
-    if (upsertError) {
-      setError(upsertError.message);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const result = await runSupabaseQuery(
+        supabase
+          .from('app_settings')
+          .upsert({
+            key: 'rag_thresholds',
+            value: { greenThreshold: green, redThreshold: red },
+            updated_by: userData.user?.id ?? null,
+          }, { onConflict: 'key' })
+          .select('key'),
+        'Save RAG thresholds'
+      );
+      assertMutationSucceeded(result, 'Save RAG thresholds');
+      toast.success('RAG thresholds saved');
+    } catch (err) {
+      const message = formatSupabaseError(err);
+      setError(message);
+      console.error('[RagThresholdsCard] save failed', err);
       toast.error('Failed to save thresholds');
-      return;
+    } finally {
+      setSaving(false);
     }
-    toast.success('RAG thresholds saved');
   };
 
   return (

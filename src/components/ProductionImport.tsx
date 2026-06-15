@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeLineName } from '@/utils/normalizeLineName';
 import { normalizeSku, isValidSku } from '@/utils/normalizeSku';
+import { assertMutationSucceeded, formatSupabaseError, runSupabaseQuery } from '@/utils/supabaseSafeQuery';
 
 interface ImportRow {
   rowNum: number;
@@ -212,7 +213,7 @@ export function ProductionImport({ open, onClose }: Props) {
     setSaving(true);
 
     // Safety net: guarantee the button never stays in "Importing..." state forever.
-    // If something hangs (network, RLS, etc.) for >90s, force-release the loading state
+    // If something hangs (network, RLS, etc.) for >30s, force-release the loading state
     // and surface a clear error toast.
     const safetyTimer = setTimeout(() => {
       console.error('[ProductionImport] Safety timeout fired — import took >30s');
@@ -236,15 +237,18 @@ export function ProductionImport({ open, onClose }: Props) {
       const dates = [...new Set(validRows.map(r => r.date))];
       const lines = [...new Set(validRows.map(r => r.work_centre))];
 
-      const { data: existingSessions, error: sessionsFetchErr } = await supabase
-        .from('production_sessions')
-        .select('id, production_line, date, shift_type')
-        .in('date', dates)
-        .in('production_line', lines);
+      const { data: existingSessions, error: sessionsFetchErr } = await runSupabaseQuery(
+        supabase
+          .from('production_sessions')
+          .select('id, production_line, date, shift_type')
+          .in('date', dates)
+          .in('production_line', lines),
+        'Load existing production sessions'
+      );
 
       if (sessionsFetchErr) {
         console.error('[ProductionImport] Failed to fetch existing sessions:', sessionsFetchErr);
-        throw new Error(`Failed to load existing sessions: ${sessionsFetchErr.message}`);
+          throw new Error(`Failed to load existing sessions: ${formatSupabaseError(sessionsFetchErr)}`);
       }
 
       // Build lookup: "line|date|shift" → session id
@@ -259,14 +263,17 @@ export function ProductionImport({ open, onClose }: Props) {
       const existingItemsMap = new Map<string, { id: string; sku: string; quantity_actual: number }[]>();
 
       if (existingSessionIds.length > 0) {
-        const { data: existingItems, error: itemsFetchErr } = await supabase
-          .from('production_items')
-          .select('id, session_id, sku, quantity_actual')
-          .in('session_id', existingSessionIds);
+        const { data: existingItems, error: itemsFetchErr } = await runSupabaseQuery(
+          supabase
+            .from('production_items')
+            .select('id, session_id, sku, quantity_actual')
+            .in('session_id', existingSessionIds),
+          'Load existing production items'
+        );
 
         if (itemsFetchErr) {
           console.error('[ProductionImport] Failed to fetch existing items:', itemsFetchErr);
-          throw new Error(`Failed to load existing items: ${itemsFetchErr.message}`);
+          throw new Error(`Failed to load existing items: ${formatSupabaseError(itemsFetchErr)}`);
         }
 
         existingItems?.forEach(item => {
@@ -315,30 +322,34 @@ export function ProductionImport({ open, onClose }: Props) {
             for (const [sku, agg] of skuAgg) {
               const existingItem = existingSkuMap.get(sku);
               if (existingItem) {
-                const { error, data } = await supabase
-                  .from('production_items')
-                  .update({ quantity_actual: agg.actualQty })
-                  .eq('id', existingItem.id)
-                  .select('id');
-                if (error) throw new Error(`Update item ${sku} failed: ${error.message}`);
-                if (!data || data.length === 0) throw new Error(`Update item ${sku} blocked by RLS`);
+                const updateResult = await runSupabaseQuery(
+                  supabase
+                    .from('production_items')
+                    .update({ quantity_actual: agg.actualQty })
+                    .eq('id', existingItem.id)
+                    .select('id'),
+                  `Update imported item ${sku}`
+                );
+                assertMutationSucceeded(updateResult, `Update item ${sku}`);
               } else {
                 // New SKU not present in the existing shift.
                 // target = matching plan qty if any, else 0 (do NOT default to imported qty).
                 const planKey = `${first.work_centre}|${first.date}|${sku}|${first.shift_type}`;
                 const plannedQty = planMap.get(planKey);
-                const { error: insertErr, data: insertData } = await supabase
-                  .from('production_items')
-                  .insert({
-                    session_id: existingSessionId,
-                    sku,
-                    product_name: agg.productName,
-                    quantity_target: plannedQty ?? 0,
-                    quantity_actual: agg.actualQty,
-                  })
-                  .select('id');
-                if (insertErr) throw new Error(`Insert item ${sku} failed: ${insertErr.message}`);
-                if (!insertData || insertData.length === 0) throw new Error(`Insert item ${sku} blocked by RLS`);
+                const insertResult = await runSupabaseQuery(
+                  supabase
+                    .from('production_items')
+                    .insert({
+                      session_id: existingSessionId,
+                      sku,
+                      product_name: agg.productName,
+                      quantity_target: plannedQty ?? 0,
+                      quantity_actual: agg.actualQty,
+                    })
+                    .select('id'),
+                  `Insert imported item ${sku}`
+                );
+                assertMutationSucceeded(insertResult, `Insert item ${sku}`);
               }
             }
 
@@ -393,7 +404,7 @@ export function ProductionImport({ open, onClose }: Props) {
       }
 
       try {
-        await refreshSessions();
+        await runSupabaseQuery(refreshSessions(), 'Refresh production history after import');
       } catch (refreshErr) {
         console.error('[ProductionImport] refreshSessions failed (non-fatal):', refreshErr);
       }
