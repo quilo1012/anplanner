@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
   FileBarChart, Package, ShieldAlert, Menu, X, Circle,
