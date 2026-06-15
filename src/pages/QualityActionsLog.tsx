@@ -249,6 +249,8 @@ export function QualityActionsLog() {
             setMonth={setCalMonth}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}
+            canEditEntry={canEditEntry}
+            onEdit={openEdit}
           />
         )}
 
