@@ -205,9 +205,21 @@ export function ProductionImport({ open, onClose }: Props) {
 
   const handleConfirm = async () => {
     if (validRows.length === 0) { toast.error('No valid rows to import'); return; }
+    if (!leaderName.trim()) { toast.error('Leader name is required'); return; }
     setSaving(true);
 
+    // Safety net: guarantee the button never stays in "Importing..." state forever.
+    // If something hangs (network, RLS, etc.) for >90s, force-release the loading state
+    // and surface a clear error toast.
+    const safetyTimer = setTimeout(() => {
+      console.error('[ProductionImport] Safety timeout fired — import took >90s');
+      setSaving(false);
+      toast.error('Import timed out after 90s. Check the console/network tab for details.');
+    }, 90_000);
+
     try {
+      console.log('[ProductionImport] Starting import of', validRows.length, 'row(s)');
+
       // Group by (work_centre, date, shift)
       const groups = new Map<string, ImportRow[]>();
       for (const row of validRows) {
@@ -215,16 +227,22 @@ export function ProductionImport({ open, onClose }: Props) {
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(row);
       }
+      console.log('[ProductionImport] Grouped into', groups.size, 'session(s)');
 
       // Fetch existing sessions for all matching groups
       const dates = [...new Set(validRows.map(r => r.date))];
       const lines = [...new Set(validRows.map(r => r.work_centre))];
-      
-      const { data: existingSessions } = await supabase
+
+      const { data: existingSessions, error: sessionsFetchErr } = await supabase
         .from('production_sessions')
         .select('id, production_line, date, shift_type')
         .in('date', dates)
         .in('production_line', lines);
+
+      if (sessionsFetchErr) {
+        console.error('[ProductionImport] Failed to fetch existing sessions:', sessionsFetchErr);
+        throw new Error(`Failed to load existing sessions: ${sessionsFetchErr.message}`);
+      }
 
       // Build lookup: "line|date|shift" → session id
       const sessionLookup = new Map<string, string>();
@@ -236,13 +254,18 @@ export function ProductionImport({ open, onClose }: Props) {
       // Fetch existing items for those sessions
       const existingSessionIds = [...new Set([...(existingSessions || []).map(s => s.id)])];
       const existingItemsMap = new Map<string, { id: string; sku: string; quantity_actual: number }[]>();
-      
+
       if (existingSessionIds.length > 0) {
-        const { data: existingItems } = await supabase
+        const { data: existingItems, error: itemsFetchErr } = await supabase
           .from('production_items')
           .select('id, session_id, sku, quantity_actual')
           .in('session_id', existingSessionIds);
-        
+
+        if (itemsFetchErr) {
+          console.error('[ProductionImport] Failed to fetch existing items:', itemsFetchErr);
+          throw new Error(`Failed to load existing items: ${itemsFetchErr.message}`);
+        }
+
         existingItems?.forEach(item => {
           const list = existingItemsMap.get(item.session_id) || [];
           list.push(item);
@@ -253,8 +276,7 @@ export function ProductionImport({ open, onClose }: Props) {
       const entries = [...groups.entries()];
       let updatedCount = 0;
       let createdCount = 0;
-
-      const failures: string[] = [];
+      const failures: { key: string; reason: string }[] = [];
 
       for (const [key, groupRows] of entries) {
         try {
@@ -288,31 +310,44 @@ export function ProductionImport({ open, onClose }: Props) {
             for (const [sku, agg] of skuAgg) {
               const existingItem = existingSkuMap.get(sku);
               if (existingItem) {
-                const { error } = await supabase
+                const { error, data } = await supabase
                   .from('production_items')
                   .update({ quantity_actual: agg.actualQty })
-                  .eq('id', existingItem.id);
-                if (error) console.error('Failed to update item:', sku, error);
+                  .eq('id', existingItem.id)
+                  .select('id');
+                if (error) throw new Error(`Update item ${sku} failed: ${error.message}`);
+                if (!data || data.length === 0) throw new Error(`Update item ${sku} blocked by RLS`);
               } else {
-                const { error: insertErr } = await supabase.from('production_items').insert({
-                  session_id: existingSessionId,
-                  sku,
-                  product_name: agg.productName,
-                  quantity_target: agg.targetQty,
-                  quantity_actual: agg.actualQty,
-                });
-                if (insertErr) console.error('Failed to insert new item:', sku, insertErr);
+                const { error: insertErr, data: insertData } = await supabase
+                  .from('production_items')
+                  .insert({
+                    session_id: existingSessionId,
+                    sku,
+                    product_name: agg.productName,
+                    quantity_target: agg.targetQty,
+                    quantity_actual: agg.actualQty,
+                  })
+                  .select('id');
+                if (insertErr) throw new Error(`Insert item ${sku} failed: ${insertErr.message}`);
+                if (!insertData || insertData.length === 0) throw new Error(`Insert item ${sku} blocked by RLS`);
               }
             }
 
             // Update planned_quantity on the session
-            const allItems = await supabase.from('production_items').select('quantity_target').eq('session_id', existingSessionId);
-            const newTotalPlanned = allItems.data?.reduce((s, i) => s + (i.quantity_target || 0), 0) || 0;
-            
-            await supabase
+            const { data: allItems, error: allItemsErr } = await supabase
+              .from('production_items')
+              .select('quantity_target')
+              .eq('session_id', existingSessionId);
+            if (allItemsErr) throw new Error(`Recompute planned failed: ${allItemsErr.message}`);
+            const newTotalPlanned = allItems?.reduce((s, i) => s + (i.quantity_target || 0), 0) || 0;
+
+            const { error: updateSessionErr, data: updatedSessionData } = await supabase
               .from('production_sessions')
               .update({ planned_quantity: newTotalPlanned, line_leader: leaderName.trim(), updated_at: new Date().toISOString() })
-              .eq('id', existingSessionId);
+              .eq('id', existingSessionId)
+              .select('id');
+            if (updateSessionErr) throw new Error(`Update session failed: ${updateSessionErr.message}`);
+            if (!updatedSessionData || updatedSessionData.length === 0) throw new Error('Update session blocked by RLS');
 
             updatedCount++;
           } else {
@@ -326,7 +361,7 @@ export function ProductionImport({ open, onClose }: Props) {
 
             const totalPlanned = items.reduce((s, i) => s + i.quantityTarget, 0);
 
-            await saveSession({
+            const result = await saveSession({
               date: first.date,
               shift: first.shift_type as 'DAY' | 'NIGHT',
               productionLine: first.work_centre,
@@ -338,15 +373,23 @@ export function ProductionImport({ open, onClose }: Props) {
               staffActual: 0,
             }, { skipRefresh: true });
 
+            if (!result.success) {
+              throw new Error(result.error || 'saveSession returned failure');
+            }
+
             createdCount++;
           }
         } catch (err) {
-          failures.push(key);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[ProductionImport] Group failed:', key, msg);
+          failures.push({ key, reason: msg });
         }
       }
 
+      console.log('[ProductionImport] Done. created=', createdCount, 'updated=', updatedCount, 'failures=', failures.length);
+
       if (failures.length > 0) {
-        toast.error(`Failed to import ${failures.length} session(s)`);
+        toast.error(`Failed to import ${failures.length} session(s). First error: ${failures[0].reason}`);
       } else {
         const parts: string[] = [];
         if (createdCount > 0) parts.push(`${createdCount} sessão(ões) criada(s)`);
@@ -354,18 +397,25 @@ export function ProductionImport({ open, onClose }: Props) {
         toast.success(`Registos de produção guardados com sucesso! ${parts.join(', ')} com ${validRows.length} produto(s).`);
       }
 
-      await refreshSessions();
+      try {
+        await refreshSessions();
+      } catch (refreshErr) {
+        console.error('[ProductionImport] refreshSessions failed (non-fatal):', refreshErr);
+      }
       onClose();
       setRows([]);
       setPlanMap(new Map());
       setLeaderName('');
-      navigate('/history');
+      if (failures.length === 0) navigate('/history');
     } catch (err) {
+      console.error('[ProductionImport] Import failed:', err);
       toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
+      clearTimeout(safetyTimer);
       setSaving(false);
     }
   };
+
 
   if (!open) return null;
 
