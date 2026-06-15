@@ -434,7 +434,7 @@ export function ProductionImport({ open, onClose }: Props) {
       <div className="bg-background rounded-xl shadow-2xl w-[95vw] max-w-5xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Import Production Data</h2>
-          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }} className="p-2 hover:bg-muted rounded-lg">
+          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); }} className="p-2 hover:bg-muted rounded-lg">
             <X size={20} />
           </button>
         </div>
@@ -468,7 +468,7 @@ export function ProductionImport({ open, onClose }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); navigate('/products'); }}
+                    onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); navigate('/products'); }}
                     className="shrink-0"
                   >
                     Go to Products
@@ -504,18 +504,25 @@ export function ProductionImport({ open, onClose }: Props) {
                 </div>
               </div>
 
-              <div className="flex items-end gap-3 mb-2">
-                <div className="flex-1 max-w-xs">
-                  <label className="text-sm font-medium text-foreground mb-1 block">Nome do Líder</label>
-                  <input
-                    type="text"
-                    value={leaderName}
-                    onChange={e => setLeaderName(e.target.value)}
-                    placeholder="Introduza o nome do líder..."
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  />
+              {distinctLines.length > 0 && (
+                <div className="border border-border rounded-lg p-3 space-y-2">
+                  <div className="text-sm font-medium text-foreground">Leader name per production line</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {distinctLines.map(line => (
+                      <div key={line}>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">{line}</label>
+                        <input
+                          type="text"
+                          value={lineLeaders[line] || ''}
+                          onChange={e => setLineLeaders(prev => ({ ...prev, [line]: e.target.value }))}
+                          placeholder="Leader name..."
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="border border-border rounded-lg overflow-auto max-h-[55vh]">
                 <Table>
@@ -578,15 +585,15 @@ export function ProductionImport({ open, onClose }: Props) {
 
         {rows.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
-            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Choose Different File</Button>
+            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLineLeaders({}); }}>Choose Different File</Button>
             <div className="flex items-center gap-3">
-              {!leaderName.trim() && validRows.length > 0 && (
+              {missingLeaderLines.length > 0 && validRows.length > 0 && (
                 <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                  <AlertCircle size={14} /> Please enter the leader name to continue
+                  <AlertCircle size={14} /> Please enter a leader name for: {missingLeaderLines.join(', ')}
                 </span>
               )}
-              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !leaderName.trim()}>
+              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); }}>Cancel</Button>
+              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !allLeadersFilled}>
                 {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>
