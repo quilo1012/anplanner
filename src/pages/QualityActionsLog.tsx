@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
 import { useShifts } from '@/contexts/ShiftContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { fetchQualityActionsForSessions } from '@/utils/qualityActions';
 import { QualityActionRow, QualitySeverity } from '@/types/quality';
 import { severityBadgeClass, severityLabel, SEVERITY_OPTIONS } from '@/utils/qualitySeverity';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon } from 'lucide-react';
+import { EditShiftDialog } from '@/components/history/EditShiftDialog';
+import { ProductionSession } from '@/types/production';
+import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil } from 'lucide-react';
 
 const SEVERITY_DOT: Record<string, string> = {
   low: 'bg-blue-500',
@@ -25,6 +28,7 @@ function ymd(d: Date) {
 
 interface LogEntry {
   id: string;
+  sessionId: string;
   date: string;
   shift: string;
   line: string;
@@ -37,6 +41,8 @@ interface LogEntry {
 
 export function QualityActionsLog() {
   const { sessions, loadMoreHistory, hasMoreHistory, isLoadingMore, historyDaysLoaded } = useShifts();
+  const { user, hasRole } = useAuth();
+  const isOperator = user?.role === 'operator';
   const [qaMap, setQaMap] = useState<Record<string, QualityActionRow[]>>({});
   const [filterLeader, setFilterLeader] = useState('');
   const [filterLine, setFilterLine] = useState('');
@@ -44,6 +50,17 @@ export function QualityActionsLog() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [calMonth, setCalMonth] = useState<Date>(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [editSession, setEditSession] = useState<ProductionSession | null>(null);
+
+  const canEditEntry = (e: LogEntry): boolean => {
+    if (hasRole(['supervisor', 'admin'])) return true;
+    if (isOperator && user?.name && e.leader.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+    return false;
+  };
+  const openEdit = (sessionId: string) => {
+    const s = sessions.find(x => x.id === sessionId);
+    if (s) setEditSession(s);
+  };
 
   useEffect(() => {
     const ids = sessions.map(s => s.id);
@@ -69,6 +86,7 @@ export function QualityActionsLog() {
       for (const r of rows) {
         out.push({
           id: r.id || r.tempId,
+          sessionId: s.id,
           date: s.date,
           shift: s.shift,
           line: s.productionLine,
@@ -186,6 +204,7 @@ export function QualityActionsLog() {
                     <th className="text-left px-3 py-2">Severity</th>
                     <th className="text-right px-3 py-2">Points</th>
                     <th className="text-left px-3 py-2">Notes</th>
+                    <th className="text-right px-3 py-2 w-12">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,6 +224,18 @@ export function QualityActionsLog() {
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-destructive font-semibold">-{e.points}</td>
                       <td className="px-3 py-2 text-muted-foreground italic">{e.notes || '—'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {canEditEntry(e) && (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(e.sessionId)}
+                            className="p-1.5 text-primary hover:bg-primary/10 rounded"
+                            title="Edit shift"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -218,6 +249,8 @@ export function QualityActionsLog() {
             setMonth={setCalMonth}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}
+            canEditEntry={canEditEntry}
+            onEdit={openEdit}
           />
         )}
 
@@ -238,6 +271,14 @@ export function QualityActionsLog() {
           )}
         </div>
       </div>
+
+      <EditShiftDialog
+        session={editSession}
+        open={!!editSession}
+        onOpenChange={(open) => { if (!open) setEditSession(null); }}
+        onSuccess={() => { /* ShiftContext refreshes; quality-actions-changed event refreshes qaMap */ }}
+        isOperator={isOperator}
+      />
     </>
   );
 }
@@ -248,9 +289,11 @@ interface CalendarViewProps {
   setMonth: (d: Date) => void;
   selectedDay: string | null;
   setSelectedDay: (d: string | null) => void;
+  canEditEntry: (e: LogEntry) => boolean;
+  onEdit: (sessionId: string) => void;
 }
 
-function CalendarView({ entries, month, setMonth, selectedDay, setSelectedDay }: CalendarViewProps) {
+function CalendarView({ entries, month, setMonth, selectedDay, setSelectedDay, canEditEntry, onEdit }: CalendarViewProps) {
   const todayStr = ymd(new Date());
   const year = month.getFullYear();
   const monthIdx = month.getMonth();
@@ -364,6 +407,16 @@ function CalendarView({ entries, month, setMonth, selectedDay, setSelectedDay }:
                   <span className="text-muted-foreground">· {e.leader}</span>
                   <span className="text-muted-foreground">· {e.shift}</span>
                   <span className="text-destructive font-semibold ml-auto">-{e.points}</span>
+                  {canEditEntry(e) && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(e.sessionId)}
+                      className="p-1 text-primary hover:bg-primary/10 rounded"
+                      title="Edit shift"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
                   {e.notes && <span className="basis-full text-muted-foreground italic">{e.notes}</span>}
                 </div>
               ))}
