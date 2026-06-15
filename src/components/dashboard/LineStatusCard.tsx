@@ -88,11 +88,41 @@ export function LineStatusCard({
             <div className="flex-1 min-w-0 space-y-1">
               {/* Leader Row */}
               {leader && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                     <User size={10} />
                     {leader}
                   </span>
+                  {leaderQuality && (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold border cursor-default",
+                              leaderQuality.occurrences === 0
+                                ? "bg-success/15 text-success border-success/30"
+                                : "bg-destructive/15 text-destructive border-destructive/30"
+                            )}
+                          >
+                            {leaderQuality.occurrences === 0 ? (
+                              <><Shield size={8} />Clean</>
+                            ) : (
+                              <><ShieldAlert size={8} />-{leaderQuality.points} pts</>
+                            )}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs space-y-0.5">
+                          <p className="font-semibold">{leader}'s quality record (this period)</p>
+                          {leaderQuality.occurrences === 0 ? (
+                            <p>No quality issues — across all lines worked</p>
+                          ) : (
+                            <p>{leaderQuality.occurrences} occurrence{leaderQuality.occurrences === 1 ? '' : 's'} · -{leaderQuality.points} pts total</p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               )}
               
