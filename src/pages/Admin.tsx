@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2, KeyRound } from 'l
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RagThresholdsCard } from '@/components/admin/RagThresholdsCard';
 
 
 export function Admin() {
@@ -409,7 +410,7 @@ export function Admin() {
             </div>
           </div>
 
-          
+          {isAdmin && <RagThresholdsCard />}
         </div>
       </div>
       <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
