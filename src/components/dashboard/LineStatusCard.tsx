@@ -38,6 +38,7 @@ export function LineStatusCard({
   colorClass,
   realProduction = 0,
   productionTarget = 0,
+  leaderQuality,
   onClick,
 }: LineStatusCardProps) {
   // Target comparison
