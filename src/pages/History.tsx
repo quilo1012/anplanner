@@ -391,9 +391,12 @@ export function History() {
               {filteredSessions.map(session => (
                 <div key={session.id} className="card p-4">
                   <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="font-medium">{formatDate(session.date)}</p>
-                      <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{session.shift}</span>
+                    <div className="flex items-start gap-2">
+                      <input type="checkbox" checked={selectedIds.has(session.id)} onChange={() => toggleSelect(session.id)} className="mt-1 h-4 w-4" />
+                      <div>
+                        <p className="font-medium">{formatDate(session.date)}</p>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{session.shift}</span>
+                      </div>
                     </div>
                     <span className={getPerformanceClass(session.performance)}>{session.performance.toFixed(0)}%</span>
                   </div>
