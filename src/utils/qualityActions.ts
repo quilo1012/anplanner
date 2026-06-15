@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { QualityActionRow } from '@/types/quality';
+import { assertMutationSucceeded, formatSupabaseError, runSupabaseQuery } from '@/utils/supabaseSafeQuery';
 
 export interface SaveQualityActionsCtx {
   sessionId: string;
@@ -15,30 +16,41 @@ export interface SaveQualityActionsCtx {
  * Replace all quality_actions for a session with the supplied list.
  */
 export async function saveQualityActionsForSession(ctx: SaveQualityActionsCtx): Promise<{ success: boolean; error?: string }> {
-  const { error: delErr } = await supabase
-    .from('quality_actions')
-    .delete()
-    .eq('session_id', ctx.sessionId);
-  if (delErr) return { success: false, error: delErr.message };
+  try {
+    const { error: delErr } = await runSupabaseQuery(
+      supabase
+        .from('quality_actions')
+        .delete()
+        .eq('session_id', ctx.sessionId),
+      'Clear quality actions'
+    );
+    if (delErr) return { success: false, error: formatSupabaseError(delErr) };
 
-  const valid = ctx.rows.filter(r => r.action_type_id);
-  if (valid.length === 0) return { success: true };
+    const valid = ctx.rows.filter(r => r.action_type_id);
+    if (valid.length === 0) return { success: true };
 
-  const payload = valid.map(r => ({
-    session_id: ctx.sessionId,
-    action_type_id: r.action_type_id,
-    production_line: ctx.productionLine,
-    line_leader: ctx.lineLeader,
-    date: ctx.date,
-    shift_type: ctx.shiftType,
-    points: r.points,
-    notes: r.notes || null,
-    recorded_by: ctx.recordedBy ?? null,
-  }));
+    const payload = valid.map(r => ({
+      session_id: ctx.sessionId,
+      action_type_id: r.action_type_id,
+      production_line: ctx.productionLine,
+      line_leader: ctx.lineLeader,
+      date: ctx.date,
+      shift_type: ctx.shiftType,
+      points: r.points,
+      notes: r.notes || null,
+      recorded_by: ctx.recordedBy ?? null,
+    }));
 
-  const { error: insErr } = await supabase.from('quality_actions').insert(payload);
-  if (insErr) return { success: false, error: insErr.message };
-  return { success: true };
+    const insertRes = await runSupabaseQuery(
+      supabase.from('quality_actions').insert(payload).select('id'),
+      'Insert quality actions'
+    );
+    assertMutationSucceeded(insertRes, 'Insert quality actions');
+    return { success: true };
+  } catch (err) {
+    console.error('[saveQualityActionsForSession] failed', err);
+    return { success: false, error: formatSupabaseError(err) };
+  }
 }
 
 export async function fetchQualityActionsForSessions(sessionIds: string[]) {
