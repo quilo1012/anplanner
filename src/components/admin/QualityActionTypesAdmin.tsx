@@ -6,6 +6,7 @@ import { useQualityActionTypes } from '@/hooks/useQualityActionTypes';
 import { QualityActionType, QualitySeverity } from '@/types/quality';
 import { SEVERITY_OPTIONS, severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 import { useAuth } from '@/contexts/AuthContext';
+import { assertMutationSucceeded, formatSupabaseError, runSupabaseQuery } from '@/utils/supabaseSafeQuery';
 
 const EMPTY_FORM = { name: '', points: 1, description: '', is_active: true, severity: 'medium' as QualitySeverity };
 
@@ -68,28 +69,32 @@ export function QualityActionTypesAdmin() {
     };
     try {
       if (editingId) {
-        const { data, error } = await supabase
-          .from('quality_action_types')
-          .update(payload)
-          .eq('id', editingId)
-          .select('id');
-        if (error) throw error;
-        if (!data || data.length === 0) throw new Error('Update blocked (no rows affected — check admin permissions).');
+        const result = await runSupabaseQuery(
+          supabase
+            .from('quality_action_types')
+            .update(payload)
+            .eq('id', editingId)
+            .select('id'),
+          'Update quality action type'
+        );
+        assertMutationSucceeded(result, 'Update quality action type');
         toast.success('Type updated');
       } else {
-        const { data, error } = await supabase
-          .from('quality_action_types')
-          .insert(payload)
-          .select('id');
-        if (error) throw error;
-        if (!data || data.length === 0) throw new Error('Insert blocked (no rows returned).');
+        const result = await runSupabaseQuery(
+          supabase
+            .from('quality_action_types')
+            .insert(payload)
+            .select('id'),
+          'Create quality action type'
+        );
+        assertMutationSucceeded(result, 'Create quality action type');
         toast.success('Type created');
       }
       reset();
-      refresh();
+      await refresh();
     } catch (err: any) {
       console.error('[QualityActionTypesAdmin] submit failed', err);
-      toast.error(err?.message || 'Failed to save type');
+      toast.error(formatSupabaseError(err) || 'Failed to save type');
     } finally {
       setSubmitting(false);
     }
