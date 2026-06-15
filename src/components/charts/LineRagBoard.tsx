@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ProductionSession } from '@/types/production';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
+import { useRagThresholds } from '@/hooks/useRagThresholds';
 
 interface LineRagBoardProps {
   sessions: ProductionSession[];
@@ -9,11 +10,11 @@ interface LineRagBoardProps {
 
 type Rag = 'green' | 'amber' | 'red';
 
-function getRag(variance: number, plan: number): Rag {
+function getRag(variance: number, plan: number, green: number, red: number): Rag {
   if (plan <= 0) return 'green';
-  if (variance >= 0) return 'green';
-  if (variance >= -10) return 'amber';
-  return 'red';
+  if (variance >= green) return 'green';
+  if (variance < red) return 'red';
+  return 'amber';
 }
 
 const RAG_STYLE: Record<Rag, { dot: string; badge: string; label: string }> = {
@@ -23,6 +24,8 @@ const RAG_STYLE: Record<Rag, { dot: string; badge: string; label: string }> = {
 };
 
 export function LineRagBoard({ sessions }: LineRagBoardProps) {
+  const { thresholds } = useRagThresholds();
+
   const rows = useMemo(() => {
     const map = new Map<string, { plan: number; actual: number; downtime: number }>();
     for (const s of sessions) {
@@ -36,11 +39,11 @@ export function LineRagBoard({ sessions }: LineRagBoardProps) {
     return Array.from(map.entries())
       .map(([line, v]) => {
         const variance = v.plan > 0 ? Math.round(((v.actual - v.plan) / v.plan) * 100) : 0;
-        const rag = getRag(variance, v.plan);
+        const rag = getRag(variance, v.plan, thresholds.greenThreshold, thresholds.redThreshold);
         return { line, plan: v.plan, actual: v.actual, downtime: v.downtime, variance, rag };
       })
       .sort((a, b) => naturalLineSort(a.line, b.line));
-  }, [sessions]);
+  }, [sessions, thresholds]);
 
   const summary = useMemo(() => {
     const counts: Record<Rag, number> = { green: 0, amber: 0, red: 0 };
