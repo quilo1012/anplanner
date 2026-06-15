@@ -7,6 +7,7 @@ import {
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import { cn } from '@/lib/utils';
+import { recordDrawerSession, type DrawerLockMethod } from '@/utils/drawerTelemetry';
 
 type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; roles: string[] };
 
