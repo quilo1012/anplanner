@@ -56,7 +56,14 @@ export function TopNav() {
   useEffect(() => {
     if (!mobileOpen) return;
 
+    const openedAt = performance.now();
     const scrollY = window.scrollY;
+    let blockedTouches = 0;
+    let blockedGestures = 0;
+    // We always apply position:fixed; if the env doesn't support it (very rare)
+    // the fallback is overflow:hidden — capture which is actually in effect.
+    let method: DrawerLockMethod = 'position-fixed';
+
     const body = document.body;
     const html = document.documentElement;
     const prev = {
@@ -81,7 +88,8 @@ export function TopNav() {
     body.style.overscrollBehavior = 'none';
     html.style.overflow = 'hidden';
     html.style.overscrollBehavior = 'none';
-    dlog('lock', { scrollY });
+    if (getComputedStyle(body).position !== 'fixed') method = 'overflow-hidden';
+    dlog('lock', { scrollY, method });
 
     const touchOriginInDrawer = new Map<number, boolean>();
     const isInsideDrawer = (target: EventTarget | null) =>
