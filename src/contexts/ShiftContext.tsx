@@ -510,11 +510,11 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
 
       if (deleteItemsRes.error) {
         console.error('Error deleting old items:', deleteItemsRes.error);
-        return { success: false, error: deleteItemsRes.error.message };
+        return { success: false, error: formatSupabaseError(deleteItemsRes.error) };
       }
       if (deleteDowntimesRes.error) {
         console.error('Error deleting old downtimes:', deleteDowntimesRes.error);
-        return { success: false, error: deleteDowntimesRes.error.message };
+        return { success: false, error: formatSupabaseError(deleteDowntimesRes.error) };
       }
 
       // Step 3: Insert new items and downtimes in PARALLEL
@@ -536,7 +536,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         comment: d.comment || null,
       }));
 
-      const insertPromises: Promise<{ error: unknown }>[] = [];
+      const insertPromises: Array<ReturnType<typeof runSupabaseQuery<{ data: { id: string }[] | null; error: unknown | null }>>> = [];
       if (itemsToInsert.length > 0) {
         insertPromises.push(runSupabaseQuery(supabase.from('production_items').insert(itemsToInsert).select('id'), 'Insert updated production items'));
       }
