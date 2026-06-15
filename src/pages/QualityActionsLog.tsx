@@ -224,6 +224,18 @@ export function QualityActionsLog() {
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-destructive font-semibold">-{e.points}</td>
                       <td className="px-3 py-2 text-muted-foreground italic">{e.notes || '—'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {canEditEntry(e) && (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(e.sessionId)}
+                            className="p-1.5 text-primary hover:bg-primary/10 rounded"
+                            title="Edit shift"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
