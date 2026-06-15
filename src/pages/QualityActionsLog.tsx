@@ -5,7 +5,23 @@ import { fetchQualityActionsForSessions } from '@/utils/qualityActions';
 import { QualityActionRow, QualitySeverity } from '@/types/quality';
 import { severityBadgeClass, severityLabel, SEVERITY_OPTIONS } from '@/utils/qualitySeverity';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import { ShieldAlert, CheckCircle2, X } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon } from 'lucide-react';
+
+const SEVERITY_DOT: Record<string, string> = {
+  low: 'bg-blue-500',
+  medium: 'bg-yellow-500',
+  high: 'bg-orange-500',
+  critical: 'bg-red-500',
+};
+function sevDot(sev?: string | null) {
+  return SEVERITY_DOT[sev || ''] || 'bg-muted-foreground';
+}
+function ymd(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 interface LogEntry {
   id: string;
