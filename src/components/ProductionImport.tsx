@@ -96,7 +96,7 @@ export function ProductionImport({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [planMap, setPlanMap] = useState<Map<string, number>>(new Map());
-  const [leaderName, setLeaderName] = useState('');
+  const [lineLeaders, setLineLeaders] = useState<Record<string, string>>({});
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -202,10 +202,13 @@ export function ProductionImport({ open, onClose }: Props) {
   // Only rows with no errors AND no warnings (i.e. SKU exists in catalog) are eligible to save
   const validRows = rows.filter(r => r.errors.length === 0 && r.warnings.length === 0);
   const matchedRows = validRows.filter(r => r.plannedQty !== undefined);
+  const distinctLines = [...new Set(validRows.map(r => r.work_centre))].sort();
+  const missingLeaderLines = distinctLines.filter(l => !lineLeaders[l]?.trim());
+  const allLeadersFilled = distinctLines.length > 0 && missingLeaderLines.length === 0;
 
   const handleConfirm = async () => {
     if (validRows.length === 0) { toast.error('No valid rows to import'); return; }
-    if (!leaderName.trim()) { toast.error('Leader name is required'); return; }
+    if (!allLeadersFilled) { toast.error(`Leader name required for: ${missingLeaderLines.join(', ')}`); return; }
     setSaving(true);
 
     // Safety net: guarantee the button never stays in "Importing..." state forever.
@@ -341,9 +344,10 @@ export function ProductionImport({ open, onClose }: Props) {
             if (allItemsErr) throw new Error(`Recompute planned failed: ${allItemsErr.message}`);
             const newTotalPlanned = allItems?.reduce((s, i) => s + (i.quantity_target || 0), 0) || 0;
 
+            const leaderForLine = (lineLeaders[first.work_centre] || '').trim();
             const { error: updateSessionErr, data: updatedSessionData } = await supabase
               .from('production_sessions')
-              .update({ planned_quantity: newTotalPlanned, line_leader: leaderName.trim(), updated_at: new Date().toISOString() })
+              .update({ planned_quantity: newTotalPlanned, line_leader: leaderForLine, updated_at: new Date().toISOString() })
               .eq('id', existingSessionId)
               .select('id');
             if (updateSessionErr) throw new Error(`Update session failed: ${updateSessionErr.message}`);
@@ -365,7 +369,7 @@ export function ProductionImport({ open, onClose }: Props) {
               date: first.date,
               shift: first.shift_type as 'DAY' | 'NIGHT',
               productionLine: first.work_centre,
-              lineLeader: leaderName.trim(),
+              lineLeader: (lineLeaders[first.work_centre] || '').trim(),
               plannedQuantity: totalPlanned,
               items,
               comments: '',
@@ -405,7 +409,7 @@ export function ProductionImport({ open, onClose }: Props) {
       onClose();
       setRows([]);
       setPlanMap(new Map());
-      setLeaderName('');
+      setLineLeaders({});
       if (failures.length === 0) navigate('/history');
     } catch (err) {
       console.error('[ProductionImport] Import failed:', err);
@@ -430,7 +434,7 @@ export function ProductionImport({ open, onClose }: Props) {
       <div className="bg-background rounded-xl shadow-2xl w-[95vw] max-w-5xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Import Production Data</h2>
-          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }} className="p-2 hover:bg-muted rounded-lg">
+          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); }} className="p-2 hover:bg-muted rounded-lg">
             <X size={20} />
           </button>
         </div>
@@ -464,7 +468,7 @@ export function ProductionImport({ open, onClose }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); navigate('/products'); }}
+                    onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); navigate('/products'); }}
                     className="shrink-0"
                   >
                     Go to Products
@@ -500,18 +504,25 @@ export function ProductionImport({ open, onClose }: Props) {
                 </div>
               </div>
 
-              <div className="flex items-end gap-3 mb-2">
-                <div className="flex-1 max-w-xs">
-                  <label className="text-sm font-medium text-foreground mb-1 block">Nome do Líder</label>
-                  <input
-                    type="text"
-                    value={leaderName}
-                    onChange={e => setLeaderName(e.target.value)}
-                    placeholder="Introduza o nome do líder..."
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  />
+              {distinctLines.length > 0 && (
+                <div className="border border-border rounded-lg p-3 space-y-2">
+                  <div className="text-sm font-medium text-foreground">Leader name per production line</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {distinctLines.map(line => (
+                      <div key={line}>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">{line}</label>
+                        <input
+                          type="text"
+                          value={lineLeaders[line] || ''}
+                          onChange={e => setLineLeaders(prev => ({ ...prev, [line]: e.target.value }))}
+                          placeholder="Leader name..."
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="border border-border rounded-lg overflow-auto max-h-[55vh]">
                 <Table>
@@ -574,15 +585,15 @@ export function ProductionImport({ open, onClose }: Props) {
 
         {rows.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
-            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Choose Different File</Button>
+            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLineLeaders({}); }}>Choose Different File</Button>
             <div className="flex items-center gap-3">
-              {!leaderName.trim() && validRows.length > 0 && (
+              {missingLeaderLines.length > 0 && validRows.length > 0 && (
                 <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                  <AlertCircle size={14} /> Please enter the leader name to continue
+                  <AlertCircle size={14} /> Please enter a leader name for: {missingLeaderLines.join(', ')}
                 </span>
               )}
-              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !leaderName.trim()}>
+              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); }}>Cancel</Button>
+              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !allLeadersFilled}>
                 {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>
