@@ -607,6 +607,19 @@ export function History() {
           onOpenChange={(open) => { if (!open) setDeleteSessionState(null); }}
           onSuccess={handleDialogSuccess}
         />
+
+        <BulkDeleteConfirmDialog
+          sessions={selectedSessions}
+          open={bulkDeleteOpen}
+          onOpenChange={setBulkDeleteOpen}
+          onComplete={(deleted) => {
+            setSelectedIds(prev => {
+              const next = new Set(prev);
+              deleted.forEach(id => next.delete(id));
+              return next;
+            });
+          }}
+        />
       </div>
     </>
   );
