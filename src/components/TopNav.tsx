@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
-  FileBarChart, Package, ShieldAlert, Menu, X, Circle,
+  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown,
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import { cn } from '@/lib/utils';
 import { recordDrawerSession, type DrawerLockMethod } from '@/utils/drawerTelemetry';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 
 type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; roles: string[] };
 
