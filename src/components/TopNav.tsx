@@ -144,7 +144,7 @@ export function TopNav() {
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
-          <div className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar">
+          <div data-mobile-drawer className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar max-h-[calc(100vh-3rem)] overflow-y-auto overscroll-contain">
             <nav className="p-2 space-y-0.5">
               {items.map(item => (
                 <NavLink
