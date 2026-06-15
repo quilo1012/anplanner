@@ -1,5 +1,5 @@
 import { CircularProgress } from '@/components/ui/circular-progress';
-import { Factory, Play, Pause, AlertTriangle, User, Package, CheckCircle, XCircle, Target, Clock } from 'lucide-react';
+import { Factory, Play, Pause, AlertTriangle, User, Package, CheckCircle, XCircle, Target, Clock, Shield, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getLineBorderClass, getLineHeaderClass } from '@/utils/lineColors';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
