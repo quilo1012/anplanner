@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 import { QualitySeverity } from '@/types/quality';
+import { normalizeName } from '@/utils/normalizeName';
 
 interface Props {
   startDate: string;
