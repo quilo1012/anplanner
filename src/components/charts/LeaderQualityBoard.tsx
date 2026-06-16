@@ -388,7 +388,7 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
                   </tr>
                 </thead>
                 <tbody>
-                  {monthlyRows.map((r, i) => (
+                  {visibleRows.map((r, i) => (
                     <tr key={r.name} className="border-b border-border/50 hover:bg-muted/30">
                       <td className="py-2 px-2 text-muted-foreground">{i + 1}</td>
                       <td className="py-2 px-2 font-medium text-foreground">{r.name}</td>
@@ -402,7 +402,8 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
                 </tbody>
               </table>
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
