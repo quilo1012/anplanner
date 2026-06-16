@@ -214,12 +214,12 @@ export function QualityActionsLog() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => exportQualityActionsToCsv(filtered)}
+              onClick={() => exportQualityActionsToXlsx(filtered)}
               disabled={filtered.length === 0}
               className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
-              title="Download CSV (opens in Excel)"
+              title="Download Excel (.xlsx)"
             >
-              <Download size={12} /> Export
+              <Download size={12} /> Export Excel
             </button>
             <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
               <button
