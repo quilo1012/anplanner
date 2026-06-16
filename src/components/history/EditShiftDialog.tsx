@@ -12,13 +12,16 @@ import { useShifts } from '@/contexts/ShiftContext';
 
 import { SkuRowForm } from '@/components/SkuRowForm';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
-import { Loader2, Save, Target, TrendingUp } from 'lucide-react';
+import { Loader2, Save, Target, TrendingUp, Wrench, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { QualityActionsForm } from '@/components/QualityActionsForm';
 import { QualityActionRow } from '@/types/quality';
 import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
 import { useAuth } from '@/contexts/AuthContext';
+import { mapToAnmaisysLine } from '@/utils/maintenanceLineMapping';
+import { createMaintenanceOrder } from '@/services/maintenanceBridge';
+import { DOWNTIME_REASONS_FALLBACK } from '@/types/downtime';
 
 interface EditShiftDialogProps {
   session: ProductionSession | null;
@@ -44,6 +47,44 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
   const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
   const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
   const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
+  const [creatingOrderId, setCreatingOrderId] = useState<string | null>(null);
+  const [createdOrders, setCreatedOrders] = useState<Record<string, number>>({});
+
+  const maintenanceDowntimes = useMemo(
+    () => structuredDowntimes.filter(dt => dt.category === 'maintenance'),
+    [structuredDowntimes]
+  );
+
+  const reasonLabel = (value: string) => {
+    const found = DOWNTIME_REASONS_FALLBACK.maintenance?.find(r => r.value === value);
+    return found?.label ?? value;
+  };
+
+  const handleCreateOrder = async (dt: StructuredDowntime) => {
+    const mapped = mapToAnmaisysLine(productionLine);
+    if (!mapped) {
+      toast.error('No line mapping available');
+      return;
+    }
+    setCreatingOrderId(dt.id);
+    try {
+      const { order_id } = await createMaintenanceOrder({
+        description: `${reasonLabel(dt.reason)} on ${productionLine}${dt.comment ? ` — ${dt.comment}` : ''}`,
+        priority: 'medium',
+        machine: null,
+        requester_name: user?.email || lineLeader || 'Anplanner',
+        line_name: mapped,
+        line_at_time: productionLine,
+        notes: `From shift ${date} ${shiftType} (${dt.duration} min downtime)`,
+      });
+      setCreatedOrders(prev => ({ ...prev, [dt.id]: order_id }));
+      toast.success(`Order #${order_id} created`);
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to create order');
+    } finally {
+      setCreatingOrderId(null);
+    }
+  };
 
   const { totalProduction, performance } = useMemo(() => {
     const total = skuRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
@@ -313,8 +354,42 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             </div>
           )}
 
-
-
+          {maintenanceDowntimes.length > 0 && (
+            <div className="border-t pt-4 space-y-2">
+              <Label className="text-sm flex items-center gap-2 font-medium">
+                <Wrench size={16} className="text-primary" /> Maintenance Downtimes
+              </Label>
+              <div className="space-y-2">
+                {maintenanceDowntimes.map(dt => {
+                  const mapped = mapToAnmaisysLine(productionLine);
+                  const created = createdOrders[dt.id];
+                  const isCreating = creatingOrderId === dt.id;
+                  return (
+                    <div key={dt.id} className="flex items-center justify-between gap-3 p-2 rounded border bg-muted/30">
+                      <div className="text-sm min-w-0 flex-1">
+                        <div className="font-medium truncate">{reasonLabel(dt.reason)} · {dt.duration} min</div>
+                        {dt.comment && <div className="text-xs text-muted-foreground truncate">{dt.comment}</div>}
+                      </div>
+                      {created ? (
+                        <span className="text-xs text-green-600 font-medium whitespace-nowrap">Order #{created} created</span>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!mapped || isCreating}
+                          onClick={() => handleCreateOrder(dt)}
+                        >
+                          {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
+                          {!mapped ? 'No line mapping' : isCreating ? 'Creating...' : 'Open Maintenance Order'}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="pt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
