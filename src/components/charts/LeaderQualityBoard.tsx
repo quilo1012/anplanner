@@ -273,15 +273,8 @@ export function LeaderQualityBoard({ startDate, endDate }: Props) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex rounded-lg border border-border overflow-hidden">
-                {(['day', 'week', '15days', 'month'] as const).map((period) => (
-                  <button key={period} onClick={() => setPeriodFilter(period)}
-                    className={`px-2 py-1 text-xs font-medium transition-colors ${periodFilter === period ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
-                    {periodLabels[period]}
-                  </button>
-                ))}
-              </div>
             </div>
+
             <div className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar size={14} />{dateDisplay}</div>
           </>
         ) : (
