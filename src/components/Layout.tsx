@@ -1,13 +1,21 @@
 import { Outlet } from 'react-router-dom';
-import { TopNav } from './TopNav';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SideNav } from './SideNav';
 
 export function Layout() {
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] flex flex-col">
-      <TopNav />
-      <main className="flex-1 min-w-0 flex flex-col">
-        <Outlet />
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-[hsl(var(--background))]">
+        <SideNav />
+        <div className="flex-1 min-w-0 flex flex-col">
+          <header className="h-10 flex items-center border-b border-sidebar-border bg-sidebar text-sidebar-foreground px-2 print:hidden">
+            <SidebarTrigger />
+          </header>
+          <main className="flex-1 min-w-0 flex flex-col">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }
