@@ -1,11 +1,81 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { useWorkOrders, WoStatus, nextStatus, WorkOrder } from '@/hooks/useWorkOrders';
+import { useWorkOrderDowntimeSummary, useWorkOrderDowntimeEvents } from '@/hooks/useWorkOrderDowntimeSummary';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { naturalLineSort } from '@/utils/naturalLineSort';
+import { formatDuration } from '@/utils/formatDuration';
 import { toast } from 'sonner';
 import { Loader2, Wrench, AlertTriangle, CheckCircle2, Clock, Plus, ArrowRight, X } from 'lucide-react';
+
+const DOWNTIME_STATUS_CLASSES: Record<'active' | 'resolved' | 'none', string> = {
+  active: 'bg-red-100 text-red-800',
+  resolved: 'bg-emerald-100 text-emerald-800',
+  none: 'bg-muted text-muted-foreground',
+};
+
+function WorkOrderDowntimePanel({ wo, onClose }: { wo: WorkOrder; onClose: () => void }) {
+  const { events, isLoading } = useWorkOrderDowntimeEvents(wo.id);
+  const total = events.reduce((sum, e) => sum + (e.duration_minutes ?? (e.resumed_at ? Math.max(0, Math.round((new Date(e.resumed_at).getTime() - new Date(e.stopped_at).getTime()) / 60000)) : 0)), 0);
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
+      <div className="bg-card border-l border-border w-full max-w-lg h-full overflow-auto p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Work Order</p>
+            <h2 className="text-lg font-semibold text-foreground">#{wo.wo_number} — {wo.line_at_time || '—'}</h2>
+            <p className="text-sm text-muted-foreground mt-1">{wo.description}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="card p-3">
+            <p className="text-xs text-muted-foreground">Total downtime</p>
+            <p className="text-lg font-bold text-foreground">{total > 0 ? formatDuration(total) : '—'}</p>
+          </div>
+          <div className="card p-3">
+            <p className="text-xs text-muted-foreground">Events</p>
+            <p className="text-lg font-bold text-foreground">{events.length}</p>
+          </div>
+        </div>
+        <h3 className="text-sm font-semibold text-foreground mb-2">Downtime events</h3>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-6 text-muted-foreground gap-2"><Loader2 size={14} className="animate-spin" /> Loading...</div>
+        ) : events.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No downtime events for this work order.</p>
+        ) : (
+          <ul className="space-y-2">
+            {events.map(e => {
+              const duration = e.duration_minutes ?? (e.resumed_at ? Math.max(0, Math.round((new Date(e.resumed_at).getTime() - new Date(e.stopped_at).getTime()) / 60000)) : null);
+              return (
+                <li key={e.id} className="border border-border rounded p-3 text-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-foreground">{e.stopped_reason || 'No reason'}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded ${e.resumed_at ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                      {e.resumed_at ? (duration !== null ? formatDuration(duration) : 'Resolved') : 'Active'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(e.stopped_at)} → {e.resumed_at ? formatDateTime(e.resumed_at) : 'ongoing'}
+                  </p>
+                  {(e.stopped_by_name || e.resumed_by_name) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {e.stopped_by_name && <>Stopped by {e.stopped_by_name}</>}
+                      {e.stopped_by_name && e.resumed_by_name && ' · '}
+                      {e.resumed_by_name && <>Resumed by {e.resumed_by_name}</>}
+                    </p>
+                  )}
+                  {e.resumed_note && <p className="text-xs text-muted-foreground mt-1 italic">"{e.resumed_note}"</p>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const STATUS_LABELS: Record<WoStatus, string> = {
   open: 'Open',
