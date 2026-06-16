@@ -27,6 +27,7 @@ import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { aggregateLeaderQuality } from '@/utils/aggregateLeaderQuality';
+import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActionDialog';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
