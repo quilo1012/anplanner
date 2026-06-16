@@ -40,10 +40,9 @@ interface HistoryRow {
   severity: QualitySeverity | null;
 }
 
-export function LeaderQualityBoard({ currentDate }: Props) {
+export function LeaderQualityBoard({ startDate, endDate }: Props) {
   const [view, setView] = useState<'period' | 'monthly'>('period');
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
-  const [periodFilter, setPeriodFilter] = useState<PeriodType>('day');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -51,18 +50,10 @@ export function LeaderQualityBoard({ currentDate }: Props) {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const [monthValue, setMonthValue] = useState<string>(() => format(parseISO(currentDate), 'yyyy-MM'));
+  const [monthValue, setMonthValue] = useState<string>(() => format(parseISO(endDate), 'yyyy-MM'));
   const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>([]);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
 
-  const { startDate, endDate } = useMemo(() => {
-    const end = parseISO(currentDate);
-    let start = end;
-    if (periodFilter === 'week') start = subDays(end, 6);
-    else if (periodFilter === '15days') start = subDays(end, 14);
-    else if (periodFilter === 'month') start = subDays(end, 29);
-    return { startDate: format(start, 'yyyy-MM-dd'), endDate: format(end, 'yyyy-MM-dd') };
-  }, [currentDate, periodFilter]);
 
   useEffect(() => {
     let cancel = false;
