@@ -3,7 +3,9 @@ import { Header } from '@/components/Header';
 import { useWorkOrders, WoStatus, nextStatus, WorkOrder } from '@/hooks/useWorkOrders';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, AlertTriangle, CheckCircle2, Clock, Plus, ArrowRight, X } from 'lucide-react';
+import { naturalLineSort } from '@/utils/naturalLineSort';
+import { toast } from 'sonner';
+import { Loader2, Wrench, AlertTriangle, CheckCircle2, Clock, Plus, ArrowRight, X } from 'lucide-react';
 
 const STATUS_LABELS: Record<WoStatus, string> = {
   open: 'Open',
@@ -29,22 +31,109 @@ const STATUS_CLASSES: Record<WoStatus, string> = {
 
 const OPEN_STATUSES: WoStatus[] = ['open', 'received', 'arrived', 'in_progress'];
 
+function useLinesList() {
+  const [lines, setLines] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    supabase.from('lines' as never).select('id, name').then(({ data }) => {
+      const list = (data || []) as unknown as { id: string; name: string }[];
+      setLines(list.sort((a, b) => naturalLineSort(a.name, b.name)));
+    });
+  }, []);
+  return lines;
+}
+
+function NewWorkOrderForm({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { user } = useAuth();
+  const { createWorkOrder } = useWorkOrders();
+  const lines = useLinesList();
+  const [description, setDescription] = useState('');
+  const [lineId, setLineId] = useState('');
+  const [machine, setMachine] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!description.trim() || !lineId) {
+      toast.error('Please fill in the line and description.');
+      return;
+    }
+    const lineName = lines.find(l => l.id === lineId)?.name || '';
+    setIsSubmitting(true);
+    const result = await createWorkOrder({
+      description: description.trim(),
+      lineId,
+      lineName,
+      machine: machine.trim() || undefined,
+      priority,
+      requesterName: user?.name || 'Unknown',
+      operatorId: user?.id || '',
+    });
+    setIsSubmitting(false);
+    if (!result.success) {
+      toast.error(`Failed to create work order: ${result.error}`);
+      return;
+    }
+    toast.success('Work order created');
+    onCreated();
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="card p-4 sm:p-6 mb-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-foreground flex items-center gap-2"><Plus size={16} /> New Work Order</h3>
+        <button type="button" onClick={onClose} className="p-1 hover:bg-muted rounded"><X size={16} /></button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Line *</label>
+          <select value={lineId} onChange={(e) => setLineId(e.target.value)} className="input-field" required>
+            <option value="">Select line...</option>
+            {lines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Machine (optional)</label>
+          <input type="text" value={machine} onChange={(e) => setMachine(e.target.value)} className="input-field" placeholder="e.g. Filler, Capper..." />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Priority</label>
+          <select value={priority} onChange={(e) => setPriority(e.target.value)} className="input-field">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">Description *</label>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input-field" rows={3} placeholder="Describe the issue..." required />
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+        <button type="submit" className="btn-primary" disabled={isSubmitting}>
+          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Create Work Order
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function formatDateTime(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-interface LineRow { id: string; name: string }
-
 export function WorkOrders() {
+  const { workOrders, isLoading, error, openCount, linesStoppedCount, advanceWorkOrder, stopLine, resumeLine, refreshWorkOrders } = useWorkOrders();
   const { user, hasRole } = useAuth();
-  const { workOrders, isLoading, error, openCount, linesStoppedCount, createWorkOrder, advanceWorkOrder } = useWorkOrders();
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | WoStatus>('OPEN');
-  const [showNew, setShowNew] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [advancingId, setAdvancingId] = useState<string | null>(null);
 
+  const isEngineer = hasRole('engineer');
   const canCreate = hasRole(['supervisor', 'admin']);
-  const canAdvance = hasRole(['engineer', 'admin']);
 
   const filteredOrders = useMemo(() => {
     if (statusFilter === 'ALL') return workOrders;
@@ -53,13 +142,38 @@ export function WorkOrders() {
   }, [workOrders, statusFilter]);
 
   const handleAdvance = async (wo: WorkOrder) => {
-    setBusy(wo.id);
-    const next = nextStatus(wo.status);
-    const result = next === 'received'
+    setAdvancingId(wo.id);
+    const result = wo.status === 'open'
       ? await advanceWorkOrder(wo, user?.id, user?.name)
       : await advanceWorkOrder(wo);
-    setBusy(null);
-    if (!result.success) alert(result.error || 'Failed to advance work order');
+    setAdvancingId(null);
+    if (!result.success) {
+      toast.error(`Failed to update work order: ${result.error}`);
+      return;
+    }
+    toast.success(`Work order #${wo.wo_number} advanced`);
+  };
+
+  const handleStopLine = async (wo: WorkOrder) => {
+    setAdvancingId(wo.id);
+    const result = await stopLine(wo);
+    setAdvancingId(null);
+    if (!result.success) {
+      toast.error(`Failed to stop line: ${result.error}`);
+      return;
+    }
+    toast.success(`Line stopped for #${wo.wo_number}`);
+  };
+
+  const handleResumeLine = async (wo: WorkOrder) => {
+    setAdvancingId(wo.id);
+    const result = await resumeLine(wo);
+    setAdvancingId(null);
+    if (!result.success) {
+      toast.error(`Failed to resume line: ${result.error}`);
+      return;
+    }
+    toast.success(`Line resumed for #${wo.wo_number} — logged on the shift`);
   };
 
   return (
@@ -94,6 +208,8 @@ export function WorkOrders() {
           </div>
         </div>
 
+        {showNewForm && <NewWorkOrderForm onClose={() => setShowNewForm(false)} onCreated={refreshWorkOrders} />}
+
         <div className="card p-4 sm:p-6">
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div>
@@ -107,14 +223,14 @@ export function WorkOrders() {
               </select>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                {filteredOrders.length} ticket{filteredOrders.length !== 1 ? 's' : ''}
-              </span>
-              {canCreate && (
-                <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-1.5">
-                  <Plus size={16} /> New Work Order
+              {canCreate && !showNewForm && (
+                <button onClick={() => setShowNewForm(true)} className="btn-primary text-sm">
+                  <Plus size={14} /> New Work Order
                 </button>
               )}
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {filteredOrders.length} ticket{filteredOrders.length !== 1 ? 's' : ''}
+              </span>
             </div>
           </div>
 
@@ -143,138 +259,72 @@ export function WorkOrders() {
                     <th className="py-2 pr-3">Engineer</th>
                     <th className="py-2 pr-3">Priority</th>
                     <th className="py-2 pr-3">Created</th>
-                    {canAdvance && <th className="py-2 pr-3">Action</th>}
+                    {isEngineer && <th className="py-2 pr-3">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredOrders.map(wo => {
-                    const next = nextStatus(wo.status);
-                    return (
-                      <tr key={wo.id} className="hover:bg-muted/50">
-                        <td className="py-2 pr-3 font-medium text-foreground">#{wo.wo_number}</td>
+                  {filteredOrders.map(wo => (
+                    <tr key={wo.id} className="hover:bg-muted/50">
+                      <td className="py-2 pr-3 font-medium text-foreground">#{wo.wo_number}</td>
+                      <td className="py-2 pr-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${STATUS_CLASSES[wo.status]}`}>{STATUS_LABELS[wo.status]}</span>
+                        {wo.line_stopped && (
+                          <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded bg-red-100 text-red-800">Line Stopped</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">{wo.line_at_time || '—'}</td>
+                      <td className="py-2 pr-3 text-muted-foreground">{wo.machine || '—'}</td>
+                      <td className="py-2 pr-3 max-w-xs truncate" title={wo.description}>{wo.description}</td>
+                      <td className="py-2 pr-3">{wo.requester_name}</td>
+                      <td className="py-2 pr-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
+                      <td className="py-2 pr-3 capitalize">{wo.priority}</td>
+                      <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">{formatDateTime(wo.created_at)}</td>
+                      {isEngineer && (
                         <td className="py-2 pr-3">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${STATUS_CLASSES[wo.status]}`}>{STATUS_LABELS[wo.status]}</span>
-                        </td>
-                        <td className="py-2 pr-3">{wo.line_at_time || '—'}</td>
-                        <td className="py-2 pr-3 text-muted-foreground">{wo.machine || '—'}</td>
-                        <td className="py-2 pr-3 max-w-xs truncate" title={wo.description}>{wo.description}</td>
-                        <td className="py-2 pr-3">{wo.requester_name}</td>
-                        <td className="py-2 pr-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
-                        <td className="py-2 pr-3 capitalize">{wo.priority}</td>
-                        <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">{formatDateTime(wo.created_at)}</td>
-                        {canAdvance && (
-                          <td className="py-2 pr-3">
-                            {next ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {nextStatus(wo.status) ? (
                               <button
-                                disabled={busy === wo.id}
                                 onClick={() => handleAdvance(wo)}
-                                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                                disabled={advancingId === wo.id}
+                                className="btn-secondary text-xs py-1 px-2 whitespace-nowrap"
+                                title={`Move to ${STATUS_LABELS[nextStatus(wo.status)!]}`}
                               >
-                                {busy === wo.id ? <Loader2 size={12} className="animate-spin" /> : <ArrowRight size={12} />}
-                                {STATUS_LABELS[next]}
+                                {advancingId === wo.id ? <Loader2 size={12} className="animate-spin" /> : <ArrowRight size={12} />}
+                                {STATUS_LABELS[nextStatus(wo.status)!]}
                               </button>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
+                            {!OPEN_STATUSES.includes(wo.status) ? null : wo.line_stopped ? (
+                              <button
+                                onClick={() => handleResumeLine(wo)}
+                                disabled={advancingId === wo.id}
+                                className="text-xs py-1 px-2 rounded whitespace-nowrap bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                title="Resume the line — logs the downtime on the matching shift"
+                              >
+                                {advancingId === wo.id ? <Loader2 size={12} className="animate-spin inline" /> : null} Resume Line
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleStopLine(wo)}
+                                disabled={advancingId === wo.id}
+                                className="text-xs py-1 px-2 rounded whitespace-nowrap bg-red-100 text-red-800 hover:bg-red-200"
+                                title="Stop the line for this work order"
+                              >
+                                {advancingId === wo.id ? <Loader2 size={12} className="animate-spin inline" /> : null} Stop Line
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
         </div>
       </div>
-
-      {showNew && canCreate && user && (
-        <NewWorkOrderModal
-          onClose={() => setShowNew(false)}
-          onCreate={async (input) => {
-            const res = await createWorkOrder({ ...input, requesterName: user.name, operatorId: user.id });
-            if (res.success) setShowNew(false);
-            return res;
-          }}
-        />
-      )}
     </>
-  );
-}
-
-interface NewWorkOrderModalProps {
-  onClose: () => void;
-  onCreate: (input: { description: string; lineId: string; lineName: string; machine?: string; priority: string }) => Promise<{ success: boolean; error?: string }>;
-}
-
-function NewWorkOrderModal({ onClose, onCreate }: NewWorkOrderModalProps) {
-  const [lines, setLines] = useState<LineRow[]>([]);
-  const [lineId, setLineId] = useState('');
-  const [description, setDescription] = useState('');
-  const [machine, setMachine] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [submitting, setSubmitting] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('lines').select('id, name').order('name');
-      if (data) setLines(data as LineRow[]);
-    })();
-  }, []);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!description.trim() || !lineId) return;
-    const line = lines.find(l => l.id === lineId);
-    if (!line) return;
-    setSubmitting(true);
-    setErr(null);
-    const res = await onCreate({ description: description.trim(), lineId, lineName: line.name, machine: machine.trim() || undefined, priority });
-    setSubmitting(false);
-    if (!res.success) setErr(res.error || 'Failed to create');
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-lg shadow-lg w-full max-w-md">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="font-semibold">New Work Order</h3>
-          <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
-        </div>
-        <form onSubmit={submit} className="p-4 space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Line *</label>
-            <select value={lineId} onChange={e => setLineId(e.target.value)} required className="input-field w-full">
-              <option value="">Select line...</option>
-              {lines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Description *</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} required rows={3} className="input-field w-full" placeholder="Describe the issue..." />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Machine (optional)</label>
-            <input value={machine} onChange={e => setMachine(e.target.value)} className="input-field w-full" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Priority</label>
-            <select value={priority} onChange={e => setPriority(e.target.value)} className="input-field w-full">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-          {err && <p className="text-xs text-destructive">{err}</p>}
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={submitting} className="btn-primary inline-flex items-center gap-1.5">
-              {submitting && <Loader2 size={14} className="animate-spin" />} Create
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }
