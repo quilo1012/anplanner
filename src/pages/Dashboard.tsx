@@ -54,8 +54,16 @@ export function Dashboard() {
   const [leaderQualityLoading, setLeaderQualityLoading] = useState(false);
   const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
   const [qualityRefreshTick, setQualityRefreshTick] = useState(0);
-  const { rows: openWoRows } = useOpenWorkOrdersDowntime();
-  const showOpenTickets = canEditSessions && openWoRows.length > 0;
+  const { rows: allOpenWoRows } = useOpenWorkOrdersDowntime();
+  // Scope the "Open Maintenance Tickets" widget to tickets raised by the
+  // logged-in leader (matched by requester_name). Admins still see everything.
+  const openWoRows = useMemo(() => {
+    if (user?.role === 'admin') return allOpenWoRows;
+    const me = (user?.name || '').trim().toLowerCase();
+    if (!me) return [];
+    return allOpenWoRows.filter(r => (r.wo.requester_name || '').trim().toLowerCase() === me);
+  }, [allOpenWoRows, user?.name, user?.role]);
+  const showOpenTickets = openWoRows.length > 0;
 
   // Per-leader quality totals across the selected period+shift (all lines).
   useEffect(() => {
