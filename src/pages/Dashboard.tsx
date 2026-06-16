@@ -49,6 +49,8 @@ export function Dashboard() {
   const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
   const [leaderQuality, setLeaderQuality] = useState<Record<string, { occurrences: number; points: number }>>({});
   const [leaderQualityLoading, setLeaderQualityLoading] = useState(false);
+  const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
+  const [qualityRefreshTick, setQualityRefreshTick] = useState(0);
 
   // Per-leader quality totals across the selected period+shift (all lines).
   useEffect(() => {
