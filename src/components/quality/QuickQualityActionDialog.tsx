@@ -35,20 +35,27 @@ export function QuickQualityActionDialog({
   const [date, setDate] = useState(defaultDate || format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [dbLines, setDbLines] = useState<string[]>([]);
+  const [dbLines, setDbLines] = useState<{ name: string; display_order: number }[]>([]);
+  const [linesError, setLinesError] = useState<string | null>(null);
+  const [linesLoading, setLinesLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setLinesError(null);
+    setLinesLoading(true);
     (async () => {
       const { data, error } = await supabase
         .from('lines')
         .select('name, display_order')
         .order('display_order', { ascending: true });
+      setLinesLoading(false);
       if (error) {
+        setLinesError(error.message);
+        setDbLines([]);
         toast.error(`Failed to load lines: ${error.message}`);
         return;
       }
-      setDbLines((data ?? []).map(r => r.name));
+      setDbLines((data ?? []) as { name: string; display_order: number }[]);
     })();
   }, [open]);
 
