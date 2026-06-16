@@ -374,7 +374,11 @@ export function Dashboard() {
           <div className="bg-card border border-border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground uppercase mb-1">Quality Actions</p>
             <p className="text-xl font-bold text-foreground tabular-nums">
-              {Object.values(leaderQuality).reduce((sum, q) => sum + (q.occurrences || 0), 0)}
+              {(() => {
+                const key = selectedLeader.trim().toLowerCase();
+                if (key) return leaderQuality[key]?.occurrences || 0;
+                return Object.values(leaderQuality).reduce((sum, q) => sum + (q.occurrences || 0), 0);
+              })()}
             </p>
           </div>
         </div>
