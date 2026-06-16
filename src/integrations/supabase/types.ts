@@ -35,6 +35,122 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: []
+      }
+      checklist_responses: {
+        Row: {
+          checklist_id: string
+          completed: boolean
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          work_order_id: string
+        }
+        Insert: {
+          checklist_id: string
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          work_order_id: string
+        }
+        Update: {
+          checklist_id?: string
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_responses_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_responses_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklists: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_required: boolean
+          problem_description_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          is_required?: boolean
+          problem_description_id: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_required?: boolean
+          problem_description_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklists_problem_description_id_fkey"
+            columns: ["problem_description_id"]
+            isOneToOne: false
+            referencedRelation: "problem_descriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       device_lines: {
         Row: {
           created_at: string
@@ -218,6 +334,42 @@ export type Database = {
         }
         Relationships: []
       }
+      line_problem_descriptions: {
+        Row: {
+          created_at: string
+          id: string
+          line_id: string
+          problem_description_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_id: string
+          problem_description_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_id?: string
+          problem_description_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "line_problem_descriptions_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "line_problem_descriptions_problem_description_id_fkey"
+            columns: ["problem_description_id"]
+            isOneToOne: false
+            referencedRelation: "problem_descriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lines: {
         Row: {
           created_at: string
@@ -241,6 +393,133 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      machine_assignments: {
+        Row: {
+          assigned_from: string
+          assigned_line: string
+          assigned_until: string | null
+          id: string
+          machine_id: string
+          moved_by: string | null
+          notes: string | null
+        }
+        Insert: {
+          assigned_from?: string
+          assigned_line: string
+          assigned_until?: string | null
+          id?: string
+          machine_id: string
+          moved_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          assigned_from?: string
+          assigned_line?: string
+          assigned_until?: string | null
+          id?: string
+          machine_id?: string
+          moved_by?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_assignments_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_events: {
+        Row: {
+          action_taken: string | null
+          created_at: string
+          engineer_id: string | null
+          engineer_name: string | null
+          event_type: string
+          id: string
+          machine_id: string | null
+          part_used: string | null
+          problem_description: string | null
+          work_order_id: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          created_at?: string
+          engineer_id?: string | null
+          engineer_name?: string | null
+          event_type: string
+          id?: string
+          machine_id?: string | null
+          part_used?: string | null
+          problem_description?: string | null
+          work_order_id?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          created_at?: string
+          engineer_id?: string | null
+          engineer_name?: string | null
+          event_type?: string
+          id?: string
+          machine_id?: string | null
+          part_used?: string | null
+          problem_description?: string | null
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_events_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_events_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_location_log: {
+        Row: {
+          created_at: string
+          from_location: string
+          id: string
+          machine_id: string
+          moved_by: string | null
+          to_location: string
+        }
+        Insert: {
+          created_at?: string
+          from_location: string
+          id?: string
+          machine_id: string
+          moved_by?: string | null
+          to_location: string
+        }
+        Update: {
+          created_at?: string
+          from_location?: string
+          id?: string
+          machine_id?: string
+          moved_by?: string | null
+          to_location?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_location_log_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       machines: {
         Row: {
@@ -469,6 +748,42 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          action_url: string | null
+          body: string
+          created_at: string
+          id: string
+          priority: string
+          read_at: string | null
+          title: string
+          user_id: string
+          wo_id: string | null
+        }
+        Insert: {
+          action_url?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          priority?: string
+          read_at?: string | null
+          title: string
+          user_id: string
+          wo_id?: string | null
+        }
+        Update: {
+          action_url?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          priority?: string
+          read_at?: string | null
+          title?: string
+          user_id?: string
+          wo_id?: string | null
+        }
+        Relationships: []
+      }
       operation_time: {
         Row: {
           created_at: string
@@ -549,6 +864,99 @@ export type Database = {
           line_ids?: string[]
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      parts_used: {
+        Row: {
+          created_at: string
+          engineer_id: string
+          engineer_name: string
+          id: string
+          product_id: string
+          quantity: number
+          work_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          engineer_id: string
+          engineer_name: string
+          id?: string
+          product_id: string
+          quantity: number
+          work_order_id: string
+        }
+        Update: {
+          created_at?: string
+          engineer_id?: string
+          engineer_name?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parts_used_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "spare_parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_used_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      problem_descriptions: {
+        Row: {
+          active: boolean | null
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          severity: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          severity?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          severity?: string | null
+        }
+        Relationships: []
+      }
+      product_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -845,6 +1253,36 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       quality_action_types: {
         Row: {
           created_at: string
@@ -938,6 +1376,45 @@ export type Database = {
           },
         ]
       }
+      spare_parts: {
+        Row: {
+          category: string
+          code: string
+          created_at: string
+          id: string
+          line: string | null
+          min_stock: number
+          name: string
+          price: number
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          code: string
+          created_at?: string
+          id?: string
+          line?: string | null
+          min_stock?: number
+          name: string
+          price?: number
+          quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string
+          id?: string
+          line?: string | null
+          min_stock?: number
+          name?: string
+          price?: number
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       structured_downtimes: {
         Row: {
           category: string
@@ -987,6 +1464,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_settings: {
+        Row: {
+          admin_pin: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_pin: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_pin?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
