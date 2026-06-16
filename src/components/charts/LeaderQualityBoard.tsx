@@ -17,11 +17,10 @@ interface MonthlyRow {
 }
 
 interface Props {
-  currentDate: string;
+  startDate: string;
+  endDate: string;
 }
 
-type PeriodType = 'day' | 'week' | '15days' | 'month';
-const periodLabels: Record<PeriodType, string> = { day: 'Day', week: 'Week', '15days': '15d', month: 'Month' };
 
 interface LeaderQualityStats {
   name: string;
@@ -41,10 +40,9 @@ interface HistoryRow {
   severity: QualitySeverity | null;
 }
 
-export function LeaderQualityBoard({ currentDate }: Props) {
+export function LeaderQualityBoard({ startDate, endDate }: Props) {
   const [view, setView] = useState<'period' | 'monthly'>('period');
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
-  const [periodFilter, setPeriodFilter] = useState<PeriodType>('day');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -52,18 +50,10 @@ export function LeaderQualityBoard({ currentDate }: Props) {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const [monthValue, setMonthValue] = useState<string>(() => format(parseISO(currentDate), 'yyyy-MM'));
+  const [monthValue, setMonthValue] = useState<string>(() => format(parseISO(endDate), 'yyyy-MM'));
   const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>([]);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
 
-  const { startDate, endDate } = useMemo(() => {
-    const end = parseISO(currentDate);
-    let start = end;
-    if (periodFilter === 'week') start = subDays(end, 6);
-    else if (periodFilter === '15days') start = subDays(end, 14);
-    else if (periodFilter === 'month') start = subDays(end, 29);
-    return { startDate: format(start, 'yyyy-MM-dd'), endDate: format(end, 'yyyy-MM-dd') };
-  }, [currentDate, periodFilter]);
 
   useEffect(() => {
     let cancel = false;
@@ -236,15 +226,13 @@ export function LeaderQualityBoard({ currentDate }: Props) {
   }, [history]);
 
   const dateDisplay = useMemo(() => {
-    const p = parseISO(currentDate);
-    const map: Record<PeriodType, string> = {
-      day: format(p, 'EEEE, MMM d, yyyy'),
-      week: `${format(subDays(p, 6), 'MMM d')} - ${format(p, 'MMM d, yyyy')} (7 Days)`,
-      '15days': `${format(subDays(p, 14), 'MMM d')} - ${format(p, 'MMM d, yyyy')} (15 Days)`,
-      month: `${format(subDays(p, 29), 'MMM d')} - ${format(p, 'MMM d, yyyy')} (30 Days)`,
-    };
-    return map[periodFilter];
-  }, [currentDate, periodFilter]);
+    const s = parseISO(startDate);
+    const e = parseISO(endDate);
+    if (startDate === endDate) return format(s, 'EEEE, MMM d, yyyy');
+    const days = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
+    return `${format(s, 'MMM d')} - ${format(e, 'MMM d, yyyy')} (${days} Days)`;
+  }, [startDate, endDate]);
+
 
   const severityClass = (pts: number) => {
     if (pts === 0) return 'text-success';
@@ -285,15 +273,8 @@ export function LeaderQualityBoard({ currentDate }: Props) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex rounded-lg border border-border overflow-hidden">
-                {(['day', 'week', '15days', 'month'] as const).map((period) => (
-                  <button key={period} onClick={() => setPeriodFilter(period)}
-                    className={`px-2 py-1 text-xs font-medium transition-colors ${periodFilter === period ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
-                    {periodLabels[period]}
-                  </button>
-                ))}
-              </div>
             </div>
+
             <div className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar size={14} />{dateDisplay}</div>
           </>
         ) : (
