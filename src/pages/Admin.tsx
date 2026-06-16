@@ -235,6 +235,7 @@ export function Admin() {
                     >
                       <option value="operator">Leader</option>
                       <option value="supervisor">Supervisor</option>
+                      <option value="engineer">Engineer (Maintenance)</option>
                       <option value="admin">Manager</option>
                     </select>
                   </div>

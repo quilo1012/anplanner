@@ -23,7 +23,7 @@ const directItems: NavItem[] = [
 
 // Grouped dropdowns
 const maintenanceItems: NavItem[] = [
-  { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin'] },
+  { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin', 'engineer'] },
 ];
 
 const reportsItems: NavItem[] = [
