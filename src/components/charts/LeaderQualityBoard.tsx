@@ -19,7 +19,9 @@ interface MonthlyRow {
 interface Props {
   startDate: string;
   endDate: string;
+  leaderFilter?: string;
 }
+
 
 
 interface LeaderQualityStats {
@@ -40,7 +42,9 @@ interface HistoryRow {
   severity: QualitySeverity | null;
 }
 
-export function LeaderQualityBoard({ startDate, endDate }: Props) {
+export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) {
+  const leaderFilterNorm = (leaderFilter || '').trim().toLowerCase();
+
   const [view, setView] = useState<'period' | 'monthly'>('period');
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
@@ -195,9 +199,14 @@ export function LeaderQualityBoard({ startDate, endDate }: Props) {
         const s = (r.shift_type || '').toUpperCase();
         if (s !== shiftFilter) return false;
       }
+      if (leaderFilterNorm) {
+        const name = (r.line_leader || '').trim().toLowerCase();
+        if (name !== leaderFilterNorm) return false;
+      }
       return true;
     });
-  }, [rows, shiftFilter]);
+  }, [rows, shiftFilter, leaderFilterNorm]);
+
 
   const stats: LeaderQualityStats[] = useMemo(() => {
     const map: Record<string, { points: number; count: number }> = {};
@@ -358,9 +367,15 @@ export function LeaderQualityBoard({ startDate, endDate }: Props) {
         <>
           {monthlyLoading ? (
             <div className="text-center py-6 text-muted-foreground text-sm">Loading…</div>
-          ) : monthlyRows.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground text-sm">No data for this month</div>
-          ) : (
+          ) : (() => {
+            const visibleRows = leaderFilterNorm
+              ? monthlyRows.filter(r => r.name.trim().toLowerCase() === leaderFilterNorm)
+              : monthlyRows;
+            if (visibleRows.length === 0) {
+              return <div className="text-center py-6 text-muted-foreground text-sm">No data for this month</div>;
+            }
+            return (
+
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -373,7 +388,7 @@ export function LeaderQualityBoard({ startDate, endDate }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {monthlyRows.map((r, i) => (
+                  {visibleRows.map((r, i) => (
                     <tr key={r.name} className="border-b border-border/50 hover:bg-muted/30">
                       <td className="py-2 px-2 text-muted-foreground">{i + 1}</td>
                       <td className="py-2 px-2 font-medium text-foreground">{r.name}</td>
@@ -387,7 +402,8 @@ export function LeaderQualityBoard({ startDate, endDate }: Props) {
                 </tbody>
               </table>
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
