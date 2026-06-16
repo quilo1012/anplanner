@@ -166,8 +166,86 @@ export function useWorkOrders() {
     }
   };
 
+  /**
+   * Marks the line as stopped for this work order: flips work_orders.line_stopped
+   * and opens a maintenance_downtime_events row (stopped_at set, resumed_at null).
+   * The actual sync into the Anplanner shift's structured_downtimes happens via
+   * the DB trigger once the line is resumed (see stopLine's counterpart, resumeLine).
+   */
+  const stopLine = async (wo: WorkOrder, stoppedReason?: string): Promise<OperationResult> => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      const userName = userData.user?.user_metadata?.name as string | undefined;
+
+      const { error: insertError } = await supabase
+        .from('maintenance_downtime_events' as never)
+        .insert({
+          work_order_id: wo.id,
+          stopped_at: new Date().toISOString(),
+          stopped_by: userId,
+          stopped_by_name: userName || null,
+          stopped_reason: stoppedReason || null,
+        } as never);
+      if (insertError) return { success: false, error: insertError.message };
+
+      const { error: updateError } = await supabase
+        .from('work_orders' as never)
+        .update({ line_stopped: true, line_stopped_at: new Date().toISOString(), line_stopped_by: userId } as never)
+        .eq('id', wo.id);
+      if (updateError) return { success: false, error: updateError.message };
+
+      await fetchWorkOrders();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  };
+
+  /**
+   * Resumes the line: finds this WO's currently-open maintenance_downtime_events
+   * row and sets resumed_at — this is what fires the DB trigger that logs the
+   * downtime onto the matching Anplanner shift.
+   */
+  const resumeLine = async (wo: WorkOrder, resumedNote?: string): Promise<OperationResult> => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      const userName = userData.user?.user_metadata?.name as string | undefined;
+      const now = new Date().toISOString();
+
+      const { data: openEvent, error: findError } = await supabase
+        .from('maintenance_downtime_events' as never)
+        .select('id')
+        .eq('work_order_id', wo.id)
+        .is('resumed_at', null)
+        .order('stopped_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (findError) return { success: false, error: findError.message };
+      if (!openEvent) return { success: false, error: 'No open downtime event found for this line stop.' };
+
+      const { error: updateEventError } = await supabase
+        .from('maintenance_downtime_events' as never)
+        .update({ resumed_at: now, resumed_by: userId, resumed_by_name: userName || null, resumed_note: resumedNote || null } as never)
+        .eq('id', (openEvent as unknown as { id: string }).id);
+      if (updateEventError) return { success: false, error: updateEventError.message };
+
+      const { error: updateWoError } = await supabase
+        .from('work_orders' as never)
+        .update({ line_stopped: false, line_resumed_at: now, line_resumed_by: userId } as never)
+        .eq('id', wo.id);
+      if (updateWoError) return { success: false, error: updateWoError.message };
+
+      await fetchWorkOrders();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  };
+
   const openCount = workOrders.filter(wo => OPEN_STATUSES.includes(wo.status)).length;
   const linesStoppedCount = workOrders.filter(wo => wo.line_stopped && OPEN_STATUSES.includes(wo.status)).length;
 
-  return { workOrders, isLoading, error, refreshWorkOrders: fetchWorkOrders, updateWorkOrderStatus, createWorkOrder, advanceWorkOrder, openCount, linesStoppedCount };
+  return { workOrders, isLoading, error, refreshWorkOrders: fetchWorkOrders, updateWorkOrderStatus, createWorkOrder, advanceWorkOrder, stopLine, resumeLine, openCount, linesStoppedCount };
 }
