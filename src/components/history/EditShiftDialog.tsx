@@ -188,20 +188,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     if (!session) return;
 
     const validRows = skuRows.filter(row => row.sku.trim());
-    if (validRows.length === 0) { toast.error('At least one SKU is required'); return; }
-    if (!isOperator && lineTarget <= 0) { toast.error('Line Production Target is required'); return; }
-
-    // Check for duplicate SKUs
-    const skuCounts = new Map<string, number>();
-    validRows.forEach(row => {
-      const key = row.sku.trim().toLowerCase();
-      if (key) skuCounts.set(key, (skuCounts.get(key) || 0) + 1);
-    });
-    const duplicates = [...skuCounts.entries()].filter(([, c]) => c > 1).map(([k]) => k);
-    if (duplicates.length > 0) {
-      toast.error(`Duplicate SKUs: ${duplicates.join(', ')}. Each SKU can only appear once per session.`);
-      return;
-    }
 
     setIsSubmitting(true);
     const safetyTimer = setTimeout(() => {
