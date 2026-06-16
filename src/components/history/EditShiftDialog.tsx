@@ -12,13 +12,16 @@ import { useShifts } from '@/contexts/ShiftContext';
 
 import { SkuRowForm } from '@/components/SkuRowForm';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
-import { Loader2, Save, Target, TrendingUp } from 'lucide-react';
+import { Loader2, Save, Target, TrendingUp, Wrench, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { QualityActionsForm } from '@/components/QualityActionsForm';
 import { QualityActionRow } from '@/types/quality';
 import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
 import { useAuth } from '@/contexts/AuthContext';
+import { mapToAnmaisysLine } from '@/utils/maintenanceLineMapping';
+import { createMaintenanceOrder } from '@/services/maintenanceBridge';
+import { DOWNTIME_REASONS_FALLBACK } from '@/types/downtime';
 
 interface EditShiftDialogProps {
   session: ProductionSession | null;
