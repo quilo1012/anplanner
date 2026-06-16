@@ -188,20 +188,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     if (!session) return;
 
     const validRows = skuRows.filter(row => row.sku.trim());
-    if (validRows.length === 0) { toast.error('At least one SKU is required'); return; }
-    if (!isOperator && lineTarget <= 0) { toast.error('Line Production Target is required'); return; }
-
-    // Check for duplicate SKUs
-    const skuCounts = new Map<string, number>();
-    validRows.forEach(row => {
-      const key = row.sku.trim().toLowerCase();
-      if (key) skuCounts.set(key, (skuCounts.get(key) || 0) + 1);
-    });
-    const duplicates = [...skuCounts.entries()].filter(([, c]) => c > 1).map(([k]) => k);
-    if (duplicates.length > 0) {
-      toast.error(`Duplicate SKUs: ${duplicates.join(', ')}. Each SKU can only appear once per session.`);
-      return;
-    }
 
     setIsSubmitting(true);
     const safetyTimer = setTimeout(() => {
@@ -310,7 +296,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isOperator && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="h-9" /></div>
             <div className="space-y-1"><Label className="text-xs">Shift</Label>
               <Select value={shiftType} onValueChange={(v) => setShiftType(v as ShiftType)}>
@@ -320,91 +306,12 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             </div>
             <div className="space-y-1"><Label className="text-xs">Production Line</Label><Input value={productionLine} onChange={(e) => setProductionLine(e.target.value)} required className="h-9" /></div>
             <div className="space-y-1"><Label className="text-xs">Leader</Label><Input value={lineLeader} onChange={(e) => setLineLeader(e.target.value)} required className="h-9" /></div>
-            <div className="space-y-1"><Label className="text-xs">Staff Planned</Label><Input type="number" min={0} value={staffPlanned} onChange={(e) => setStaffPlanned(parseInt(e.target.value) || 0)} className="h-9" /></div>
-            <div className="space-y-1"><Label className="text-xs">Staff Actual</Label><Input type="number" min={0} value={staffActual} onChange={(e) => setStaffActual(parseInt(e.target.value) || 0)} className="h-9" /></div>
           </div>
           )}
-
-          {!isOperator && (
-          <div className="border-t pt-4">
-            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-              <Label className="text-sm flex items-center gap-2 font-medium"><Target size={16} className="text-primary" />Line Production Target</Label>
-              <div className="relative max-w-xs mt-1">
-                <Input type="number" value={lineTarget || ''} onChange={(e) => setLineTarget(parseInt(e.target.value) || 0)} min={0} className="h-10 pr-14 text-lg font-semibold" required />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">units</span>
-              </div>
-            </div>
-          </div>
-          )}
-
-          <div className="border-t pt-4">
-            <SkuRowForm skuRows={skuRows} onChange={setSkuRows} canReview={!isOperator} errors={{}} showTarget={false} />
-          </div>
-
-          <div className="p-4 bg-muted rounded-lg border">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div>
-                  <div className="text-xs text-muted-foreground">Total Production</div>
-                  <div className="text-xl font-bold flex items-center gap-2"><TrendingUp size={18} className="text-primary" />{totalProduction.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">units</span></div>
-                </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <div className="text-xs text-muted-foreground">Target</div>
-                  <div className="text-lg font-semibold">{lineTarget.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">units</span></div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-muted-foreground">Performance</div>
-                <div className={`text-2xl font-bold ${performance >= 100 ? 'text-green-600' : performance >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>{performance.toFixed(1)}%</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-1 border-t pt-4">
-            <Label className="text-xs">Comments / Observations</Label>
-            <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
-          </div>
 
           {!isOperator && (
             <div className="border-t pt-4">
               <QualityActionsForm rows={qualityRows} onChange={setQualityRows} />
-            </div>
-          )}
-
-          {maintenanceDowntimes.length > 0 && (
-            <div className="border-t pt-4 space-y-2">
-              <Label className="text-sm flex items-center gap-2 font-medium">
-                <Wrench size={16} className="text-primary" /> Maintenance Downtimes
-              </Label>
-              <div className="space-y-2">
-                {maintenanceDowntimes.map(dt => {
-                  const created = createdOrders[dt.id];
-                  const isCreating = creatingOrderId === dt.id;
-                  return (
-                    <div key={dt.id} className="flex items-center justify-between gap-3 p-2 rounded border bg-muted/30">
-                      <div className="text-sm min-w-0 flex-1">
-                        <div className="font-medium truncate">{reasonLabel(dt.reason)} · {dt.duration} min</div>
-                        {dt.comment && <div className="text-xs text-muted-foreground truncate">{dt.comment}</div>}
-                      </div>
-                      {created ? (
-                        <span className="text-xs text-green-600 font-medium whitespace-nowrap">Order #{created} created</span>
-                      ) : (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={isCreating}
-                          onClick={() => handleCreateOrder(dt)}
-                        >
-                          {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
-                          {isCreating ? 'Creating...' : 'Open Maintenance Order'}
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           )}
 
