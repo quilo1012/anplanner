@@ -74,7 +74,7 @@ export function Dashboard() {
       setLeaderQualityLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [startDate, endDate, selectedShift, sessions]);
+  }, [startDate, endDate, selectedShift, sessions, qualityRefreshTick]);
 
 
   // Apply URL params on mount / when they change (e.g. after iTouching import redirect)
