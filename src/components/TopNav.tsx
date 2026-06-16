@@ -22,6 +22,10 @@ const directItems: NavItem[] = [
 ];
 
 // Grouped dropdowns
+const maintenanceItems: NavItem[] = [
+  { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin'] },
+];
+
 const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
@@ -35,7 +39,7 @@ const systemItems: NavItem[] = [
 ];
 
 // Flat list used by the mobile drawer (unchanged behavior)
-const navItems: NavItem[] = [...directItems, ...reportsItems, ...systemItems];
+const navItems: NavItem[] = [...directItems, ...maintenanceItems, ...reportsItems, ...systemItems];
 
 // Drawer debug: enable via `?drawerDebug=1` or `localStorage.drawerDebug = '1'`.
 const drawerDebug = (() => {
