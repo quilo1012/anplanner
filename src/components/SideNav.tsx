@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
-  FileBarChart, Package, ShieldAlert, Circle, Trophy, Wrench, ChevronDown,
+  FileBarChart, Package, ShieldAlert, Circle, Trophy, Wrench, ChevronDown, Users,
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS, UserRole } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
@@ -23,7 +23,10 @@ const directItems: NavItem[] = [
   { path: '/products', label: 'Products', icon: Package, roles: ['supervisor', 'admin'] },
 ];
 const maintenanceItems: NavItem[] = [
-  { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin'] },
+  { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin', 'engineer', 'operator'] },
+  { path: '/maintenance/engineers', label: 'Engineers', icon: Users, roles: ['supervisor', 'admin', 'engineer'] },
+  { path: '/maintenance/machines', label: 'Machines', icon: Package, roles: ['supervisor', 'admin', 'engineer'] },
+  { path: '/maintenance/spare-parts', label: 'Spare Parts', icon: Package, roles: ['supervisor', 'admin'] },
 ];
 const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
