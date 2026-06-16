@@ -36,6 +36,25 @@ interface OperationResult {
 
 const OPEN_STATUSES: WoStatus[] = ['open', 'received', 'arrived', 'in_progress'];
 
+/** Full status flow, in order. Each call to advance moves one step forward. */
+const STATUS_FLOW: WoStatus[] = ['open', 'received', 'arrived', 'in_progress', 'finished', 'closed'];
+
+export function nextStatus(current: WoStatus): WoStatus | null {
+  const idx = STATUS_FLOW.indexOf(current);
+  if (idx === -1 || idx === STATUS_FLOW.length - 1) return null;
+  return STATUS_FLOW[idx + 1];
+}
+
+interface NewWorkOrderInput {
+  description: string;
+  lineId: string;
+  lineName: string;
+  machine?: string;
+  priority: string;
+  requesterName: string;
+  operatorId: string;
+}
+
 /**
  * Fetches and manages work orders (maintenance tickets), brought in from the
  * Anmaisys fusion. Note: `work_orders` isn't yet in the generated Supabase
@@ -83,8 +102,72 @@ export function useWorkOrders() {
     }
   };
 
+  const createWorkOrder = async (input: NewWorkOrderInput): Promise<OperationResult> => {
+    try {
+      const { error: insertError } = await supabase
+        .from('work_orders' as never)
+        .insert({
+          description: input.description,
+          line_id: input.lineId,
+          line_at_time: input.lineName,
+          machine: input.machine || null,
+          priority: input.priority,
+          requester_name: input.requesterName,
+          operator_id: input.operatorId,
+          status: 'open',
+        } as never);
+      if (insertError) return { success: false, error: insertError.message };
+      await fetchWorkOrders();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  };
+
+  /**
+   * Moves a work order one step forward in the status flow, stamping the
+   * matching timestamp column (received_at, arrived_at, started_at,
+   * finished_at, closed_at) and, on first acceptance, assigning the engineer.
+   */
+  const advanceWorkOrder = async (wo: WorkOrder, engineerId?: string, engineerName?: string): Promise<OperationResult> => {
+    const next = nextStatus(wo.status);
+    if (!next) return { success: false, error: 'This work order is already at its final status.' };
+
+    const now = new Date().toISOString();
+    const timestampColumn: Record<WoStatus, string | null> = {
+      open: null,
+      received: 'received_at',
+      arrived: 'arrived_at',
+      in_progress: 'started_at',
+      finished: 'finished_at',
+      closed: 'closed_at',
+      completed: null,
+      force_closed: null,
+    };
+
+    const update: Record<string, unknown> = { status: next };
+    const col = timestampColumn[next];
+    if (col) update[col] = now;
+    if (next === 'received' && engineerId) {
+      update.engineer_id = engineerId;
+      update.engineer_name = engineerName || null;
+    }
+
+    try {
+      const { error: updateError } = await supabase
+        .from('work_orders' as never)
+        .update(update as never)
+        .eq('id', wo.id);
+      if (updateError) return { success: false, error: updateError.message };
+      await fetchWorkOrders();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  };
+
   const openCount = workOrders.filter(wo => OPEN_STATUSES.includes(wo.status)).length;
   const linesStoppedCount = workOrders.filter(wo => wo.line_stopped && OPEN_STATUSES.includes(wo.status)).length;
 
-  return { workOrders, isLoading, error, refreshWorkOrders: fetchWorkOrders, updateWorkOrderStatus, openCount, linesStoppedCount };
+  return { workOrders, isLoading, error, refreshWorkOrders: fetchWorkOrders, updateWorkOrderStatus, createWorkOrder, advanceWorkOrder, openCount, linesStoppedCount };
 }
