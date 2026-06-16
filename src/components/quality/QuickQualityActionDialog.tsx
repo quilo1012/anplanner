@@ -23,7 +23,7 @@ interface Props {
 }
 
 export function QuickQualityActionDialog({
-  open, onOpenChange, lines, leaders,
+  open, onOpenChange, leaders,
   defaultLine = '', defaultLeader = '', defaultShift = 'DAY',
   defaultDate, recordedBy, onSaved,
 }: Props) {
@@ -121,7 +121,7 @@ export function QuickQualityActionDialog({
               <Select value={line} onValueChange={setLine}>
                 <SelectTrigger className="h-8"><SelectValue placeholder="Line" /></SelectTrigger>
                 <SelectContent>
-                  {(dbLines.length ? dbLines : lines).map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  {dbLines.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
