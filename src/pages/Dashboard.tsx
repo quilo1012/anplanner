@@ -445,13 +445,13 @@ export function Dashboard() {
                 <PerformanceByLeader sessions={filteredSessions} />
               </div>
               <div className="card p-3">
-                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Trophy size={16} />Leader Board</h3>
                 <LeaderPerformanceBoard sessions={filteredSessions} currentDate={startDate} />
               </div>
-              <div className="card p-3">
+              <div className="card p-3 lg:col-span-2">
                 <LeaderQualityBoard currentDate={startDate} />
               </div>
             </div>
+
 
 
             {/* Section: Trends */}
