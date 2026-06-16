@@ -199,9 +199,14 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
         const s = (r.shift_type || '').toUpperCase();
         if (s !== shiftFilter) return false;
       }
+      if (leaderFilterNorm) {
+        const name = (r.line_leader || '').trim().toLowerCase();
+        if (name !== leaderFilterNorm) return false;
+      }
       return true;
     });
-  }, [rows, shiftFilter]);
+  }, [rows, shiftFilter, leaderFilterNorm]);
+
 
   const stats: LeaderQualityStats[] = useMemo(() => {
     const map: Record<string, { points: number; count: number }> = {};
