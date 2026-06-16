@@ -3,14 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SkuRowForm } from '@/components/SkuRowForm';
 
-import { ExcelUpload } from '@/components/ExcelUpload';
 import { IntouchImport, LineGroup } from '@/components/IntouchImport';
 import { normalizeLineName } from '@/utils/normalizeLineName';
 import { PlanTemplateExport } from '@/components/PlanTemplateExport';
-import { PlanImport } from '@/components/PlanImport';
 import { ProductionImport } from '@/components/ProductionImport';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
 
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,11 +63,10 @@ export function Planner() {
   const [formState, setFormState] = useState<PlannerFormState>(createInitialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [showProductUpload] = useState(false);
   const [showIntouchImport, setShowIntouchImport] = useState(false);
-  const [showPlanImport, setShowPlanImport] = useState(false);
   const [showProductionImport, setShowProductionImport] = useState(false);
+
   
   
 
@@ -138,33 +137,8 @@ export function Planner() {
   };
 
 
-  const handleExcelImport = async (entries: import('@/types/shift').ShiftFormData[]) => {
-    // Excel import creates individual sessions per entry
-    let hasError = false;
-    for (const entry of entries) {
-      const result = await saveSession({
-        date: entry.date,
-        shift: entry.shift,
-        productionLine: entry.productionLine,
-        lineLeader: entry.lineLeader,
-        plannedQuantity: entry.productionTarget || 0,
-        items: [{ sku: entry.sku, productName: entry.product, quantityTarget: entry.productionTarget || 0, quantityActual: entry.realProduction || 0 }],
-        comments: entry.observations || '',
-        staffPlanned: entry.staffPlanned || 0,
-        staffActual: entry.staffActual || 0,
-      });
-      if (!result.success) {
-        toast.error(`Failed to import: ${result.error}`);
-        hasError = true;
-        break;
-      }
-    }
-    if (!hasError) {
-      toast.success('Import completed successfully!');
-      setShowExcelUpload(false);
-      navigate('/history');
-    }
-  };
+
+
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -336,24 +310,17 @@ export function Planner() {
           {canReview && (
             <div className="flex flex-wrap gap-2 justify-end">
               <PlanTemplateExport />
-              <button type="button" onClick={() => setShowPlanImport(true)} className="btn-secondary">
-                <FileSpreadsheet size={18} />
-                <span className="hidden sm:inline">Import Plan</span>
-              </button>
-              <button onClick={() => setShowExcelUpload(true)} className="btn-secondary">
-                <FileSpreadsheet size={18} />
-                <span className="hidden sm:inline">Import Sessions</span>
-              </button>
-              <button onClick={() => setShowIntouchImport(true)} className="btn-secondary">
+              <Button variant="secondary" onClick={() => setShowIntouchImport(true)} className="gap-2">
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import iTouching</span>
-              </button>
-              <button onClick={() => setShowProductionImport(true)} className="btn-secondary">
+              </Button>
+              <Button variant="secondary" onClick={() => setShowProductionImport(true)} className="gap-2">
                 <FileSpreadsheet size={18} />
                 <span className="hidden sm:inline">Import Production</span>
-              </button>
+              </Button>
             </div>
           )}
+
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Shift Information Card */}
@@ -470,10 +437,8 @@ export function Planner() {
             </div>
           </form>
 
-          {showExcelUpload && (
-            <ExcelUpload onImport={handleExcelImport} onClose={() => setShowExcelUpload(false)} />
-          )}
           {/* ProductCsvUpload removed — managed via Products Database page */}
+
           <IntouchImport
             open={showIntouchImport}
             onClose={() => setShowIntouchImport(false)}
@@ -530,15 +495,11 @@ export function Planner() {
               navigate(`/?date=${encodeURIComponent(importDate)}&shift=${encodeURIComponent(importShift)}`);
             }}
           />
-          <PlanImport
-            open={showPlanImport}
-            onClose={() => setShowPlanImport(false)}
-            onImported={() => navigate('/history')}
-          />
           <ProductionImport
             open={showProductionImport}
             onClose={() => setShowProductionImport(false)}
           />
+
           </>)}
         </div>
       </div>
