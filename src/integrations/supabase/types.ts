@@ -88,6 +88,30 @@ export type Database = {
           },
         ]
       }
+      lines: {
+        Row: {
+          created_at: string
+          display_order: number
+          has_sides: boolean
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          has_sides?: boolean
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          has_sides?: boolean
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       operation_time: {
         Row: {
           created_at: string
@@ -391,24 +415,39 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active: boolean
           created_at: string
           email: string
           id: string
+          labor_rate: number
+          last_seen_at: string | null
           name: string
+          shift: string | null
+          ui_preferences: Json
           updated_at: string
         }
         Insert: {
+          active?: boolean
           created_at?: string
           email: string
           id: string
+          labor_rate?: number
+          last_seen_at?: string | null
           name: string
+          shift?: string | null
+          ui_preferences?: Json
           updated_at?: string
         }
         Update: {
+          active?: boolean
           created_at?: string
           email?: string
           id?: string
+          labor_rate?: number
+          last_seen_at?: string | null
           name?: string
+          shift?: string | null
+          ui_preferences?: Json
           updated_at?: string
         }
         Relationships: []
@@ -585,7 +624,13 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
-      app_role: "admin" | "supervisor" | "operator"
+      app_role:
+        | "admin"
+        | "supervisor"
+        | "operator"
+        | "engineer"
+        | "manager"
+        | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -713,7 +758,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "supervisor", "operator"],
+      app_role: [
+        "admin",
+        "supervisor",
+        "operator",
+        "engineer",
+        "manager",
+        "viewer",
+      ],
     },
   },
 } as const
