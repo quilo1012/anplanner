@@ -567,7 +567,10 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Daily Summary Table */}
+            {/* Leader Quality Board + Daily Summary (Quality Issues by Leader lives inside) */}
+            <div className="card p-3 mb-3">
+              <LeaderQualityBoard startDate={startDate} endDate={endDate} leaderFilter={selectedLeader} />
+            </div>
             <div className="card p-3 mb-3 dashboard-section">
               <DailySummaryTable
                 sessions={filteredSessions}
