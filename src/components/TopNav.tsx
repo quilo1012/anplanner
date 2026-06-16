@@ -282,6 +282,32 @@ export function TopNav() {
             </NavLink>
           ))}
 
+          {visibleMaintenance.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleMaintenance))}>
+                <Wrench size={16} strokeWidth={2} />
+                <span>Maintenance</span>
+                <ChevronDown size={14} strokeWidth={2} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+                {visibleMaintenance.map(item => (
+                  <DropdownMenuItem key={item.path} asChild>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-2 cursor-pointer w-full',
+                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <item.icon size={16} strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {visibleReports.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleReports))}>
