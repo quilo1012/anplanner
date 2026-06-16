@@ -8,8 +8,9 @@ import { severityBadgeClass, severityLabel, SEVERITY_OPTIONS } from '@/utils/qua
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { ProductionSession } from '@/types/production';
-import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil, Download } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil, Download, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActionDialog';
 
 function exportQualityActionsToXlsx(rows: LogEntry[]) {
   const headers = ['Date', 'Shift', 'Line', 'Leader', 'Issue', 'Severity', 'Points', 'Notes'];
@@ -95,6 +96,8 @@ export function QualityActionsLog() {
   const [calMonth, setCalMonth] = useState<Date>(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
+  const [newActionOpen, setNewActionOpen] = useState(false);
+  const canOpenAction = hasRole(['supervisor', 'admin']);
 
   const canEditEntry = (e: LogEntry): boolean => {
     if (hasRole(['supervisor', 'admin'])) return true;
@@ -212,6 +215,16 @@ export function QualityActionsLog() {
             {filtered.length} occurrence(s) · -{totalPoints} pts
           </div>
           <div className="flex items-center gap-2">
+            {canOpenAction && (
+              <button
+                type="button"
+                onClick={() => setNewActionOpen(true)}
+                className="inline-flex items-center gap-1 rounded-md border border-primary bg-primary text-primary-foreground px-3 py-1.5 text-xs hover:opacity-90"
+                title="Open new quality action"
+              >
+                <Plus size={12} /> New Action
+              </button>
+            )}
             <button
               type="button"
               onClick={() => exportQualityActionsToXlsx(filtered)}
@@ -334,6 +347,14 @@ export function QualityActionsLog() {
         onOpenChange={(open) => { if (!open) setEditSession(null); }}
         onSuccess={() => { /* ShiftContext refreshes; quality-actions-changed event refreshes qaMap */ }}
         isOperator={isOperator}
+      />
+      <QuickQualityActionDialog
+        open={newActionOpen}
+        onOpenChange={setNewActionOpen}
+        lines={uniqueLines}
+        leaders={uniqueLeaders}
+        recordedBy={user?.id ?? null}
+        onSaved={() => window.dispatchEvent(new Event('quality-actions-changed'))}
       />
     </>
   );
