@@ -9,24 +9,49 @@ import { naturalLineSort } from '@/utils/naturalLineSort';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { ProductionSession } from '@/types/production';
 import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
-function exportQualityActionsToCsv(rows: LogEntry[]) {
+function exportQualityActionsToXlsx(rows: LogEntry[]) {
   const headers = ['Date', 'Shift', 'Line', 'Leader', 'Issue', 'Severity', 'Points', 'Notes'];
-  const csv = [
-    headers.join(','),
-    ...rows.map(e => [
-      e.date, e.shift, e.line, e.leader, e.name, e.severity || '', `-${e.points}`, (e.notes || '').replace(/\n/g, ' '),
-    ].map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')),
-  ].join('\n');
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `quality_actions_${new Date().toISOString().split('T')[0]}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const data = rows.map(e => [
+    e.date,
+    e.shift,
+    e.line,
+    e.leader,
+    e.name,
+    e.severity ? severityLabel(e.severity) : '',
+    -Math.abs(e.points || 0),
+    (e.notes || '').replace(/\n/g, ' '),
+  ]);
+  const totalPts = rows.reduce((s, e) => s + (e.points || 0), 0);
+  const aoa: (string | number)[][] = [
+    headers,
+    ...data,
+    [],
+    ['', '', '', '', '', 'TOTAL', -totalPts, ''],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 22 },
+    { wch: 36 }, { wch: 12 }, { wch: 10 }, { wch: 50 },
+  ];
+  ws['!autofilter'] = { ref: `A1:H${data.length + 1}` };
+
+  for (let c = 0; c < headers.length; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[ref]) {
+      (ws[ref] as { s?: unknown }).s = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '1F2937' } },
+        alignment: { horizontal: 'center' },
+      };
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Quality Actions');
+  XLSX.writeFile(wb, `quality_actions_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 const SEVERITY_DOT: Record<string, string> = {
@@ -189,12 +214,12 @@ export function QualityActionsLog() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => exportQualityActionsToCsv(filtered)}
+              onClick={() => exportQualityActionsToXlsx(filtered)}
               disabled={filtered.length === 0}
               className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
-              title="Download CSV (opens in Excel)"
+              title="Download Excel (.xlsx)"
             >
-              <Download size={12} /> Export
+              <Download size={12} /> Export Excel
             </button>
             <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
               <button
