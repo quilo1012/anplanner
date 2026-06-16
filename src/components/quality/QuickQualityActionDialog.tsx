@@ -35,20 +35,27 @@ export function QuickQualityActionDialog({
   const [date, setDate] = useState(defaultDate || format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [dbLines, setDbLines] = useState<string[]>([]);
+  const [dbLines, setDbLines] = useState<{ name: string; display_order: number }[]>([]);
+  const [linesError, setLinesError] = useState<string | null>(null);
+  const [linesLoading, setLinesLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setLinesError(null);
+    setLinesLoading(true);
     (async () => {
       const { data, error } = await supabase
         .from('lines')
         .select('name, display_order')
         .order('display_order', { ascending: true });
+      setLinesLoading(false);
       if (error) {
+        setLinesError(error.message);
+        setDbLines([]);
         toast.error(`Failed to load lines: ${error.message}`);
         return;
       }
-      setDbLines((data ?? []).map(r => r.name));
+      setDbLines((data ?? []) as { name: string; display_order: number }[]);
     })();
   }, [open]);
 
@@ -118,12 +125,21 @@ export function QuickQualityActionDialog({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-xs">Line</Label>
-              <Select value={line} onValueChange={setLine}>
-                <SelectTrigger className="h-8"><SelectValue placeholder="Line" /></SelectTrigger>
+              <Select value={line} onValueChange={setLine} disabled={linesLoading || !!linesError || dbLines.length === 0}>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder={linesError ? 'Failed to load lines' : linesLoading ? 'Loading…' : 'Line'} />
+                </SelectTrigger>
                 <SelectContent>
-                  {dbLines.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  {dbLines.map((l, idx) => (
+                    <SelectItem key={l.name} value={l.name}>
+                      {idx + 1}. {l.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {linesError && (
+                <p className="text-xs text-destructive mt-1">Error loading lines: {linesError}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Leader</Label>
