@@ -16,7 +16,7 @@ export interface OpenWorkOrderRow {
  * "Open Maintenance Tickets" widget on the dashboard stays live.
  */
 export function useOpenWorkOrdersDowntime() {
-  const { workOrders, isLoading: woLoading, refetch } = useWorkOrders();
+  const { workOrders, isLoading: woLoading, refreshWorkOrders } = useWorkOrders();
   const { byWoId, isLoading: dtLoading, refresh } = useWorkOrderDowntimeSummary();
   const [, setTick] = useState(0);
 
@@ -24,10 +24,10 @@ export function useOpenWorkOrdersDowntime() {
     const id = setInterval(() => {
       setTick(t => t + 1);
       refresh();
-      refetch?.();
+      refreshWorkOrders();
     }, 60_000);
     return () => clearInterval(id);
-  }, [refresh, refetch]);
+  }, [refresh, refreshWorkOrders]);
 
   const rows = useMemo<OpenWorkOrderRow[]>(() => {
     return workOrders
