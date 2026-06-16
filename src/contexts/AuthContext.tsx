@@ -42,10 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const isInitializing = useRef(true);
 
-  // Fetch user profile and role from database
   const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
     try {
-      // Fetch profile and role in parallel for faster init
       const [profileRes, roleRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', supabaseUser.id).maybeSingle(),
         supabase.from('user_roles').select('role').eq('user_id', supabaseUser.id).maybeSingle(),
@@ -72,7 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // Self-healing: auto-create missing profile so RLS policies work
       const name = (supabaseUser.user_metadata?.name ||
         supabaseUser.email?.split('@')[0] || 'User').trim();
       console.warn('Profile missing for user, auto-creating:', supabaseUser.id);
@@ -95,7 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Fetch all users (admin only)
   const refreshUsers = async () => {
     try {
       const { data: profiles, error: profilesError } = await supabase
@@ -132,11 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Initialize auth state
   useEffect(() => {
     let isMounted = true;
 
-    // Check initial session FIRST
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -152,7 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await refreshUsers();
               }
             } else {
-              // Stale session — clear it to prevent zombie auth state
               await supabase.auth.signOut();
             }
           }
@@ -166,7 +159,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Safety timeout: force loading to false after 5s to prevent infinite spinner
     const safetyTimeout = setTimeout(() => {
       if (isMounted) {
         setIsLoading(false);
@@ -179,15 +171,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(safetyTimeout);
     });
 
-    // Set up auth state listener for subsequent changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
-
-        // Skip events during initialization to prevent race conditions
         if (isInitializing.current) return;
-
-        // Skip initial session event since we handle it above
         if (event === 'INITIAL_SESSION') return;
 
         if (session?.user) {
@@ -246,7 +233,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (credentials: LoginCredentials & { name: string }): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Validate name length (server-side also validates, this is for UX)
       const trimmedName = credentials.name.trim();
       if (trimmedName.length === 0) {
         return { success: false, error: 'Name is required' };
@@ -302,9 +288,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const addUser = async (userData: { name: string; email: string; password: string; role: UserRole }): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase.functions.invoke('delete-user', {
+      const invokePromise = supabase.functions.invoke('delete-user', {
         body: { action: 'create', email: userData.email, password: userData.password, name: userData.name, role: userData.role },
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out after 15s. Please check your connection and try again.')), 15000)
+      );
+
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as Awaited<typeof invokePromise>;
 
       if (error) {
         console.error('Error creating user:', error);
@@ -319,13 +310,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true };
     } catch (error) {
       console.error('Add user error:', error);
-      return { success: false, error: 'An unexpected error occurred' };
+      return { success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred' };
     }
   };
 
   const updateUser = async (id: string, data: Partial<{ name: string; email: string; role: UserRole }>): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Update profile
       if (data.name || data.email) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -341,7 +331,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Update role
       if (data.role) {
         const { error: roleError } = await supabase
           .from('user_roles')
@@ -356,7 +345,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await refreshUsers();
 
-      // Update current user if editing self
       if (id === user?.id) {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (currentUser) {
@@ -428,7 +416,6 @@ export function useAuth() {
   return context;
 }
 
-// Re-export types for compatibility
 export const ROLE_LABELS: Record<UserRole, string> = {
   operator: 'Lider',
   supervisor: 'Supervisor',
