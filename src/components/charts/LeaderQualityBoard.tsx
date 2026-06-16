@@ -34,7 +34,7 @@ interface HistoryRow {
 }
 
 export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) {
-  const leaderFilterNorm = (leaderFilter || '').trim().toLowerCase();
+  const leaderFilterNorm = normalizeName(leaderFilter);
 
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
