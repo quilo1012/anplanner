@@ -75,7 +75,12 @@ export function LeaderQualityBoard({ currentDate }: Props) {
       .lte('date', endDate)
       .then(({ data, error }) => {
         if (cancel) return;
+        if (error) console.error('[LeaderQualityBoard] period query failed:', error);
         if (!error && data) setRows(data);
+        setLoading(false);
+      }, (err) => {
+        if (cancel) return;
+        console.error('[LeaderQualityBoard] period query rejected:', err);
         setLoading(false);
       });
     return () => { cancel = true; };
