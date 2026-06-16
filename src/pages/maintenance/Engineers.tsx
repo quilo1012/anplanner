@@ -1,6 +1,4 @@
-import { MobileMenu } from '@/components/MobileMenu'; // placeholder to avoid unused; will not render here
-
-export default function Engineers() {
+export function Engineers() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-2">Engineers</h1>
@@ -8,3 +6,5 @@ export default function Engineers() {
     </div>
   );
 }
+
+export default Engineers;

@@ -1,4 +1,4 @@
-export default function Machines() {
+export function Machines() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-2">Machines</h1>
@@ -6,3 +6,5 @@ export default function Machines() {
     </div>
   );
 }
+
+export default Machines;

@@ -1,4 +1,4 @@
-export default function SpareParts() {
+export function SpareParts() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-2">Spare Parts</h1>
@@ -6,3 +6,5 @@ export default function SpareParts() {
     </div>
   );
 }
+
+export default SpareParts;
