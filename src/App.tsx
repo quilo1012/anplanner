@@ -55,8 +55,8 @@ const App = () => (
             <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><WeeklyReport /></Suspense></ProtectedRoute>} />
             <Route path="quality-actions-log" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><QualityActionsLog /></Suspense></ProtectedRoute>} />
             <Route path="leader-quality" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><LeaderQualityDashboard /></Suspense></ProtectedRoute>} />
-            <Route path="maintenance/work-orders" element={<ProtectedRoute allowedRoles={['supervisor', 'admin', 'engineer']}><Suspense fallback={<PageLoader />}><WorkOrders /></Suspense></ProtectedRoute>} />
-            <Route path="maintenance/work-orders/:id" element={<ProtectedRoute allowedRoles={['supervisor', 'admin', 'engineer']}><Suspense fallback={<PageLoader />}><WorkOrderDetail /></Suspense></ProtectedRoute>} />
+            <Route path="maintenance/work-orders" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin', 'engineer', 'manager']}><Suspense fallback={<PageLoader />}><WorkOrders /></Suspense></ProtectedRoute>} />
+            <Route path="maintenance/work-orders/:id" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin', 'engineer', 'manager']}><Suspense fallback={<PageLoader />}><WorkOrderDetail /></Suspense></ProtectedRoute>} />
             
             <Route
               path="admin"

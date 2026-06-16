@@ -205,7 +205,7 @@ export function WorkOrders() {
   const [openPanelWo, setOpenPanelWo] = useState<WorkOrder | null>(null);
 
   const isEngineer = hasRole('engineer');
-  const canCreate = hasRole(['supervisor', 'admin']);
+  const canCreate = hasRole(['operator', 'supervisor', 'admin', 'manager']);
 
   const filteredOrders = useMemo(() => {
     if (statusFilter === 'ALL') return workOrders;

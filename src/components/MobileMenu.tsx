@@ -33,7 +33,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Maintenance',
     items: [
-      { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin'] },
+      { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['operator', 'supervisor', 'admin', 'engineer', 'manager'] },
     ],
   },
   {
