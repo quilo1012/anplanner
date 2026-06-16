@@ -226,15 +226,13 @@ export function LeaderQualityBoard({ startDate, endDate }: Props) {
   }, [history]);
 
   const dateDisplay = useMemo(() => {
-    const p = parseISO(currentDate);
-    const map: Record<PeriodType, string> = {
-      day: format(p, 'EEEE, MMM d, yyyy'),
-      week: `${format(subDays(p, 6), 'MMM d')} - ${format(p, 'MMM d, yyyy')} (7 Days)`,
-      '15days': `${format(subDays(p, 14), 'MMM d')} - ${format(p, 'MMM d, yyyy')} (15 Days)`,
-      month: `${format(subDays(p, 29), 'MMM d')} - ${format(p, 'MMM d, yyyy')} (30 Days)`,
-    };
-    return map[periodFilter];
-  }, [currentDate, periodFilter]);
+    const s = parseISO(startDate);
+    const e = parseISO(endDate);
+    if (startDate === endDate) return format(s, 'EEEE, MMM d, yyyy');
+    const days = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
+    return `${format(s, 'MMM d')} - ${format(e, 'MMM d, yyyy')} (${days} Days)`;
+  }, [startDate, endDate]);
+
 
   const severityClass = (pts: number) => {
     if (pts === 0) return 'text-success';
