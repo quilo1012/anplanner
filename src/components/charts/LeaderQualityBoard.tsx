@@ -178,13 +178,16 @@ export function LeaderQualityBoard({ currentDate }: Props) {
           map[leader].prod += Number(it.quantity_actual) || 0;
         }
 
-        const result: MonthlyRow[] = Object.entries(map).map(([name, v]) => ({
-          name,
-          totalPoints: v.points,
-          occurrences: v.occ,
-          totalProduction: v.prod,
-          score: Math.max(0, 100 - v.points),
-        })).sort((a, b) => a.score - b.score || b.totalPoints - a.totalPoints);
+        const result: MonthlyRow[] = Object.entries(map)
+          .filter(([, v]) => v.occ > 0)
+          .map(([name, v]) => ({
+            name,
+            totalPoints: v.points,
+            occurrences: v.occ,
+            totalProduction: v.prod,
+            score: Math.max(0, 100 - v.points),
+          }))
+          .sort((a, b) => a.score - b.score || b.totalPoints - a.totalPoints);
 
         if (!cancel) setMonthlyRows(result);
       } catch (err) {
