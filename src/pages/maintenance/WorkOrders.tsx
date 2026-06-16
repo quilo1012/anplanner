@@ -363,7 +363,7 @@ export function WorkOrders() {
                       <td className="py-2 pr-3 text-muted-foreground">{dt?.events_count ?? 0}</td>
                       <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">{formatDateTime(wo.created_at)}</td>
                       {isEngineer && (
-                        <td className="py-2 pr-3">
+                        <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {nextStatus(wo.status) ? (
                               <button
@@ -401,13 +401,15 @@ export function WorkOrders() {
                         </td>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
       </div>
+      {openPanelWo && <WorkOrderDowntimePanel wo={openPanelWo} onClose={() => setOpenPanelWo(null)} />}
     </>
   );
 }
