@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { severityBadgeClass, severityLabel } from '@/utils/qualitySeverity';
 import { QualitySeverity } from '@/types/quality';
+import { normalizeName } from '@/utils/normalizeName';
 
 interface Props {
   startDate: string;
@@ -33,7 +34,7 @@ interface HistoryRow {
 }
 
 export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) {
-  const leaderFilterNorm = (leaderFilter || '').trim().toLowerCase();
+  const leaderFilterNorm = normalizeName(leaderFilter);
 
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
@@ -100,8 +101,7 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
         if (s !== shiftFilter) return false;
       }
       if (leaderFilterNorm) {
-        const name = (r.line_leader || '').trim().toLowerCase();
-        if (name !== leaderFilterNorm) return false;
+        if (normalizeName(r.line_leader) !== leaderFilterNorm) return false;
       }
       return true;
     });

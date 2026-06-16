@@ -31,6 +31,7 @@ import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActio
 import { Link } from 'react-router-dom';
 import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
 import { Wrench } from 'lucide-react';
+import { normalizeName, sameName } from '@/utils/normalizeName';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -58,9 +59,9 @@ export function Dashboard() {
   // Scope the "Open Maintenance Tickets" widget strictly to tickets the
   // logged-in user opened in their own name (matched by requester_name).
   const openWoRows = useMemo(() => {
-    const me = (user?.name || '').trim().toLowerCase();
+    const me = normalizeName(user?.name);
     if (!me) return [];
-    return allOpenWoRows.filter(r => (r.wo.requester_name || '').trim().toLowerCase() === me);
+    return allOpenWoRows.filter(r => sameName(r.wo.requester_name, user?.name));
   }, [allOpenWoRows, user?.name]);
   const showOpenTickets = openWoRows.length > 0;
 
