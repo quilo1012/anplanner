@@ -42,7 +42,9 @@ interface HistoryRow {
   severity: QualitySeverity | null;
 }
 
-export function LeaderQualityBoard({ startDate, endDate }: Props) {
+export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) {
+  const leaderFilterNorm = (leaderFilter || '').trim().toLowerCase();
+
   const [view, setView] = useState<'period' | 'monthly'>('period');
   const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
