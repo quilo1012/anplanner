@@ -304,6 +304,136 @@ export type Database = {
           },
         ]
       }
+      maintenance_downtime: {
+        Row: {
+          category: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          line: string
+          machine: string | null
+          notes: string | null
+          reason: string
+          reported_by: string | null
+          started_at: string
+          work_order_id: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          line: string
+          machine?: string | null
+          notes?: string | null
+          reason: string
+          reported_by?: string | null
+          started_at?: string
+          work_order_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          line?: string
+          machine?: string | null
+          notes?: string | null
+          reason?: string
+          reported_by?: string | null
+          started_at?: string
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_downtime_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_downtime_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_downtime_events: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          episode_number: number
+          id: string
+          is_recurrence: boolean
+          resumed_at: string | null
+          resumed_by: string | null
+          resumed_by_name: string | null
+          resumed_note: string | null
+          stopped_at: string
+          stopped_by: string | null
+          stopped_by_name: string | null
+          stopped_reason: string | null
+          work_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          episode_number?: number
+          id?: string
+          is_recurrence?: boolean
+          resumed_at?: string | null
+          resumed_by?: string | null
+          resumed_by_name?: string | null
+          resumed_note?: string | null
+          stopped_at: string
+          stopped_by?: string | null
+          stopped_by_name?: string | null
+          stopped_reason?: string | null
+          work_order_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          episode_number?: number
+          id?: string
+          is_recurrence?: boolean
+          resumed_at?: string | null
+          resumed_by?: string | null
+          resumed_by_name?: string | null
+          resumed_note?: string | null
+          stopped_at?: string
+          stopped_by?: string | null
+          stopped_by_name?: string | null
+          stopped_reason?: string | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_downtime_events_resumed_by_fkey"
+            columns: ["resumed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_downtime_events_stopped_by_fkey"
+            columns: ["stopped_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_downtime_events_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mobile_assets: {
         Row: {
           active: boolean
@@ -567,6 +697,7 @@ export type Database = {
           date: string
           id: string
           is_archived: boolean
+          is_unplanned: boolean
           line_leader: string
           planned_quantity: number | null
           production_line: string
@@ -583,6 +714,7 @@ export type Database = {
           date: string
           id?: string
           is_archived?: boolean
+          is_unplanned?: boolean
           line_leader: string
           planned_quantity?: number | null
           production_line: string
@@ -599,6 +731,7 @@ export type Database = {
           date?: string
           id?: string
           is_archived?: boolean
+          is_unplanned?: boolean
           line_leader?: string
           planned_quantity?: number | null
           production_line?: string
@@ -811,27 +944,39 @@ export type Database = {
           comment: string | null
           created_at: string
           duration: number
+          ended_at: string | null
           id: string
           reason: string
           session_id: string
+          source: string
+          started_at: string | null
+          work_order_id: string | null
         }
         Insert: {
           category: string
           comment?: string | null
           created_at?: string
           duration?: number
+          ended_at?: string | null
           id?: string
           reason: string
           session_id: string
+          source?: string
+          started_at?: string | null
+          work_order_id?: string | null
         }
         Update: {
           category?: string
           comment?: string | null
           created_at?: string
           duration?: number
+          ended_at?: string | null
           id?: string
           reason?: string
           session_id?: string
+          source?: string
+          started_at?: string | null
+          work_order_id?: string | null
         }
         Relationships: [
           {
