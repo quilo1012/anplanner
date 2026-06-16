@@ -27,6 +27,7 @@ import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { aggregateLeaderQuality } from '@/utils/aggregateLeaderQuality';
+import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActionDialog';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -48,6 +49,8 @@ export function Dashboard() {
   const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
   const [leaderQuality, setLeaderQuality] = useState<Record<string, { occurrences: number; points: number }>>({});
   const [leaderQualityLoading, setLeaderQualityLoading] = useState(false);
+  const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
+  const [qualityRefreshTick, setQualityRefreshTick] = useState(0);
 
   // Per-leader quality totals across the selected period+shift (all lines).
   useEffect(() => {
@@ -71,7 +74,7 @@ export function Dashboard() {
       setLeaderQualityLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [startDate, endDate, selectedShift, sessions]);
+  }, [startDate, endDate, selectedShift, sessions, qualityRefreshTick]);
 
 
   // Apply URL params on mount / when they change (e.g. after iTouching import redirect)
@@ -371,7 +374,7 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground uppercase mb-1">OEE</p>
             <p className="text-xl font-bold text-foreground tabular-nums">{stats.oee.toFixed(1)}%</p>
           </div>
-          <div className="bg-card border border-border rounded-lg p-3 text-center">
+          <div className="bg-card border border-border rounded-lg p-3 text-center relative">
             <p className="text-xs text-muted-foreground uppercase mb-1">Quality Actions</p>
             <p className="text-xl font-bold text-foreground tabular-nums">
               {(() => {
@@ -380,6 +383,15 @@ export function Dashboard() {
                 return Object.values(leaderQuality).reduce((sum, q) => sum + (q.occurrences || 0), 0);
               })()}
             </p>
+            {canEditSessions && (
+              <button
+                onClick={() => setQualityDialogOpen(true)}
+                className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-primary text-primary-foreground hover:opacity-90"
+                title="Open quality occurrence"
+              >
+                + Open
+              </button>
+            )}
           </div>
         </div>
         )}
@@ -533,6 +545,19 @@ export function Dashboard() {
         open={!!editSession}
         onOpenChange={(open) => { if (!open) setEditSession(null); }}
         isOperator={isOperator}
+      />
+
+      <QuickQualityActionDialog
+        open={qualityDialogOpen}
+        onOpenChange={setQualityDialogOpen}
+        lines={uniqueLines}
+        leaders={uniqueLeaders}
+        defaultLine={selectedLine}
+        defaultLeader={selectedLeader}
+        defaultShift={selectedShift}
+        defaultDate={endDate}
+        recordedBy={user?.id ?? null}
+        onSaved={() => setQualityRefreshTick(t => t + 1)}
       />
     </>
   );
