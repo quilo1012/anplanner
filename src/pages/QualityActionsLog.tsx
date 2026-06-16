@@ -186,22 +186,34 @@ export function QualityActionsLog() {
           <div className="text-xs text-muted-foreground">
             {filtered.length} occurrence(s) · -{totalPoints} pts
           </div>
-          <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setView('list')}
-              className={`px-3 py-1.5 inline-flex items-center gap-1 ${view === 'list' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+              onClick={() => exportQualityActionsToCsv(filtered)}
+              disabled={filtered.length === 0}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
+              title="Download CSV (opens in Excel)"
             >
-              <List size={12} /> List
+              <Download size={12} /> Export
             </button>
-            <button
-              type="button"
-              onClick={() => setView('calendar')}
-              className={`px-3 py-1.5 inline-flex items-center gap-1 border-l border-border ${view === 'calendar' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
-            >
-              <CalendarIcon size={12} /> Calendar
-            </button>
+            <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => setView('list')}
+                className={`px-3 py-1.5 inline-flex items-center gap-1 ${view === 'list' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+              >
+                <List size={12} /> List
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('calendar')}
+                className={`px-3 py-1.5 inline-flex items-center gap-1 border-l border-border ${view === 'calendar' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+              >
+                <CalendarIcon size={12} /> Calendar
+              </button>
+            </div>
           </div>
+
         </div>
 
         {view === 'list' ? (
