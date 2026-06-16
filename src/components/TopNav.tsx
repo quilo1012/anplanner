@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
-  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown, Trophy,
+  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown, Trophy, Wrench,
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
