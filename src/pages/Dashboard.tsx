@@ -31,6 +31,7 @@ import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActio
 import { Link } from 'react-router-dom';
 import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
 import { Wrench } from 'lucide-react';
+import { normalizeName, sameName } from '@/utils/normalizeName';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
