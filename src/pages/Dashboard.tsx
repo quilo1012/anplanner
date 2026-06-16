@@ -374,7 +374,7 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground uppercase mb-1">OEE</p>
             <p className="text-xl font-bold text-foreground tabular-nums">{stats.oee.toFixed(1)}%</p>
           </div>
-          <div className="bg-card border border-border rounded-lg p-3 text-center">
+          <div className="bg-card border border-border rounded-lg p-3 text-center relative">
             <p className="text-xs text-muted-foreground uppercase mb-1">Quality Actions</p>
             <p className="text-xl font-bold text-foreground tabular-nums">
               {(() => {
@@ -383,6 +383,15 @@ export function Dashboard() {
                 return Object.values(leaderQuality).reduce((sum, q) => sum + (q.occurrences || 0), 0);
               })()}
             </p>
+            {canEditSessions && (
+              <button
+                onClick={() => setQualityDialogOpen(true)}
+                className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-primary text-primary-foreground hover:opacity-90"
+                title="Open quality occurrence"
+              >
+                + Open
+              </button>
+            )}
           </div>
         </div>
         )}
