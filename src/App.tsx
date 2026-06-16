@@ -20,6 +20,7 @@ const QualityActionTypesPage = lazy(() => import('@/pages/QualityActionTypes').t
 const QualityActionsLog = lazy(() => import('@/pages/QualityActionsLog').then(m => ({ default: m.QualityActionsLog })));
 const LeaderQualityDashboard = lazy(() => import('@/pages/LeaderQualityDashboard').then(m => ({ default: m.LeaderQualityDashboard })));
 const WorkOrders = lazy(() => import('@/pages/maintenance/WorkOrders').then(m => ({ default: m.WorkOrders })));
+const WorkOrderDetail = lazy(() => import('@/pages/maintenance/WorkOrderDetail').then(m => ({ default: m.WorkOrderDetail })));
 
 
 function PageLoader() {
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="quality-actions-log" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><QualityActionsLog /></Suspense></ProtectedRoute>} />
             <Route path="leader-quality" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><LeaderQualityDashboard /></Suspense></ProtectedRoute>} />
             <Route path="maintenance/work-orders" element={<ProtectedRoute allowedRoles={['supervisor', 'admin', 'engineer']}><Suspense fallback={<PageLoader />}><WorkOrders /></Suspense></ProtectedRoute>} />
+            <Route path="maintenance/work-orders/:id" element={<ProtectedRoute allowedRoles={['supervisor', 'admin', 'engineer']}><Suspense fallback={<PageLoader />}><WorkOrderDetail /></Suspense></ProtectedRoute>} />
             
             <Route
               path="admin"
