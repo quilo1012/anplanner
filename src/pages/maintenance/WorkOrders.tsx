@@ -330,13 +330,18 @@ export function WorkOrders() {
                     <th className="py-2 pr-3">Requester</th>
                     <th className="py-2 pr-3">Engineer</th>
                     <th className="py-2 pr-3">Priority</th>
+                    <th className="py-2 pr-3 whitespace-nowrap">Downtime</th>
+                    <th className="py-2 pr-3">Events</th>
                     <th className="py-2 pr-3">Created</th>
                     {isEngineer && <th className="py-2 pr-3">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredOrders.map(wo => (
-                    <tr key={wo.id} className="hover:bg-muted/50">
+                  {filteredOrders.map(wo => {
+                    const dt = downtimeByWo[wo.id];
+                    const status = dt?.downtime_status ?? 'none';
+                    return (
+                    <tr key={wo.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setOpenPanelWo(wo)}>
                       <td className="py-2 pr-3 font-medium text-foreground">#{wo.wo_number}</td>
                       <td className="py-2 pr-3">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${STATUS_CLASSES[wo.status]}`}>{STATUS_LABELS[wo.status]}</span>
@@ -350,6 +355,12 @@ export function WorkOrders() {
                       <td className="py-2 pr-3">{wo.requester_name}</td>
                       <td className="py-2 pr-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
                       <td className="py-2 pr-3 capitalize">{wo.priority}</td>
+                      <td className="py-2 pr-3 whitespace-nowrap">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${DOWNTIME_STATUS_CLASSES[status]}`}>
+                          {dt && dt.total_minutes > 0 ? formatDuration(dt.total_minutes) : '—'}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-3 text-muted-foreground">{dt?.events_count ?? 0}</td>
                       <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">{formatDateTime(wo.created_at)}</td>
                       {isEngineer && (
                         <td className="py-2 pr-3">
