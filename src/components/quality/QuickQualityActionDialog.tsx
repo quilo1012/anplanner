@@ -35,6 +35,23 @@ export function QuickQualityActionDialog({
   const [date, setDate] = useState(defaultDate || format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [dbLines, setDbLines] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('lines')
+        .select('name, display_order')
+        .order('display_order', { ascending: true });
+      if (error) {
+        toast.error(`Failed to load lines: ${error.message}`);
+        return;
+      }
+      setDbLines((data ?? []).map(r => r.name));
+    })();
+  }, [open]);
+
 
   useEffect(() => {
     if (open) {
@@ -104,7 +121,7 @@ export function QuickQualityActionDialog({
               <Select value={line} onValueChange={setLine}>
                 <SelectTrigger className="h-8"><SelectValue placeholder="Line" /></SelectTrigger>
                 <SelectContent>
-                  {lines.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  {(dbLines.length ? dbLines : lines).map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
