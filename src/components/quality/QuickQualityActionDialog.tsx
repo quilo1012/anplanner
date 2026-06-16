@@ -121,7 +121,7 @@ export function QuickQualityActionDialog({
               <Select value={line} onValueChange={setLine}>
                 <SelectTrigger className="h-8"><SelectValue placeholder="Line" /></SelectTrigger>
                 <SelectContent>
-                  {lines.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  {(dbLines.length ? dbLines : lines).map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
