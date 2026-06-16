@@ -8,8 +8,9 @@ import { severityBadgeClass, severityLabel, SEVERITY_OPTIONS } from '@/utils/qua
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { ProductionSession } from '@/types/production';
-import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil, Download } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil, Download, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActionDialog';
 
 function exportQualityActionsToXlsx(rows: LogEntry[]) {
   const headers = ['Date', 'Shift', 'Line', 'Leader', 'Issue', 'Severity', 'Points', 'Notes'];
