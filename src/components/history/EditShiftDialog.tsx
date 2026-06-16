@@ -47,6 +47,44 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
   const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
   const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
   const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
+  const [creatingOrderId, setCreatingOrderId] = useState<string | null>(null);
+  const [createdOrders, setCreatedOrders] = useState<Record<string, number>>({});
+
+  const maintenanceDowntimes = useMemo(
+    () => structuredDowntimes.filter(dt => dt.category === 'maintenance'),
+    [structuredDowntimes]
+  );
+
+  const reasonLabel = (value: string) => {
+    const found = DOWNTIME_REASONS_FALLBACK.maintenance?.find(r => r.value === value);
+    return found?.label ?? value;
+  };
+
+  const handleCreateOrder = async (dt: StructuredDowntime) => {
+    const mapped = mapToAnmaisysLine(productionLine);
+    if (!mapped) {
+      toast.error('No line mapping available');
+      return;
+    }
+    setCreatingOrderId(dt.id);
+    try {
+      const { order_id } = await createMaintenanceOrder({
+        description: `${reasonLabel(dt.reason)} on ${productionLine}${dt.comment ? ` — ${dt.comment}` : ''}`,
+        priority: 'medium',
+        machine: null,
+        requester_name: user?.email || lineLeader || 'Anplanner',
+        line_name: mapped,
+        line_at_time: productionLine,
+        notes: `From shift ${date} ${shiftType} (${dt.duration} min downtime)`,
+      });
+      setCreatedOrders(prev => ({ ...prev, [dt.id]: order_id }));
+      toast.success(`Order #${order_id} created`);
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to create order');
+    } finally {
+      setCreatingOrderId(null);
+    }
+  };
 
   const { totalProduction, performance } = useMemo(() => {
     const total = skuRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
