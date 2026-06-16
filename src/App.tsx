@@ -19,6 +19,7 @@ const Products = lazy(() => import('@/pages/Products').then(m => ({ default: m.P
 const QualityActionTypesPage = lazy(() => import('@/pages/QualityActionTypes').then(m => ({ default: m.QualityActionTypes })));
 const QualityActionsLog = lazy(() => import('@/pages/QualityActionsLog').then(m => ({ default: m.QualityActionsLog })));
 const LeaderQualityDashboard = lazy(() => import('@/pages/LeaderQualityDashboard').then(m => ({ default: m.LeaderQualityDashboard })));
+const WorkOrders = lazy(() => import('@/pages/maintenance/WorkOrders').then(m => ({ default: m.WorkOrders })));
 
 
 function PageLoader() {
