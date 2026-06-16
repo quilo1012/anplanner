@@ -149,21 +149,25 @@ export function LeaderQualityBoard({ currentDate }: Props) {
           itemsData = itemsRes.data || [];
         }
 
+        // Treat purely-numeric or single-character entries as junk (legacy imports
+        // sometimes stored a line number in line_leader instead of a real name).
+        const isValidLeader = (n: string) => n.length >= 2 && !/^\d+$/.test(n);
+
         const sessionToLeader: Record<string, string> = {};
         for (const s of sessions as any[]) {
           const name = (s.line_leader || '').trim();
-          if (name) sessionToLeader[s.id] = name;
+          if (isValidLeader(name)) sessionToLeader[s.id] = name;
         }
 
         const map: Record<string, { points: number; occ: number; prod: number }> = {};
         for (const s of sessions as any[]) {
           const name = (s.line_leader || '').trim();
-          if (!name) continue;
+          if (!isValidLeader(name)) continue;
           if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
         }
         for (const qa of (qaRes.data || []) as any[]) {
           const name = (qa.line_leader || '').trim();
-          if (!name) continue;
+          if (!isValidLeader(name)) continue;
           if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
           map[name].points += Number(qa.points) || 0;
           map[name].occ += 1;
