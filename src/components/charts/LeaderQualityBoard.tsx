@@ -75,7 +75,12 @@ export function LeaderQualityBoard({ currentDate }: Props) {
       .lte('date', endDate)
       .then(({ data, error }) => {
         if (cancel) return;
+        if (error) console.error('[LeaderQualityBoard] period query failed:', error);
         if (!error && data) setRows(data);
+        setLoading(false);
+      }, (err) => {
+        if (cancel) return;
+        console.error('[LeaderQualityBoard] period query rejected:', err);
         setLoading(false);
       });
     return () => { cancel = true; };
@@ -116,64 +121,73 @@ export function LeaderQualityBoard({ currentDate }: Props) {
     let cancel = false;
     setMonthlyLoading(true);
     (async () => {
-      const monthStart = startOfMonth(parseISO(`${monthValue}-01`));
-      const monthEnd = endOfMonth(monthStart);
-      const sd = format(monthStart, 'yyyy-MM-dd');
-      const ed = format(monthEnd, 'yyyy-MM-dd');
+      try {
+        const monthStart = startOfMonth(parseISO(`${monthValue}-01`));
+        const monthEnd = endOfMonth(monthStart);
+        const sd = format(monthStart, 'yyyy-MM-dd');
+        const ed = format(monthEnd, 'yyyy-MM-dd');
 
-      const [qaRes, sessionsRes] = await Promise.all([
-        supabase.from('quality_actions').select('line_leader, points').gte('date', sd).lte('date', ed),
-        supabase.from('production_sessions').select('id, line_leader').gte('date', sd).lte('date', ed),
-      ]);
-      if (cancel) return;
-
-      const sessions = sessionsRes.data || [];
-      const sessionIds = sessions.map((s: any) => s.id);
-
-      let itemsRes: any = { data: [] };
-      if (sessionIds.length > 0) {
-        itemsRes = await supabase
-          .from('production_items')
-          .select('session_id, quantity_actual')
-          .in('session_id', sessionIds);
+        const [qaRes, sessionsRes] = await Promise.all([
+          supabase.from('quality_actions').select('line_leader, points').gte('date', sd).lte('date', ed),
+          supabase.from('production_sessions').select('id, line_leader').gte('date', sd).lte('date', ed),
+        ]);
         if (cancel) return;
-      }
+        if (qaRes.error) console.error('[LeaderQualityBoard] quality_actions failed:', qaRes.error);
+        if (sessionsRes.error) console.error('[LeaderQualityBoard] production_sessions failed:', sessionsRes.error);
 
-      const sessionToLeader: Record<string, string> = {};
-      for (const s of sessions as any[]) {
-        const name = (s.line_leader || '').trim();
-        if (name) sessionToLeader[s.id] = name;
-      }
+        const sessions = sessionsRes.data || [];
+        const sessionIds = sessions.map((s: any) => s.id);
 
-      const map: Record<string, { points: number; occ: number; prod: number }> = {};
-      for (const s of sessions as any[]) {
-        const name = (s.line_leader || '').trim();
-        if (!name) continue;
-        if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
-      }
-      for (const qa of (qaRes.data || []) as any[]) {
-        const name = (qa.line_leader || '').trim();
-        if (!name) continue;
-        if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
-        map[name].points += Number(qa.points) || 0;
-        map[name].occ += 1;
-      }
-      for (const it of (itemsRes.data || []) as any[]) {
-        const leader = sessionToLeader[it.session_id];
-        if (!leader) continue;
-        map[leader].prod += Number(it.quantity_actual) || 0;
-      }
+        let itemsData: any[] = [];
+        if (sessionIds.length > 0) {
+          const itemsRes = await supabase
+            .from('production_items')
+            .select('session_id, quantity_actual')
+            .in('session_id', sessionIds);
+          if (cancel) return;
+          if (itemsRes.error) console.error('[LeaderQualityBoard] production_items failed:', itemsRes.error);
+          itemsData = itemsRes.data || [];
+        }
 
-      const result: MonthlyRow[] = Object.entries(map).map(([name, v]) => ({
-        name,
-        totalPoints: v.points,
-        occurrences: v.occ,
-        totalProduction: v.prod,
-        score: Math.max(0, 100 - v.points),
-      })).sort((a, b) => a.score - b.score || b.totalPoints - a.totalPoints);
+        const sessionToLeader: Record<string, string> = {};
+        for (const s of sessions as any[]) {
+          const name = (s.line_leader || '').trim();
+          if (name) sessionToLeader[s.id] = name;
+        }
 
-      setMonthlyRows(result);
-      setMonthlyLoading(false);
+        const map: Record<string, { points: number; occ: number; prod: number }> = {};
+        for (const s of sessions as any[]) {
+          const name = (s.line_leader || '').trim();
+          if (!name) continue;
+          if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
+        }
+        for (const qa of (qaRes.data || []) as any[]) {
+          const name = (qa.line_leader || '').trim();
+          if (!name) continue;
+          if (!map[name]) map[name] = { points: 0, occ: 0, prod: 0 };
+          map[name].points += Number(qa.points) || 0;
+          map[name].occ += 1;
+        }
+        for (const it of itemsData) {
+          const leader = sessionToLeader[it.session_id];
+          if (!leader) continue;
+          map[leader].prod += Number(it.quantity_actual) || 0;
+        }
+
+        const result: MonthlyRow[] = Object.entries(map).map(([name, v]) => ({
+          name,
+          totalPoints: v.points,
+          occurrences: v.occ,
+          totalProduction: v.prod,
+          score: Math.max(0, 100 - v.points),
+        })).sort((a, b) => a.score - b.score || b.totalPoints - a.totalPoints);
+
+        if (!cancel) setMonthlyRows(result);
+      } catch (err) {
+        console.error('[LeaderQualityBoard] monthly fetch failed:', err);
+      } finally {
+        if (!cancel) setMonthlyLoading(false);
+      }
     })();
     return () => { cancel = true; };
   }, [view, monthValue]);
