@@ -8,7 +8,26 @@ import { severityBadgeClass, severityLabel, SEVERITY_OPTIONS } from '@/utils/qua
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { ProductionSession } from '@/types/production';
-import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil, Download } from 'lucide-react';
+
+function exportQualityActionsToCsv(rows: LogEntry[]) {
+  const headers = ['Date', 'Shift', 'Line', 'Leader', 'Issue', 'Severity', 'Points', 'Notes'];
+  const csv = [
+    headers.join(','),
+    ...rows.map(e => [
+      e.date, e.shift, e.line, e.leader, e.name, e.severity || '', `-${e.points}`, (e.notes || '').replace(/\n/g, ' '),
+    ].map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')),
+  ].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `quality_actions_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const SEVERITY_DOT: Record<string, string> = {
   low: 'bg-blue-500',
@@ -167,22 +186,34 @@ export function QualityActionsLog() {
           <div className="text-xs text-muted-foreground">
             {filtered.length} occurrence(s) · -{totalPoints} pts
           </div>
-          <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setView('list')}
-              className={`px-3 py-1.5 inline-flex items-center gap-1 ${view === 'list' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+              onClick={() => exportQualityActionsToCsv(filtered)}
+              disabled={filtered.length === 0}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
+              title="Download CSV (opens in Excel)"
             >
-              <List size={12} /> List
+              <Download size={12} /> Export
             </button>
-            <button
-              type="button"
-              onClick={() => setView('calendar')}
-              className={`px-3 py-1.5 inline-flex items-center gap-1 border-l border-border ${view === 'calendar' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
-            >
-              <CalendarIcon size={12} /> Calendar
-            </button>
+            <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => setView('list')}
+                className={`px-3 py-1.5 inline-flex items-center gap-1 ${view === 'list' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+              >
+                <List size={12} /> List
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('calendar')}
+                className={`px-3 py-1.5 inline-flex items-center gap-1 border-l border-border ${view === 'calendar' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+              >
+                <CalendarIcon size={12} /> Calendar
+              </button>
+            </div>
           </div>
+
         </div>
 
         {view === 'list' ? (
