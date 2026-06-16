@@ -165,6 +165,59 @@ export type Database = {
           },
         ]
       }
+      engineer_scores: {
+        Row: {
+          engineer_id: string
+          id: string
+          score: number
+          updated_at: string
+        }
+        Insert: {
+          engineer_id: string
+          id?: string
+          score?: number
+          updated_at?: string
+        }
+        Update: {
+          engineer_id?: string
+          id?: string
+          score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engineer_scores_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engineers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          pin_hash: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          pin_hash: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          pin_hash?: string
+        }
+        Relationships: []
+      }
       lines: {
         Row: {
           created_at: string
@@ -188,6 +241,103 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      machines: {
+        Row: {
+          category: Database["public"]["Enums"]["machine_category"] | null
+          code: string | null
+          created_at: string
+          current_line: string | null
+          current_location: string
+          fixed_line: string | null
+          health_score: number
+          id: string
+          last_maintenance_date: string | null
+          line_id: string | null
+          machine_type: string
+          name: string
+          sector: string | null
+          side: string
+          status: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["machine_category"] | null
+          code?: string | null
+          created_at?: string
+          current_line?: string | null
+          current_location?: string
+          fixed_line?: string | null
+          health_score?: number
+          id?: string
+          last_maintenance_date?: string | null
+          line_id?: string | null
+          machine_type: string
+          name: string
+          sector?: string | null
+          side?: string
+          status?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["machine_category"] | null
+          code?: string | null
+          created_at?: string
+          current_line?: string | null
+          current_location?: string
+          fixed_line?: string | null
+          health_score?: number
+          id?: string
+          last_maintenance_date?: string | null
+          line_id?: string | null
+          machine_type?: string
+          name?: string
+          sector?: string | null
+          side?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machines_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mobile_assets: {
+        Row: {
+          active: boolean
+          asset_number: number
+          asset_type: Database["public"]["Enums"]["mobile_asset_type"]
+          created_at: string
+          current_line_id: string | null
+          id: string
+        }
+        Insert: {
+          active?: boolean
+          asset_number: number
+          asset_type: Database["public"]["Enums"]["mobile_asset_type"]
+          created_at?: string
+          current_line_id?: string | null
+          id?: string
+        }
+        Update: {
+          active?: boolean
+          asset_number?: number
+          asset_type?: Database["public"]["Enums"]["mobile_asset_type"]
+          created_at?: string
+          current_line_id?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mobile_assets_current_line_id_fkey"
+            columns: ["current_line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       operation_time: {
         Row: {
@@ -714,6 +864,352 @@ export type Database = {
         }
         Relationships: []
       }
+      wo_episodes: {
+        Row: {
+          accepted_at: string | null
+          arrived_at: string | null
+          episode_number: number
+          finish_engineer_id: string | null
+          finish_pin_verified: boolean
+          finished_at: string | null
+          id: string
+          notes: string | null
+          reopen_reason: string | null
+          reopened_by: string | null
+          started_at: string
+          started_work_at: string | null
+          work_order_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          arrived_at?: string | null
+          episode_number?: number
+          finish_engineer_id?: string | null
+          finish_pin_verified?: boolean
+          finished_at?: string | null
+          id?: string
+          notes?: string | null
+          reopen_reason?: string | null
+          reopened_by?: string | null
+          started_at?: string
+          started_work_at?: string | null
+          work_order_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          arrived_at?: string | null
+          episode_number?: number
+          finish_engineer_id?: string | null
+          finish_pin_verified?: boolean
+          finished_at?: string | null
+          id?: string
+          notes?: string | null
+          reopen_reason?: string | null
+          reopened_by?: string | null
+          started_at?: string
+          started_work_at?: string | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wo_episodes_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wo_messages: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string | null
+          message: string
+          user_id: string
+          user_name: string
+          work_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          message: string
+          user_id: string
+          user_name: string
+          work_order_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          message?: string
+          user_id?: string
+          user_name?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wo_messages_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wo_pauses: {
+        Row: {
+          created_at: string
+          id: string
+          paused_at: string
+          reason: string | null
+          resumed_at: string | null
+          wo_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          paused_at?: string
+          reason?: string | null
+          resumed_at?: string | null
+          wo_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          paused_at?: string
+          reason?: string | null
+          resumed_at?: string | null
+          wo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wo_pauses_wo_id_fkey"
+            columns: ["wo_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wo_photos: {
+        Row: {
+          created_at: string
+          id: string
+          photo_type: string
+          storage_path: string
+          uploaded_by: string
+          work_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          photo_type: string
+          storage_path: string
+          uploaded_by: string
+          work_order_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          photo_type?: string
+          storage_path?: string
+          uploaded_by?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wo_photos_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_logs: {
+        Row: {
+          action: string
+          created_at: string
+          engineer_id: string | null
+          engineer_name: string | null
+          id: string
+          work_order_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          engineer_id?: string | null
+          engineer_name?: string | null
+          id?: string
+          work_order_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          engineer_id?: string | null
+          engineer_name?: string | null
+          id?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_logs_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_orders: {
+        Row: {
+          arrived_at: string | null
+          checklist_completed: boolean
+          closed_at: string | null
+          closed_by: string | null
+          completed_at: string | null
+          created_at: string
+          current_episode: number
+          description: string
+          engineer_id: string | null
+          engineer_name: string | null
+          engineer_notified_acknowledged_at: string | null
+          finished_at: string | null
+          id: string
+          line_at_time: string | null
+          line_id: string | null
+          line_resumed_at: string | null
+          line_resumed_by: string | null
+          line_stopped: boolean
+          line_stopped_at: string | null
+          line_stopped_by: string | null
+          locked_at: string | null
+          locked_engineer_id: string | null
+          machine: string | null
+          mobile_asset_id: string | null
+          notes: string | null
+          notified_engineers: string[] | null
+          operator_id: string
+          operator_signature_name: string | null
+          pause_reason: string
+          paused_at: string | null
+          physical_line_id: string | null
+          priority: string
+          received_at: string | null
+          recurrence_of_wo_id: string | null
+          reopen_count: number
+          requester_name: string
+          signed_by_name: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["wo_status"]
+          total_paused_minutes: number
+          wo_number: number
+        }
+        Insert: {
+          arrived_at?: string | null
+          checklist_completed?: boolean
+          closed_at?: string | null
+          closed_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          current_episode?: number
+          description: string
+          engineer_id?: string | null
+          engineer_name?: string | null
+          engineer_notified_acknowledged_at?: string | null
+          finished_at?: string | null
+          id?: string
+          line_at_time?: string | null
+          line_id?: string | null
+          line_resumed_at?: string | null
+          line_resumed_by?: string | null
+          line_stopped?: boolean
+          line_stopped_at?: string | null
+          line_stopped_by?: string | null
+          locked_at?: string | null
+          locked_engineer_id?: string | null
+          machine?: string | null
+          mobile_asset_id?: string | null
+          notes?: string | null
+          notified_engineers?: string[] | null
+          operator_id: string
+          operator_signature_name?: string | null
+          pause_reason?: string
+          paused_at?: string | null
+          physical_line_id?: string | null
+          priority?: string
+          received_at?: string | null
+          recurrence_of_wo_id?: string | null
+          reopen_count?: number
+          requester_name: string
+          signed_by_name?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["wo_status"]
+          total_paused_minutes?: number
+          wo_number?: number
+        }
+        Update: {
+          arrived_at?: string | null
+          checklist_completed?: boolean
+          closed_at?: string | null
+          closed_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          current_episode?: number
+          description?: string
+          engineer_id?: string | null
+          engineer_name?: string | null
+          engineer_notified_acknowledged_at?: string | null
+          finished_at?: string | null
+          id?: string
+          line_at_time?: string | null
+          line_id?: string | null
+          line_resumed_at?: string | null
+          line_resumed_by?: string | null
+          line_stopped?: boolean
+          line_stopped_at?: string | null
+          line_stopped_by?: string | null
+          locked_at?: string | null
+          locked_engineer_id?: string | null
+          machine?: string | null
+          mobile_asset_id?: string | null
+          notes?: string | null
+          notified_engineers?: string[] | null
+          operator_id?: string
+          operator_signature_name?: string | null
+          pause_reason?: string
+          paused_at?: string | null
+          physical_line_id?: string | null
+          priority?: string
+          received_at?: string | null
+          recurrence_of_wo_id?: string | null
+          reopen_count?: number
+          requester_name?: string
+          signed_by_name?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["wo_status"]
+          total_paused_minutes?: number
+          wo_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_mobile_asset_id_fkey"
+            columns: ["mobile_asset_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -743,6 +1239,17 @@ export type Database = {
         | "engineer"
         | "manager"
         | "viewer"
+      machine_category: "line_fixed" | "line_mobile" | "support"
+      mobile_asset_type: "printer" | "bag_sealer"
+      wo_status:
+        | "open"
+        | "in_progress"
+        | "completed"
+        | "force_closed"
+        | "received"
+        | "arrived"
+        | "finished"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -877,6 +1384,18 @@ export const Constants = {
         "engineer",
         "manager",
         "viewer",
+      ],
+      machine_category: ["line_fixed", "line_mobile", "support"],
+      mobile_asset_type: ["printer", "bag_sealer"],
+      wo_status: [
+        "open",
+        "in_progress",
+        "completed",
+        "force_closed",
+        "received",
+        "arrived",
+        "finished",
+        "closed",
       ],
     },
   },
