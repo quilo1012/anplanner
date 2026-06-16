@@ -483,7 +483,7 @@ export function Dashboard() {
                 <LeaderPerformanceBoard sessions={filteredSessions} startDate={startDate} endDate={endDate} />
               </div>
               <div className="card p-3 lg:col-span-2">
-                <LeaderQualityBoard startDate={startDate} endDate={endDate} />
+                <LeaderQualityBoard startDate={startDate} endDate={endDate} leaderFilter={selectedLeader} />
               </div>
             </div>
 
