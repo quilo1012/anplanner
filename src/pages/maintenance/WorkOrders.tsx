@@ -197,10 +197,12 @@ function formatDateTime(value: string | null): string {
 
 export function WorkOrders() {
   const { workOrders, isLoading, error, openCount, linesStoppedCount, advanceWorkOrder, stopLine, resumeLine, refreshWorkOrders } = useWorkOrders();
+  const { byWoId: downtimeByWo } = useWorkOrderDowntimeSummary();
   const { user, hasRole } = useAuth();
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | WoStatus>('OPEN');
   const [showNewForm, setShowNewForm] = useState(false);
   const [advancingId, setAdvancingId] = useState<string | null>(null);
+  const [openPanelWo, setOpenPanelWo] = useState<WorkOrder | null>(null);
 
   const isEngineer = hasRole('engineer');
   const canCreate = hasRole(['supervisor', 'admin']);
