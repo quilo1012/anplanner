@@ -546,6 +546,19 @@ export function Dashboard() {
         onOpenChange={(open) => { if (!open) setEditSession(null); }}
         isOperator={isOperator}
       />
+
+      <QuickQualityActionDialog
+        open={qualityDialogOpen}
+        onOpenChange={setQualityDialogOpen}
+        lines={uniqueLines}
+        leaders={uniqueLeaders}
+        defaultLine={selectedLine}
+        defaultLeader={selectedLeader}
+        defaultShift={selectedShift}
+        defaultDate={endDate}
+        recordedBy={user?.id ?? null}
+        onSaved={() => setQualityRefreshTick(t => t + 1)}
+      />
     </>
   );
 }
