@@ -372,8 +372,10 @@ export function Dashboard() {
             <p className="text-xl font-bold text-foreground tabular-nums">{stats.oee.toFixed(1)}%</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3 text-center">
-            <p className="text-xs text-muted-foreground uppercase mb-1">Staff</p>
-            <p className="text-xl font-bold text-foreground tabular-nums">{stats.totalActualStaff}<span className="text-sm font-normal text-muted-foreground">/{stats.totalPlannedStaff}</span></p>
+            <p className="text-xs text-muted-foreground uppercase mb-1">Quality Actions</p>
+            <p className="text-xl font-bold text-foreground tabular-nums">
+              {Object.values(leaderQuality).reduce((sum, q) => sum + (q.occurrences || 0), 0)}
+            </p>
           </div>
         </div>
         )}
