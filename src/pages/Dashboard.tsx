@@ -264,19 +264,6 @@ export function Dashboard() {
               <span className="text-[10px] text-muted-foreground">to</span>
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
                 className="bg-transparent text-xs font-mono text-foreground outline-none w-[110px]" />
-              <div className="w-px h-4 bg-border mx-1" />
-              <div className="flex gap-0.5">
-                {[{ key: 'today', label: 'Today' }, { key: '7d', label: '7D' }, { key: '30d', label: '30D' }, { key: 'month', label: 'Month' }].map(p => (
-                  <button key={p.key} onClick={() => setPreset(p.key)}
-                    className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
-                      activePreset === p.key
-                        ? 'bg-primary/15 text-primary border border-primary/30'
-                        : 'text-muted-foreground hover:text-foreground border border-transparent'
-                    }`}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* 2. Shift toggle */}
