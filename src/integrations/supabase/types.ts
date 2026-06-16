@@ -1871,6 +1871,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_active_profile_names: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
+      list_engineer_names: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
