@@ -10,7 +10,7 @@ export function LeaderQualityDashboard() {
       <Header title="Leader Quality Board" subtitle="Dedicated quality scorecard view" />
       <div className="flex-1 overflow-auto p-3 sm:p-4">
         <div className="card p-3">
-          <LeaderQualityBoard currentDate={today} />
+          <LeaderQualityBoard startDate={today} endDate={today} />
         </div>
       </div>
     </>
