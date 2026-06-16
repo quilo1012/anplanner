@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart, Package, ShieldAlert } from 'lucide-react';
+import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart, Package, ShieldAlert, Wrench } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 
 type NavItem = {
