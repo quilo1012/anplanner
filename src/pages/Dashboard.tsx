@@ -250,64 +250,97 @@ export function Dashboard() {
     <>
       <Header title="Production Dashboard" subtitle={`${selectedShift} Shift — ${dateRangeLabel}`} />
       <div className="flex-1 overflow-auto p-3 sm:p-4 print:p-0">
-        {/* ═══ FILTER BAR ═══ */}
-        <div className="card p-3 mb-3 no-print space-y-2">
-          {/* Row 1: Date range + presets + shift */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2">
-              <Calendar size={16} className="text-primary shrink-0" />
-              <span className="text-xs font-semibold text-foreground hidden sm:inline">Period:</span>
+        {/* ═══ INTEGRATED CONTROL STRIP ═══ */}
+        <div className="no-print mb-3">
+          <div className="flex flex-wrap items-center gap-1.5 bg-card border border-border p-1.5 rounded-xl ring-1 ring-white/5 shadow-lg">
+            {/* 1. Period + presets */}
+            <div className="flex items-center gap-2 bg-background/60 px-3 py-1.5 rounded-lg border border-border/60">
+              <Calendar size={14} className="text-primary shrink-0" />
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-xs font-mono text-foreground outline-none w-[110px]" />
+              <span className="text-[10px] text-muted-foreground">to</span>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-xs font-mono text-foreground outline-none w-[110px]" />
+              <div className="w-px h-4 bg-border mx-1" />
+              <div className="flex gap-0.5">
+                {[{ key: 'today', label: 'Today' }, { key: '7d', label: '7D' }, { key: '30d', label: '30D' }, { key: 'month', label: 'Month' }].map(p => (
+                  <button key={p.key} onClick={() => setPreset(p.key)}
+                    className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
+                      activePreset === p.key
+                        ? 'bg-primary/15 text-primary border border-primary/30'
+                        : 'text-muted-foreground hover:text-foreground border border-transparent'
+                    }`}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field text-sm py-1.5 px-2 w-auto" />
-            <span className="text-xs text-muted-foreground">to</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input-field text-sm py-1.5 px-2 w-auto" />
-            <div className="flex rounded-md border border-border overflow-hidden">
-              {[{ key: 'today', label: 'Today' }, { key: '7d', label: '7D' }, { key: '30d', label: '30D' }, { key: 'month', label: 'Month' }].map(p => (
-                <button key={p.key} onClick={() => setPreset(p.key)}
-                  className={`px-2.5 py-1 text-xs font-medium transition-colors ${activePreset === p.key ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex rounded-lg border border-border overflow-hidden">
+
+            {/* 2. Shift toggle */}
+            <div className="flex items-center p-1 bg-background/60 rounded-lg border border-border/60">
               {SHIFT_TYPES.map(shift => (
                 <button key={shift} onClick={() => setSelectedShift(shift)}
-                  className={`px-3 py-1.5 font-medium text-sm transition-colors ${selectedShift === shift ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
+                  className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    selectedShift === shift
+                      ? 'bg-primary text-primary-foreground shadow-inner'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}>
                   {shift}
                 </button>
               ))}
             </div>
-          </div>
-          {/* Row 2: Line, Leader, Downtime filters */}
-          {canViewCharts && (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2">
-              <Filter size={14} className="text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground hidden sm:inline">Filters:</span>
-            </div>
-            <select value={selectedLine} onChange={(e) => setSelectedLine(e.target.value)} className="select-field text-sm py-1.5 px-2 w-auto min-w-[100px]">
-              <option value="">All Lines</option>
-              {uniqueLines.map(line => <option key={line} value={line}>{line}</option>)}
-            </select>
-            <select value={selectedLeader} onChange={(e) => setSelectedLeader(e.target.value)} className="select-field text-sm py-1.5 px-2 w-auto min-w-[100px]">
-              <option value="">All Leaders</option>
-              {uniqueLeaders.map(leader => <option key={leader} value={leader}>{leader}</option>)}
-            </select>
-            {hasOptionalFilters && (
-              <button onClick={clearFilters} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Clear filters">
-                <X size={16} />
-              </button>
+
+            {/* 3. Contextual filters */}
+            {canViewCharts && (
+              <>
+                <div className="flex-1 min-w-[160px] relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-[9px] font-bold uppercase tracking-tighter text-muted-foreground pointer-events-none">Line</span>
+                  <select value={selectedLine} onChange={(e) => setSelectedLine(e.target.value)}
+                    className="w-full appearance-none bg-background/60 border border-border/60 rounded-lg pl-10 pr-7 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 hover:bg-muted/40 cursor-pointer transition-all">
+                    <option value="">All Lines</option>
+                    {uniqueLines.map(line => <option key={line} value={line}>{line}</option>)}
+                  </select>
+                  <span className="absolute inset-y-0 right-2 flex items-center text-muted-foreground pointer-events-none">▾</span>
+                </div>
+
+                <div className="flex-1 min-w-[160px] relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-[9px] font-bold uppercase tracking-tighter text-muted-foreground pointer-events-none">Lead</span>
+                  <select value={selectedLeader} onChange={(e) => setSelectedLeader(e.target.value)}
+                    className="w-full appearance-none bg-background/60 border border-border/60 rounded-lg pl-10 pr-7 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 hover:bg-muted/40 cursor-pointer transition-all">
+                    <option value="">All Leaders</option>
+                    {uniqueLeaders.map(leader => <option key={leader} value={leader}>{leader}</option>)}
+                  </select>
+                  <span className="absolute inset-y-0 right-2 flex items-center text-muted-foreground pointer-events-none">▾</span>
+                </div>
+
+                {hasOptionalFilters && (
+                  <button onClick={clearFilters}
+                    className="p-2 rounded-lg border border-border/60 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                    title="Clear filters">
+                    <X size={14} />
+                  </button>
+                )}
+
+                {/* 4. Actions */}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <button onClick={() => setShowCharts(!showCharts)}
+                    className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-border/60 transition-all ${
+                      showCharts
+                        ? 'bg-background/60 text-foreground hover:bg-muted/40'
+                        : 'bg-background/60 text-muted-foreground hover:text-foreground'
+                    }`}>
+                    <BarChart3 size={14} className="text-primary" />
+                    <span className="hidden sm:inline">Charts</span>
+                  </button>
+                  <button onClick={handlePrint}
+                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground bg-background/60 rounded-lg border border-border/60 hover:bg-muted/40 transition-all">
+                    <Printer size={14} />
+                    <span className="hidden sm:inline">Print</span>
+                  </button>
+                </div>
+              </>
             )}
-            <div className="ml-auto flex items-center gap-2">
-              <button onClick={() => setShowCharts(!showCharts)} className={`btn-secondary text-xs px-2 py-1.5 ${showCharts ? '' : 'opacity-60'}`}>
-                <BarChart3 size={14} /><span className="hidden sm:inline">Charts</span>
-              </button>
-              <button onClick={handlePrint} className="btn-secondary text-xs px-2 py-1.5">
-                <Printer size={14} /><span className="hidden sm:inline">Print</span>
-              </button>
-            </div>
           </div>
-          )}
         </div>
 
         {/* Print Header */}
