@@ -35,6 +35,83 @@ export type Database = {
         }
         Relationships: []
       }
+      device_lines: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          line_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          line_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          line_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_lines_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_lines_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          created_at: string
+          device_token: string
+          id: string
+          label: string | null
+          last_seen_at: string | null
+          line_id: string | null
+          paired_at: string | null
+          paired_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_token: string
+          id?: string
+          label?: string | null
+          last_seen_at?: string | null
+          line_id?: string | null
+          paired_at?: string | null
+          paired_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_token?: string
+          id?: string
+          label?: string | null
+          last_seen_at?: string | null
+          line_id?: string | null
+          paired_at?: string | null
+          paired_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       downtime_categories: {
         Row: {
           created_at: string
@@ -161,6 +238,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      operator_line_accounts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          label: string
+          line_ids: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          label: string
+          line_ids?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          label?: string
+          line_ids?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       production_items: {
         Row: {
@@ -609,6 +719,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_device_line_ids: { Args: never; Returns: string[] }
+      current_device_token: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
