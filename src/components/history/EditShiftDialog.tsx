@@ -19,8 +19,6 @@ import { QualityActionsForm } from '@/components/QualityActionsForm';
 import { QualityActionRow } from '@/types/quality';
 import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
 import { useAuth } from '@/contexts/AuthContext';
-import { mapToAnmaisysLine } from '@/utils/maintenanceLineMapping';
-import { createMaintenanceOrder } from '@/services/maintenanceBridge';
 import { DOWNTIME_REASONS_FALLBACK } from '@/types/downtime';
 
 interface EditShiftDialogProps {
@@ -61,24 +59,44 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
   };
 
   const handleCreateOrder = async (dt: StructuredDowntime) => {
-    const mapped = mapToAnmaisysLine(productionLine);
-    if (!mapped) {
-      toast.error('No line mapping available');
+    if (!user?.id) {
+      toast.error('You must be signed in to open a maintenance order');
       return;
     }
     setCreatingOrderId(dt.id);
     try {
-      const { order_id } = await createMaintenanceOrder({
-        description: `${reasonLabel(dt.reason)} on ${productionLine}${dt.comment ? ` — ${dt.comment}` : ''}`,
-        priority: 'medium',
-        machine: null,
-        requester_name: user?.email || lineLeader || 'Anplanner',
-        line_name: mapped,
-        line_at_time: productionLine,
-        notes: `From shift ${date} ${shiftType} (${dt.duration} min downtime)`,
-      });
-      setCreatedOrders(prev => ({ ...prev, [dt.id]: order_id }));
-      toast.success(`Order #${order_id} created`);
+      // Look up the line_id by exact name (post-fusion: same names on both sides)
+      const { data: lineRow, error: lineErr } = await supabase
+        .from('lines')
+        .select('id')
+        .eq('name', productionLine)
+        .maybeSingle();
+      if (lineErr) throw lineErr;
+      if (!lineRow?.id) throw new Error(`Line "${productionLine}" not found`);
+
+      // Priority by downtime length
+      const priority = dt.duration >= 60 ? 'high' : dt.duration >= 20 ? 'medium' : 'low';
+
+      const { data, error: insertErr } = await supabase
+        .from('work_orders' as never)
+        .insert({
+          description: `${reasonLabel(dt.reason)} on ${productionLine}${dt.comment ? ` — ${dt.comment}` : ''}`,
+          priority,
+          machine: null,
+          requester_name: `${user.email ?? lineLeader ?? 'Anplanner'} (via Anplanner)`,
+          operator_id: user.id,
+          line_id: lineRow.id,
+          line_at_time: productionLine,
+          notes: `From shift ${date} ${shiftType} (${dt.duration} min downtime)`,
+          status: 'open',
+        } as never)
+        .select('wo_number')
+        .single();
+      if (insertErr) throw insertErr;
+
+      const orderNumber = (data as { wo_number: number } | null)?.wo_number ?? 0;
+      setCreatedOrders(prev => ({ ...prev, [dt.id]: orderNumber }));
+      toast.success(`Order #${orderNumber} created`);
     } catch (err) {
       toast.error((err as Error).message || 'Failed to create order');
     } finally {
@@ -361,7 +379,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
               </Label>
               <div className="space-y-2">
                 {maintenanceDowntimes.map(dt => {
-                  const mapped = mapToAnmaisysLine(productionLine);
                   const created = createdOrders[dt.id];
                   const isCreating = creatingOrderId === dt.id;
                   return (
@@ -377,11 +394,11 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!mapped || isCreating}
+                          disabled={isCreating}
                           onClick={() => handleCreateOrder(dt)}
                         >
                           {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
-                          {!mapped ? 'No line mapping' : isCreating ? 'Creating...' : 'Open Maintenance Order'}
+                          {isCreating ? 'Creating...' : 'Open Maintenance Order'}
                         </Button>
                       )}
                     </div>
