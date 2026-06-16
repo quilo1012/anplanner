@@ -19,7 +19,9 @@ interface MonthlyRow {
 interface Props {
   startDate: string;
   endDate: string;
+  leaderFilter?: string;
 }
+
 
 
 interface LeaderQualityStats {
