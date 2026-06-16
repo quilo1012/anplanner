@@ -367,9 +367,15 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
         <>
           {monthlyLoading ? (
             <div className="text-center py-6 text-muted-foreground text-sm">Loading…</div>
-          ) : monthlyRows.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground text-sm">No data for this month</div>
-          ) : (
+          ) : (() => {
+            const visibleRows = leaderFilterNorm
+              ? monthlyRows.filter(r => r.name.trim().toLowerCase() === leaderFilterNorm)
+              : monthlyRows;
+            if (visibleRows.length === 0) {
+              return <div className="text-center py-6 text-muted-foreground text-sm">No data for this month</div>;
+            }
+            return (
+
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
