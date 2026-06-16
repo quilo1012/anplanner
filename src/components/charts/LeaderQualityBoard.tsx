@@ -101,8 +101,7 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
         if (s !== shiftFilter) return false;
       }
       if (leaderFilterNorm) {
-        const name = (r.line_leader || '').trim().toLowerCase();
-        if (name !== leaderFilterNorm) return false;
+        if (normalizeName(r.line_leader) !== leaderFilterNorm) return false;
       }
       return true;
     });
