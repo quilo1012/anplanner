@@ -301,13 +301,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const addUser = async (userData: { name: string; email: string; password: string; role: UserRole }): Promise<{ success: boolean; error?: string }> => {
-    console.log('[DIAG] addUser called with', userData.email);
     try {
-      console.log('[DIAG] about to invoke delete-user function');
       const { data, error } = await supabase.functions.invoke('delete-user', {
         body: { action: 'create', email: userData.email, password: userData.password, name: userData.name, role: userData.role },
       });
-      console.log('[DIAG] invoke returned', { data, error });
 
       if (error) {
         console.error('Error creating user:', error);
@@ -315,16 +312,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data?.error) {
-        console.log('[DIAG] data.error present', data.error);
         return { success: false, error: data.error };
       }
 
-      console.log('[DIAG] about to refreshUsers');
       await refreshUsers();
-      console.log('[DIAG] refreshUsers done, returning success');
       return { success: true };
     } catch (error) {
-      console.error('[DIAG] caught exception', error);
+      console.error('Add user error:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   };
