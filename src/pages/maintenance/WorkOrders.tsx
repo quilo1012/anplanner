@@ -1,81 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { useWorkOrders, WoStatus, nextStatus, WorkOrder } from '@/hooks/useWorkOrders';
-import { useWorkOrderDowntimeSummary, useWorkOrderDowntimeEvents } from '@/hooks/useWorkOrderDowntimeSummary';
+import { useProblemDescriptions } from '@/hooks/useProblemDescriptions';
+import { useLineWoHistory } from '@/hooks/useLineWoHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import { formatDuration } from '@/utils/formatDuration';
 import { toast } from 'sonner';
-import { Loader2, Wrench, AlertTriangle, CheckCircle2, Clock, Plus, ArrowRight, X } from 'lucide-react';
-
-const DOWNTIME_STATUS_CLASSES: Record<'active' | 'resolved' | 'none', string> = {
-  active: 'bg-red-100 text-red-800',
-  resolved: 'bg-emerald-100 text-emerald-800',
-  none: 'bg-muted text-muted-foreground',
-};
-
-function WorkOrderDowntimePanel({ wo, onClose }: { wo: WorkOrder; onClose: () => void }) {
-  const { events, isLoading } = useWorkOrderDowntimeEvents(wo.id);
-  const total = events.reduce((sum, e) => sum + (e.duration_minutes ?? (e.resumed_at ? Math.max(0, Math.round((new Date(e.resumed_at).getTime() - new Date(e.stopped_at).getTime()) / 60000)) : 0)), 0);
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <div className="bg-card border-l border-border w-full max-w-lg h-full overflow-auto p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-xs text-muted-foreground">Work Order</p>
-            <h2 className="text-lg font-semibold text-foreground">#{wo.wo_number} — {wo.line_at_time || '—'}</h2>
-            <p className="text-sm text-muted-foreground mt-1">{wo.description}</p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="card p-3">
-            <p className="text-xs text-muted-foreground">Total downtime</p>
-            <p className="text-lg font-bold text-foreground">{total > 0 ? formatDuration(total) : '—'}</p>
-          </div>
-          <div className="card p-3">
-            <p className="text-xs text-muted-foreground">Events</p>
-            <p className="text-lg font-bold text-foreground">{events.length}</p>
-          </div>
-        </div>
-        <h3 className="text-sm font-semibold text-foreground mb-2">Downtime events</h3>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-6 text-muted-foreground gap-2"><Loader2 size={14} className="animate-spin" /> Loading...</div>
-        ) : events.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No downtime events for this work order.</p>
-        ) : (
-          <ul className="space-y-2">
-            {events.map(e => {
-              const duration = e.duration_minutes ?? (e.resumed_at ? Math.max(0, Math.round((new Date(e.resumed_at).getTime() - new Date(e.stopped_at).getTime()) / 60000)) : null);
-              return (
-                <li key={e.id} className="border border-border rounded p-3 text-sm">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-foreground">{e.stopped_reason || 'No reason'}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${e.resumed_at ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                      {e.resumed_at ? (duration !== null ? formatDuration(duration) : 'Resolved') : 'Active'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateTime(e.stopped_at)} → {e.resumed_at ? formatDateTime(e.resumed_at) : 'ongoing'}
-                  </p>
-                  {(e.stopped_by_name || e.resumed_by_name) && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {e.stopped_by_name && <>Stopped by {e.stopped_by_name}</>}
-                      {e.stopped_by_name && e.resumed_by_name && ' · '}
-                      {e.resumed_by_name && <>Resumed by {e.resumed_by_name}</>}
-                    </p>
-                  )}
-                  {e.resumed_note && <p className="text-xs text-muted-foreground mt-1 italic">"{e.resumed_note}"</p>}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
+import { Loader2, AlertTriangle, CheckCircle2, Clock, Plus, ArrowRight, X } from 'lucide-react';
 
 const STATUS_LABELS: Record<WoStatus, string> = {
   open: 'Open',
@@ -112,32 +45,49 @@ function useLinesList() {
   return lines;
 }
 
-function NewWorkOrderForm({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NewWorkOrderForm({ onClose, onCreated, initialLineStopped }: { onClose: () => void; onCreated: () => void; initialLineStopped?: boolean }) {
   const { user } = useAuth();
   const { createWorkOrder } = useWorkOrders();
+  const { problems } = useProblemDescriptions();
   const lines = useLinesList();
-  const [description, setDescription] = useState('');
+  const [problemId, setProblemId] = useState('');
+  const [notes, setNotes] = useState('');
   const [lineId, setLineId] = useState('');
   const [machine, setMachine] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [lineStopped, setLineStopped] = useState(initialLineStopped ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { history: lineHistory } = useLineWoHistory(lineId || undefined);
+
+  const problemsByCategory = useMemo(() => {
+    const groups = new Map<string, typeof problems>();
+    for (const p of problems) {
+      const cat = p.category || 'Other';
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat)!.push(p);
+    }
+    return groups;
+  }, [problems]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim() || !lineId) {
-      toast.error('Please fill in the line and description.');
+    if (!problemId || !lineId) {
+      toast.error('Please select a line and a problem type.');
       return;
     }
     const lineName = lines.find(l => l.id === lineId)?.name || '';
+    const problemName = problems.find(p => p.id === problemId)?.name || '';
     setIsSubmitting(true);
     const result = await createWorkOrder({
-      description: description.trim(),
+      description: problemName,
       lineId,
       lineName,
       machine: machine.trim() || undefined,
       priority,
       requesterName: user?.name || 'Unknown',
       operatorId: user?.id || '',
+      notes: notes.trim() || undefined,
+      lineStopped,
     });
     setIsSubmitting(false);
     if (!result.success) {
@@ -153,7 +103,16 @@ function NewWorkOrderForm({ onClose, onCreated }: { onClose: () => void; onCreat
     <form onSubmit={handleSubmit} className="card p-4 sm:p-6 mb-4 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-foreground flex items-center gap-2"><Plus size={16} /> New Work Order</h3>
-        <button type="button" onClick={onClose} className="p-1 hover:bg-muted rounded"><X size={16} /></button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLineStopped(!lineStopped)}
+            className={`text-xs font-medium px-2 py-1 rounded ${lineStopped ? 'bg-red-100 text-red-800' : 'bg-muted text-muted-foreground'}`}
+          >
+            {lineStopped ? '● Line Stopped' : 'Line Running — click to mark stopped'}
+          </button>
+          <button type="button" onClick={onClose} className="p-1 hover:bg-muted rounded"><X size={16} /></button>
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -161,6 +120,17 @@ function NewWorkOrderForm({ onClose, onCreated }: { onClose: () => void; onCreat
           <select value={lineId} onChange={(e) => setLineId(e.target.value)} className="input-field" required>
             <option value="">Select line...</option>
             {lines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Problem Type *</label>
+          <select value={problemId} onChange={(e) => setProblemId(e.target.value)} className="input-field" required>
+            <option value="">Select problem...</option>
+            {Array.from(problemsByCategory.entries()).map(([category, items]) => (
+              <optgroup key={category} label={category}>
+                {items.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div>
@@ -176,9 +146,25 @@ function NewWorkOrderForm({ onClose, onCreated }: { onClose: () => void; onCreat
           </select>
         </div>
       </div>
+      {lineHistory && lineHistory.totalCount > 0 && (
+        <div className="flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertTriangle size={14} className="text-amber-700 shrink-0" />
+          <span className="text-amber-800">
+            {lineHistory.totalCount} previous WO(s) · Last WO: {lineHistory.lastWoDaysAgo} day(s) ago
+          </span>
+          {lineHistory.commonProblems.length > 0 && (
+            <span className="text-amber-700">Common:</span>
+          )}
+          {lineHistory.commonProblems.map(p => (
+            <span key={p.description} className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+              {p.description} ({p.count}x)
+            </span>
+          ))}
+        </div>
+      )}
       <div>
-        <label className="block text-xs font-medium text-muted-foreground mb-1">Description *</label>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input-field" rows={3} placeholder="Describe the issue..." required />
+        <label className="block text-xs font-medium text-muted-foreground mb-1">Additional notes (optional)</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="input-field" rows={2} placeholder="Any extra detail..." />
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
@@ -197,15 +183,14 @@ function formatDateTime(value: string | null): string {
 
 export function WorkOrders() {
   const { workOrders, isLoading, error, openCount, linesStoppedCount, advanceWorkOrder, stopLine, resumeLine, refreshWorkOrders } = useWorkOrders();
-  const { byWoId: downtimeByWo } = useWorkOrderDowntimeSummary();
   const { user, hasRole } = useAuth();
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | WoStatus>('OPEN');
-  const [showNewForm, setShowNewForm] = useState(false);
+  const [formOpen, setFormOpen] = useState<{ open: boolean; lineStopped: boolean }>({ open: false, lineStopped: false });
   const [advancingId, setAdvancingId] = useState<string | null>(null);
-  const [openPanelWo, setOpenPanelWo] = useState<WorkOrder | null>(null);
 
   const isEngineer = hasRole('engineer');
-  const canCreate = hasRole(['operator', 'supervisor', 'admin', 'manager']);
+  const canCreate = hasRole(['supervisor', 'admin', 'operator']);
 
   const filteredOrders = useMemo(() => {
     if (statusFilter === 'ALL') return workOrders;
@@ -256,6 +241,50 @@ export function WorkOrders() {
       />
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
+        {canCreate && !formOpen.open && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <button
+                onClick={() => setFormOpen({ open: true, lineStopped: false })}
+                className="card p-4 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-primary/10"><Plus size={18} className="text-primary" /></div>
+                <div>
+                  <p className="font-medium text-foreground">New Work Order</p>
+                  <p className="text-xs text-muted-foreground">Submit a maintenance request</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setStatusFilter('OPEN')}
+                className="card p-4 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-muted"><Clock size={18} className="text-muted-foreground" /></div>
+                <div>
+                  <p className="font-medium text-foreground">My Work Orders</p>
+                  <p className="text-xs text-muted-foreground">Track your submitted orders</p>
+                </div>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <button
+                onClick={() => setFormOpen({ open: true, lineStopped: true })}
+                className="rounded-xl bg-red-600 hover:bg-red-700 text-white p-4 text-left transition-colors"
+              >
+                <p className="text-lg font-bold">● MACHINE STOPPED</p>
+                <p className="text-sm text-red-100">Open WO Request — Line Stopped (downtime starts now)</p>
+              </button>
+              <button
+                onClick={() => setFormOpen({ open: true, lineStopped: false })}
+                className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white p-4 text-left transition-colors"
+              >
+                <p className="text-lg font-bold">⚠ PROBLEM, LINE STILL RUNNING</p>
+                <p className="text-sm text-amber-100">Open WO Request — Line in Operation (no downtime)</p>
+              </button>
+            </div>
+          </>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
           <div className="card p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-100"><AlertTriangle size={18} className="text-red-700" /></div>
@@ -280,7 +309,13 @@ export function WorkOrders() {
           </div>
         </div>
 
-        {showNewForm && <NewWorkOrderForm onClose={() => setShowNewForm(false)} onCreated={refreshWorkOrders} />}
+        {formOpen.open && (
+          <NewWorkOrderForm
+            onClose={() => setFormOpen({ open: false, lineStopped: false })}
+            onCreated={refreshWorkOrders}
+            initialLineStopped={formOpen.lineStopped}
+          />
+        )}
 
         <div className="card p-4 sm:p-6">
           <div className="flex flex-wrap items-end gap-3 mb-4">
@@ -295,8 +330,8 @@ export function WorkOrders() {
               </select>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              {canCreate && !showNewForm && (
-                <button onClick={() => setShowNewForm(true)} className="btn-primary text-sm">
+              {canCreate && !formOpen.open && (
+                <button onClick={() => setFormOpen({ open: true, lineStopped: false })} className="btn-primary text-sm">
                   <Plus size={14} /> New Work Order
                 </button>
               )}
@@ -330,18 +365,13 @@ export function WorkOrders() {
                     <th className="py-2 pr-3">Requester</th>
                     <th className="py-2 pr-3">Engineer</th>
                     <th className="py-2 pr-3">Priority</th>
-                    <th className="py-2 pr-3 whitespace-nowrap">Downtime</th>
-                    <th className="py-2 pr-3">Events</th>
                     <th className="py-2 pr-3">Created</th>
                     {isEngineer && <th className="py-2 pr-3">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredOrders.map(wo => {
-                    const dt = downtimeByWo[wo.id];
-                    const status = dt?.downtime_status ?? 'none';
-                    return (
-                    <tr key={wo.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setOpenPanelWo(wo)}>
+                  {filteredOrders.map(wo => (
+                    <tr key={wo.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/maintenance/work-orders/${wo.id}`)}>
                       <td className="py-2 pr-3 font-medium text-foreground">#{wo.wo_number}</td>
                       <td className="py-2 pr-3">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${STATUS_CLASSES[wo.status]}`}>{STATUS_LABELS[wo.status]}</span>
@@ -355,12 +385,6 @@ export function WorkOrders() {
                       <td className="py-2 pr-3">{wo.requester_name}</td>
                       <td className="py-2 pr-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
                       <td className="py-2 pr-3 capitalize">{wo.priority}</td>
-                      <td className="py-2 pr-3 whitespace-nowrap">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${DOWNTIME_STATUS_CLASSES[status]}`}>
-                          {dt && dt.total_minutes > 0 ? formatDuration(dt.total_minutes) : '—'}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-3 text-muted-foreground">{dt?.events_count ?? 0}</td>
                       <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">{formatDateTime(wo.created_at)}</td>
                       {isEngineer && (
                         <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}>
@@ -401,15 +425,13 @@ export function WorkOrders() {
                         </td>
                       )}
                     </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
         </div>
       </div>
-      {openPanelWo && <WorkOrderDowntimePanel wo={openPanelWo} onClose={() => setOpenPanelWo(null)} />}
     </>
   );
 }
