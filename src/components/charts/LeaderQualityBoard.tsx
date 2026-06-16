@@ -210,7 +210,7 @@ export function LeaderQualityBoard({ currentDate }: Props) {
     const map: Record<string, { points: number; count: number }> = {};
     for (const r of filtered) {
       const name = (r.line_leader || '').trim();
-      if (!name) continue;
+      if (name.length < 2 || /^\d+$/.test(name)) continue;
       if (!map[name]) map[name] = { points: 0, count: 0 };
       map[name].points += Number(r.points) || 0;
       map[name].count += 1;
