@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
-  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown, Trophy,
+  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown, Trophy, Wrench,
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
@@ -22,6 +22,10 @@ const directItems: NavItem[] = [
 ];
 
 // Grouped dropdowns
+const maintenanceItems: NavItem[] = [
+  { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin'] },
+];
+
 const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
@@ -35,7 +39,7 @@ const systemItems: NavItem[] = [
 ];
 
 // Flat list used by the mobile drawer (unchanged behavior)
-const navItems: NavItem[] = [...directItems, ...reportsItems, ...systemItems];
+const navItems: NavItem[] = [...directItems, ...maintenanceItems, ...reportsItems, ...systemItems];
 
 // Drawer debug: enable via `?drawerDebug=1` or `localStorage.drawerDebug = '1'`.
 const drawerDebug = (() => {
@@ -233,6 +237,7 @@ export function TopNav() {
 
   const items = navItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
   const visibleDirect = directItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleMaintenance = maintenanceItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
   const visibleReports = reportsItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
   const visibleSystem = systemItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
 
@@ -276,6 +281,32 @@ export function TopNav() {
               <span>{item.label}</span>
             </NavLink>
           ))}
+
+          {visibleMaintenance.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleMaintenance))}>
+                <Wrench size={16} strokeWidth={2} />
+                <span>Maintenance</span>
+                <ChevronDown size={14} strokeWidth={2} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+                {visibleMaintenance.map(item => (
+                  <DropdownMenuItem key={item.path} asChild>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-2 cursor-pointer w-full',
+                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <item.icon size={16} strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {visibleReports.length > 0 && (
             <DropdownMenu>
