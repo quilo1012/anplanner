@@ -481,6 +481,13 @@ export type Database = {
             foreignKeyName: "machine_events_work_order_id_fkey"
             columns: ["work_order_id"]
             isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
+          },
+          {
+            foreignKeyName: "machine_events_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
             referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
@@ -595,7 +602,7 @@ export type Database = {
           reason: string
           reported_by: string | null
           started_at: string
-          work_order_id: string | null
+          work_order_id: string
         }
         Insert: {
           category: string
@@ -608,7 +615,7 @@ export type Database = {
           reason: string
           reported_by?: string | null
           started_at?: string
-          work_order_id?: string | null
+          work_order_id: string
         }
         Update: {
           category?: string
@@ -621,7 +628,7 @@ export type Database = {
           reason?: string
           reported_by?: string | null
           started_at?: string
-          work_order_id?: string | null
+          work_order_id?: string
         }
         Relationships: [
           {
@@ -630,6 +637,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_downtime_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
           },
           {
             foreignKeyName: "maintenance_downtime_work_order_id_fkey"
@@ -703,6 +717,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_downtime_events_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
           },
           {
             foreignKeyName: "maintenance_downtime_events_work_order_id_fkey"
@@ -832,6 +853,13 @@ export type Database = {
             referencedRelation: "production_sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "operation_time_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "v_session_downtime_summary"
+            referencedColumns: ["session_id"]
+          },
         ]
       }
       operator_line_accounts: {
@@ -902,6 +930,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "spare_parts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_used_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
           },
           {
             foreignKeyName: "parts_used_work_order_id_fkey"
@@ -995,6 +1030,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "production_sessions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "v_session_downtime_summary"
+            referencedColumns: ["session_id"]
           },
         ]
       }
@@ -1374,6 +1416,13 @@ export type Database = {
             referencedRelation: "production_sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "quality_actions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "v_session_downtime_summary"
+            referencedColumns: ["session_id"]
+          },
         ]
       }
       spare_parts: {
@@ -1462,6 +1511,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "production_sessions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "structured_downtimes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "v_session_downtime_summary"
+            referencedColumns: ["session_id"]
           },
         ]
       }
@@ -1558,6 +1614,13 @@ export type Database = {
             foreignKeyName: "wo_episodes_work_order_id_fkey"
             columns: ["work_order_id"]
             isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
+          },
+          {
+            foreignKeyName: "wo_episodes_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
             referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
@@ -1592,6 +1655,13 @@ export type Database = {
           work_order_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "wo_messages_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
+          },
           {
             foreignKeyName: "wo_messages_work_order_id_fkey"
             columns: ["work_order_id"]
@@ -1631,6 +1701,13 @@ export type Database = {
             foreignKeyName: "wo_pauses_wo_id_fkey"
             columns: ["wo_id"]
             isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
+          },
+          {
+            foreignKeyName: "wo_pauses_wo_id_fkey"
+            columns: ["wo_id"]
+            isOneToOne: false
             referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
@@ -1666,6 +1743,13 @@ export type Database = {
             foreignKeyName: "wo_photos_work_order_id_fkey"
             columns: ["work_order_id"]
             isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
+          },
+          {
+            foreignKeyName: "wo_photos_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
             referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
@@ -1697,6 +1781,13 @@ export type Database = {
           work_order_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_order_logs_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "v_work_order_downtime_summary"
+            referencedColumns: ["work_order_id"]
+          },
           {
             foreignKeyName: "work_order_logs_work_order_id_fkey"
             columns: ["work_order_id"]
@@ -1855,7 +1946,25 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_session_downtime_summary: {
+        Row: {
+          categories: string[] | null
+          events_count: number | null
+          session_id: string | null
+          total_minutes: number | null
+        }
+        Relationships: []
+      }
+      v_work_order_downtime_summary: {
+        Row: {
+          downtime_status: string | null
+          events_count: number | null
+          last_event_at: string | null
+          total_minutes: number | null
+          work_order_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       current_device_line_ids: { Args: never; Returns: string[] }
