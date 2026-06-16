@@ -354,8 +354,42 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             </div>
           )}
 
-
-
+          {maintenanceDowntimes.length > 0 && (
+            <div className="border-t pt-4 space-y-2">
+              <Label className="text-sm flex items-center gap-2 font-medium">
+                <Wrench size={16} className="text-primary" /> Maintenance Downtimes
+              </Label>
+              <div className="space-y-2">
+                {maintenanceDowntimes.map(dt => {
+                  const mapped = mapToAnmaisysLine(productionLine);
+                  const created = createdOrders[dt.id];
+                  const isCreating = creatingOrderId === dt.id;
+                  return (
+                    <div key={dt.id} className="flex items-center justify-between gap-3 p-2 rounded border bg-muted/30">
+                      <div className="text-sm min-w-0 flex-1">
+                        <div className="font-medium truncate">{reasonLabel(dt.reason)} · {dt.duration} min</div>
+                        {dt.comment && <div className="text-xs text-muted-foreground truncate">{dt.comment}</div>}
+                      </div>
+                      {created ? (
+                        <span className="text-xs text-green-600 font-medium whitespace-nowrap">Order #{created} created</span>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!mapped || isCreating}
+                          onClick={() => handleCreateOrder(dt)}
+                        >
+                          {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
+                          {!mapped ? 'No line mapping' : isCreating ? 'Creating...' : 'Open Maintenance Order'}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="pt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
