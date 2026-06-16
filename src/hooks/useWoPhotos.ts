@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getErrorMessage } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export type PhotoType = 'before' | 'after';
 
@@ -114,6 +115,7 @@ export function useWoPhotos(workOrderId: string | undefined) {
   const uploadPhoto = async (file: File, photoType: PhotoType, userId: string): Promise<OperationResult> => {
     if (!workOrderId) {
       console.error('[useWoPhotos] uploadPhoto: missing work order id');
+      toast.error('Cannot upload photo: missing work order id');
       return { success: false, error: 'Missing work order id' };
     }
     setIsUploading(true);
@@ -124,6 +126,7 @@ export function useWoPhotos(workOrderId: string | undefined) {
       } catch (err) {
         const msg = getErrorMessage(err);
         console.error('[useWoPhotos] uploadPhoto: compression failed', err);
+        toast.error(`Image compression failed: ${msg}`);
         return { success: false, error: `Image compression failed: ${msg}` };
       }
       const ext = compressed.name.split('.').pop() || 'jpg';
@@ -134,6 +137,7 @@ export function useWoPhotos(workOrderId: string | undefined) {
         .upload(path, compressed, { upsert: true });
       if (uploadError) {
         console.error('[useWoPhotos] uploadPhoto: storage upload failed', { path, error: uploadError });
+        toast.error(`Upload failed: ${uploadError.message}`);
         return { success: false, error: `Upload failed: ${uploadError.message}` };
       }
 
@@ -142,14 +146,17 @@ export function useWoPhotos(workOrderId: string | undefined) {
         .insert({ work_order_id: workOrderId, photo_type: photoType, storage_path: path, uploaded_by: userId } as never);
       if (dbError) {
         console.error('[useWoPhotos] uploadPhoto: DB insert failed', { workOrderId, path, error: dbError });
+        toast.error(`Database insert failed: ${dbError.message}`);
         return { success: false, error: `Database insert failed: ${dbError.message}` };
       }
 
       await fetchPhotos();
+      toast.success(`${photoType === 'before' ? 'Before' : 'After'} photo uploaded`);
       return { success: true };
     } catch (err) {
       const msg = getErrorMessage(err);
       console.error('[useWoPhotos] uploadPhoto: unexpected error', err);
+      toast.error(`Photo upload error: ${msg}`);
       return { success: false, error: msg };
     } finally {
       setIsUploading(false);
