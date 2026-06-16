@@ -1,460 +1,176 @@
-import { useEffect, useRef, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard, ClipboardEdit, History, LogOut, Settings,
-  FileBarChart, Package, ShieldAlert, Menu, X, Circle, ChevronDown, Trophy, Wrench,
-} from 'lucide-react';
-import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
+import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, ClipboardEdit, History, LogOut, Settings, FileBarChart, Circle, Package, ShieldAlert, ChevronDown, Users, Wrench } from 'lucide-react';
+import { useAuth, ROLE_LABELS, UserRole } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import { cn } from '@/lib/utils';
-import { recordDrawerSession, type DrawerLockMethod } from '@/utils/drawerTelemetry';
 import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 
-type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; roles: string[] };
+type NavItem = {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles: UserRole[];
+};
 
-// Direct links shown in the desktop top bar
-const directItems: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
-  { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
-  { path: '/products', label: 'Products', icon: Package, roles: ['supervisor', 'admin'] },
+type NavEntry =
+  | { kind: 'link'; item: NavItem }
+  | { kind: 'group'; label: string; icon: typeof LayoutDashboard; items: NavItem[] };
+
+// Top-level links shown directly in the bar, plus grouped dropdowns for Reports/System.
+const navEntries: NavEntry[] = [
+  { kind: 'link', item: { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] } },
+  { kind: 'link', item: { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] } },
+  { kind: 'link', item: { path: '/products', label: 'Products', icon: Package, roles: ['supervisor', 'admin'] } },
+  {
+    kind: 'group',
+    label: 'Maintenance',
+    icon: Wrench,
+    items: [
+      { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin', 'engineer', 'operator'] },
+      { path: '/maintenance/engineers', label: 'Engineers', icon: Users, roles: ['supervisor', 'admin', 'engineer'] },
+      { path: '/maintenance/machines', label: 'Machines', icon: Package, roles: ['supervisor', 'admin', 'engineer'] },
+      { path: '/maintenance/spare-parts', label: 'Spare Parts', icon: Package, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
+    kind: 'group',
+    label: 'Reports',
+    icon: FileBarChart,
+    items: [
+      { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
+      { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
+      { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
+    ],
+  },
+  {
+    kind: 'group',
+    label: 'System',
+    icon: Settings,
+    items: [
+      { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+      { path: '/quality-action-types', label: 'Quality Action Types', icon: ShieldAlert, roles: ['admin'] },
+    ],
+  },
 ];
 
-// Grouped dropdowns
-const maintenanceItems: NavItem[] = [
-  { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['operator', 'supervisor', 'admin', 'engineer', 'manager'] },
-];
+const linkClasses = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap",
+    isActive
+      ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-md'
+      : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+  );
 
-const reportsItems: NavItem[] = [
-  { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
-  { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-  { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
-  { path: '/leader-quality', label: 'Leader Quality Board', icon: Trophy, roles: ['supervisor', 'admin'] },
-];
-
-const systemItems: NavItem[] = [
-  { path: '/admin', label: 'Admin', icon: Settings, roles: ['admin'] },
-  { path: '/quality-action-types', label: 'Quality Action Types', icon: ShieldAlert, roles: ['admin'] },
-];
-
-// Flat list used by the mobile drawer (unchanged behavior)
-const navItems: NavItem[] = [...directItems, ...maintenanceItems, ...reportsItems, ...systemItems];
-
-// Drawer debug: enable via `?drawerDebug=1` or `localStorage.drawerDebug = '1'`.
-const drawerDebug = (() => {
-  if (typeof window === 'undefined') return false;
-  try {
-    return (
-      new URLSearchParams(window.location.search).get('drawerDebug') === '1' ||
-      window.localStorage.getItem('drawerDebug') === '1'
-    );
-  } catch {
-    return false;
-  }
-})();
-const dlog = (...a: unknown[]) => { if (drawerDebug) console.log('[drawer]', ...a); };
-
+/**
+ * Horizontal top navigation bar (replaces the left Sidebar on lg+ screens).
+ * Smaller screens continue to use MobileMenu's hamburger drawer.
+ */
 export function TopNav() {
   const { user, logout, hasRole } = useAuth();
   const onlineUsers = useOnlineUsers();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const toggleBtnRef = useRef<HTMLButtonElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
-  // Auto-close mobile drawer whenever the route changes (safety net)
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  // Lock body scroll & prevent iOS overscroll/bounce while the mobile drawer is open.
-  // Uses position:fixed body-freeze (the most reliable cross-iOS technique) with
-  // scroll restoration on close, plus touchmove/gesture prevention as defense in depth.
-  useEffect(() => {
-    if (!mobileOpen) return;
-
-    const openedAt = performance.now();
-    const scrollY = window.scrollY;
-    let blockedTouches = 0;
-    let blockedGestures = 0;
-    // We always apply position:fixed; if the env doesn't support it (very rare)
-    // the fallback is overflow:hidden — capture which is actually in effect.
-    let method: DrawerLockMethod = 'position-fixed';
-
-    const body = document.body;
-    const html = document.documentElement;
-    const prev = {
-      bodyPosition: body.style.position,
-      bodyTop: body.style.top,
-      bodyLeft: body.style.left,
-      bodyRight: body.style.right,
-      bodyWidth: body.style.width,
-      bodyOverflow: body.style.overflow,
-      bodyOverscroll: body.style.overscrollBehavior,
-      htmlOverflow: html.style.overflow,
-      htmlOverscroll: html.style.overscrollBehavior,
-    };
-
-    // position:fixed freeze — survives iOS Safari quirks where overflow:hidden alone fails.
-    body.style.position = 'fixed';
-    body.style.top = `-${scrollY}px`;
-    body.style.left = '0';
-    body.style.right = '0';
-    body.style.width = '100%';
-    body.style.overflow = 'hidden';
-    body.style.overscrollBehavior = 'none';
-    html.style.overflow = 'hidden';
-    html.style.overscrollBehavior = 'none';
-    if (getComputedStyle(body).position !== 'fixed') method = 'overflow-hidden';
-    dlog('lock', { scrollY, method });
-
-    const touchOriginInDrawer = new Map<number, boolean>();
-    const isInsideDrawer = (target: EventTarget | null) =>
-      !!(target instanceof Element && target.closest('[data-mobile-drawer]'));
-
-    const onTouchStart = (e: TouchEvent) => {
-      for (const t of Array.from(e.changedTouches)) {
-        const inside = isInsideDrawer(t.target);
-        touchOriginInDrawer.set(t.identifier, inside);
-        if (drawerDebug) {
-          const el = t.target as Element | null;
-          dlog('touchstart', { id: t.identifier, inside, tag: el?.tagName, cls: el?.className });
-        }
-      }
-    };
-    const onTouchEnd = (e: TouchEvent) => {
-      for (const t of Array.from(e.changedTouches)) touchOriginInDrawer.delete(t.identifier);
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      for (const t of Array.from(e.touches)) {
-        if (touchOriginInDrawer.get(t.identifier) === false) {
-          e.preventDefault();
-          blockedTouches++;
-          dlog('blocked touchmove (origin outside)', { id: t.identifier });
-          return;
-        }
-      }
-      if (!isInsideDrawer(e.target)) {
-        e.preventDefault();
-        blockedTouches++;
-        dlog('blocked touchmove (target outside)');
-      }
-    };
-    const onGesture = (e: Event) => {
-      e.preventDefault();
-      blockedGestures++;
-      dlog('blocked gesture', e.type);
-    };
-
-    document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
-    document.addEventListener('touchend', onTouchEnd, { passive: true, capture: true });
-    document.addEventListener('touchcancel', onTouchEnd, { passive: true, capture: true });
-    document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
-    document.addEventListener('gesturestart', onGesture, { passive: false });
-    document.addEventListener('gesturechange', onGesture, { passive: false });
-
-    return () => {
-      body.style.position = prev.bodyPosition;
-      body.style.top = prev.bodyTop;
-      body.style.left = prev.bodyLeft;
-      body.style.right = prev.bodyRight;
-      body.style.width = prev.bodyWidth;
-      body.style.overflow = prev.bodyOverflow;
-      body.style.overscrollBehavior = prev.bodyOverscroll;
-      html.style.overflow = prev.htmlOverflow;
-      html.style.overscrollBehavior = prev.htmlOverscroll;
-      // Restore scroll position synchronously so the page doesn't jump.
-      window.scrollTo(0, scrollY);
-      const scrollDriftPx = window.scrollY - scrollY;
-      dlog('unlock', { restoredScrollY: scrollY, scrollDriftPx });
-
-      document.removeEventListener('touchstart', onTouchStart, { capture: true } as any);
-      document.removeEventListener('touchend', onTouchEnd, { capture: true } as any);
-      document.removeEventListener('touchcancel', onTouchEnd, { capture: true } as any);
-      document.removeEventListener('touchmove', onTouchMove, { capture: true } as any);
-      document.removeEventListener('gesturestart', onGesture);
-      document.removeEventListener('gesturechange', onGesture);
-
-      recordDrawerSession({
-        method,
-        durationMs: Math.round(performance.now() - openedAt),
-        blockedTouches,
-        blockedGestures,
-        scrollDriftPx,
-      });
-    };
-  }, [mobileOpen]);
-
-  // Focus management: trap Tab within the drawer, close on Escape, restore focus on close.
-  useEffect(() => {
-    if (!mobileOpen) return;
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-
-    // Move focus into the drawer.
-    const focusFirst = () => {
-      const root = drawerRef.current;
-      if (!root) return;
-      const first = root.querySelector<HTMLElement>(
-        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      first?.focus();
-    };
-    const raf = requestAnimationFrame(focusFirst);
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setMobileOpen(false);
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      const root = drawerRef.current;
-      if (!root) return;
-      const focusables = Array.from(
-        root.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
-    };
-    document.addEventListener('keydown', onKey);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener('keydown', onKey);
-      // Restore focus to the trigger (or whatever was focused before).
-      const restoreTo = previouslyFocusedRef.current ?? toggleBtnRef.current;
-      restoreTo?.focus?.();
-    };
-  }, [mobileOpen]);
-
-  const items = navItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
-  const visibleDirect = directItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
-  const visibleMaintenance = maintenanceItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
-  const visibleReports = reportsItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
-  const visibleSystem = systemItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
-
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    cn(
-      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap',
-      isActive
-        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-        : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-    );
-
-  const groupTriggerClass = (active: boolean) =>
-    cn(
-      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap outline-none',
-      active
-        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-        : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-    );
-
-  const isGroupActive = (group: NavItem[]) =>
-    group.some(g => location.pathname === g.path || (g.path !== '/' && location.pathname.startsWith(g.path)));
+  const visibleEntries = navEntries
+    .map(entry => entry.kind === 'link'
+      ? entry
+      : { ...entry, items: entry.items.filter(item => hasRole(item.roles)) })
+    .filter(entry => entry.kind === 'link' ? hasRole(entry.item.roles) : entry.items.length > 0);
 
   return (
-    <header className="sticky top-0 z-40 bg-sidebar text-sidebar-foreground border-b border-sidebar-border print:hidden">
-      <div className="flex items-center gap-3 px-3 h-12">
+    <header className="bg-sidebar text-sidebar-foreground border-b border-sidebar-border">
+      <div className="flex items-center gap-2 px-4 py-2">
         {/* Logo */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 pr-3 mr-1 border-r border-sidebar-border shrink-0">
           <img
             src="/lovable-uploads/30acb027-2373-44c6-beeb-e940da9f52c7.jpg"
             alt="Applied Nutrition"
-            className="h-8 w-auto rounded bg-white p-0.5"
+            className="h-8 w-auto rounded-md bg-white p-0.5"
           />
-          <span className="hidden sm:inline font-semibold text-sm">Shift Report</span>
+          <h1 className="text-sm font-bold leading-tight text-sidebar-foreground hidden sm:block">Shift Report</h1>
         </div>
 
-        {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0 justify-center">
-          {visibleDirect.map(item => (
-            <NavLink key={item.path} to={item.path} end={item.path === '/'} className={linkClass}>
-              <item.icon size={16} strokeWidth={2} />
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-
-          {visibleMaintenance.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleMaintenance))}>
-                <Wrench size={16} strokeWidth={2} />
-                <span>Maintenance</span>
-                <ChevronDown size={14} strokeWidth={2} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
-                {visibleMaintenance.map(item => (
-                  <DropdownMenuItem key={item.path} asChild>
-                    <NavLink
-                      to={item.path}
-                      className={({ isActive }) => cn(
-                        'flex items-center gap-2 cursor-pointer w-full',
-                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      )}
-                    >
-                      <item.icon size={16} strokeWidth={2} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {visibleReports.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleReports))}>
-                <FileBarChart size={16} strokeWidth={2} />
-                <span>Reports</span>
-                <ChevronDown size={14} strokeWidth={2} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
-                {visibleReports.map(item => (
-                  <DropdownMenuItem key={item.path} asChild>
-                    <NavLink
-                      to={item.path}
-                      className={({ isActive }) => cn(
-                        'flex items-center gap-2 cursor-pointer w-full',
-                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      )}
-                    >
-                      <item.icon size={16} strokeWidth={2} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {visibleSystem.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className={groupTriggerClass(isGroupActive(visibleSystem))}>
-                <Settings size={16} strokeWidth={2} />
-                <span>System</span>
-                <ChevronDown size={14} strokeWidth={2} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
-                {visibleSystem.map(item => (
-                  <DropdownMenuItem key={item.path} asChild>
-                    <NavLink
-                      to={item.path}
-                      className={({ isActive }) => cn(
-                        'flex items-center gap-2 cursor-pointer w-full',
-                        isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      )}
-                    >
-                      <item.icon size={16} strokeWidth={2} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+        {/* Nav links */}
+        <nav className="flex items-center gap-1 flex-1 overflow-x-auto">
+          {visibleEntries.map(entry => {
+            if (entry.kind === 'link') {
+              return (
+                <NavLink key={entry.item.path} to={entry.item.path} end={entry.item.path === '/'} className={linkClasses}>
+                  <entry.item.icon size={16} strokeWidth={2} />
+                  <span>{entry.item.label}</span>
+                </NavLink>
+              );
+            }
+            return (
+              <DropdownMenu key={entry.label}>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors whitespace-nowrap">
+                    <entry.icon size={16} strokeWidth={2} />
+                    <span>{entry.label}</span>
+                    <ChevronDown size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {entry.items.map(item => (
+                    <DropdownMenuItem key={item.path} asChild>
+                      <NavLink
+                        to={item.path}
+                        className={({ isActive }) => cn("flex items-center gap-2 w-full cursor-pointer", isActive && 'font-semibold text-primary')}
+                      >
+                        <item.icon size={16} strokeWidth={2} />
+                        {item.label}
+                      </NavLink>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          })}
         </nav>
 
+        {/* Online users + user menu */}
+        <div className="flex items-center gap-2 pl-2 shrink-0">
+          {onlineUsers.length > 0 && (
+            <div className="hidden md:flex items-center gap-1.5 text-xs text-sidebar-foreground/70 px-2" title={onlineUsers.map(u => u.name).join(', ')}>
+              <Circle size={8} className="fill-green-500 text-green-500" />
+              <Users size={14} />
+              <span>{onlineUsers.length}</span>
+            </div>
+          )}
 
-        {/* Spacer for mobile */}
-        <div className="flex-1 lg:hidden" />
-
-        {/* Online users (desktop) */}
-        {onlineUsers.length > 0 && (
-          <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 rounded-md bg-sidebar-accent/40 text-xs">
-            <Circle size={8} className="fill-green-500 text-green-500" />
-            <span className="text-sidebar-foreground/80">{onlineUsers.length} online</span>
-          </div>
-        )}
-
-        {/* User (desktop) */}
-        {user && (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="hidden lg:flex items-center gap-2 shrink-0 px-2 py-1 rounded-md hover:bg-sidebar-accent transition-colors outline-none"
-              aria-label="User menu"
-            >
-              <div className="w-7 h-7 rounded-full bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center text-xs font-bold">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="text-xs leading-tight text-left">
-                <p className="font-medium">{user.name}</p>
-                <p className="text-sidebar-foreground/60">{ROLE_LABELS[user.role]}</p>
-              </div>
-              <ChevronDown size={14} strokeWidth={2} className="text-sidebar-foreground/70" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
-              <DropdownMenuItem onClick={logout} className="cursor-pointer">
-                <LogOut size={16} className="mr-2" />
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-
-        {/* Mobile menu button */}
-        <button
-          ref={toggleBtnRef}
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={mobileOpen}
-          aria-controls="mobile-drawer"
-        >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
-
-      {/* Mobile menu + overlay */}
-      {mobileOpen && (
-        <>
-          <div
-            className="lg:hidden fixed inset-0 top-12 z-30 bg-black/50"
-            onClick={() => setMobileOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            id="mobile-drawer"
-            ref={drawerRef}
-            data-mobile-drawer
-            role="dialog"
-            aria-modal="true"
-            aria-label="Main navigation"
-            className="lg:hidden relative z-40 border-t border-sidebar-border bg-sidebar max-h-[calc(100vh-3rem)] overflow-y-auto overscroll-contain"
-          >
-            <nav className="p-2 space-y-0.5">
-              {items.map(item => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === '/'}
-                  onClick={() => setMobileOpen(false)}
-                  className={linkClass}
-                >
-                  <item.icon size={18} strokeWidth={2} />
-                  <span>{item.label}</span>
-                </NavLink>
-              ))}
-              {user && (
-                <button
-                  onClick={() => { setMobileOpen(false); logout(); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent transition-colors"
-                >
-                  <LogOut size={18} />
-                  Sign Out ({user.name})
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-sidebar-accent transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center font-bold text-sidebar-primary-foreground text-sm shrink-0">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="hidden lg:block text-left">
+                    <p className="text-sm font-medium leading-tight text-sidebar-foreground">{user.name}</p>
+                    <p className="text-xs text-sidebar-foreground/60 leading-tight">{ROLE_LABELS[user.role]}</p>
+                  </div>
                 </button>
-              )}
-            </nav>
-          </div>
-        </>
-      )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  <p className="font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground font-normal">{ROLE_LABELS[user.role]}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
+                  <LogOut size={16} className="mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
     </header>
   );
 }
