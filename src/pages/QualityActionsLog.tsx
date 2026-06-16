@@ -96,6 +96,8 @@ export function QualityActionsLog() {
   const [calMonth, setCalMonth] = useState<Date>(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
+  const [newActionOpen, setNewActionOpen] = useState(false);
+  const canOpenAction = hasRole(['supervisor', 'admin']);
 
   const canEditEntry = (e: LogEntry): boolean => {
     if (hasRole(['supervisor', 'admin'])) return true;
