@@ -237,6 +237,7 @@ export function TopNav() {
 
   const items = navItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
   const visibleDirect = directItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
+  const visibleMaintenance = maintenanceItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
   const visibleReports = reportsItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
   const visibleSystem = systemItems.filter(i => hasRole(i.roles as Parameters<typeof hasRole>[0]));
 
