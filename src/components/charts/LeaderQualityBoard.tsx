@@ -17,11 +17,10 @@ interface MonthlyRow {
 }
 
 interface Props {
-  currentDate: string;
+  startDate: string;
+  endDate: string;
 }
 
-type PeriodType = 'day' | 'week' | '15days' | 'month';
-const periodLabels: Record<PeriodType, string> = { day: 'Day', week: 'Week', '15days': '15d', month: 'Month' };
 
 interface LeaderQualityStats {
   name: string;
