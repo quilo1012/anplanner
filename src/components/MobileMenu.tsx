@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, Clock, FileBarChart, Package, ShieldAlert, Wrench } from 'lucide-react';
-import { useAuth, ROLE_LABELS } from '@/contexts/AuthContext';
+import { Menu, X, LayoutDashboard, ClipboardEdit, History, Settings, LogOut, FileBarChart, Package, ShieldAlert, Wrench } from 'lucide-react';
+import { useAuth, ROLE_LABELS, UserRole } from '@/contexts/AuthContext';
 
 type NavItem = {
   path: string;
   label: string;
   icon: typeof LayoutDashboard;
-  roles: string[];
+  roles: UserRole[];
 };
 
 type NavGroup = {
@@ -21,7 +21,6 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'supervisor', 'admin'] },
       { path: '/planner', label: 'Planner', icon: ClipboardEdit, roles: ['supervisor', 'admin'] },
-      
     ],
   },
   {
@@ -33,7 +32,10 @@ const navGroups: NavGroup[] = [
   {
     label: 'Maintenance',
     items: [
-      { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['operator', 'supervisor', 'admin', 'engineer', 'manager'] },
+      { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin', 'engineer', 'operator'] },
+      { path: '/maintenance/engineers', label: 'Engineers', icon: Package, roles: ['supervisor', 'admin', 'engineer'] },
+      { path: '/maintenance/machines', label: 'Machines', icon: Package, roles: ['supervisor', 'admin', 'engineer'] },
+      { path: '/maintenance/spare-parts', label: 'Spare Parts', icon: Package, roles: ['supervisor', 'admin'] },
     ],
   },
   {
@@ -60,7 +62,7 @@ export function MobileMenu() {
   const filteredGroups = navGroups
     .map(group => ({
       ...group,
-      items: group.items.filter(item => hasRole(item.roles as Parameters<typeof hasRole>[0])),
+      items: group.items.filter(item => hasRole(item.roles)),
     }))
     .filter(group => group.items.length > 0);
 
@@ -73,7 +75,6 @@ export function MobileMenu() {
 
   return (
     <>
-      {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-sidebar text-sidebar-foreground z-40 flex items-center justify-between px-4">
         <div className="flex items-center gap-3">
           <img
@@ -91,7 +92,6 @@ export function MobileMenu() {
         </button>
       </header>
 
-      {/* Mobile Menu Overlay */}
       {isOpen && (
         <div className="lg:hidden fixed inset-0 z-50 pt-14">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsOpen(false)} />
@@ -129,7 +129,6 @@ export function MobileMenu() {
               ))}
             </div>
 
-            {/* User info */}
             {user && (
               <div className="p-4 border-t border-sidebar-border">
                 <div className="flex items-center gap-3 mb-3">
