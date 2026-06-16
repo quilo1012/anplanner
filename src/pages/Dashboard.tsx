@@ -55,14 +55,13 @@ export function Dashboard() {
   const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
   const [qualityRefreshTick, setQualityRefreshTick] = useState(0);
   const { rows: allOpenWoRows } = useOpenWorkOrdersDowntime();
-  // Scope the "Open Maintenance Tickets" widget to tickets raised by the
-  // logged-in leader (matched by requester_name). Admins still see everything.
+  // Scope the "Open Maintenance Tickets" widget strictly to tickets the
+  // logged-in user opened in their own name (matched by requester_name).
   const openWoRows = useMemo(() => {
-    if (user?.role === 'admin') return allOpenWoRows;
     const me = (user?.name || '').trim().toLowerCase();
     if (!me) return [];
     return allOpenWoRows.filter(r => (r.wo.requester_name || '').trim().toLowerCase() === me);
-  }, [allOpenWoRows, user?.name, user?.role]);
+  }, [allOpenWoRows, user?.name]);
   const showOpenTickets = openWoRows.length > 0;
 
   // Per-leader quality totals across the selected period+shift (all lines).
@@ -547,9 +546,6 @@ export function Dashboard() {
               <div className="card p-3">
                 <LeaderPerformanceBoard sessions={filteredSessions} startDate={startDate} endDate={endDate} />
               </div>
-              <div className="card p-3 lg:col-span-2">
-                <LeaderQualityBoard startDate={startDate} endDate={endDate} leaderFilter={selectedLeader} />
-              </div>
             </div>
 
 
@@ -571,7 +567,10 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Daily Summary Table */}
+            {/* Leader Quality Board + Daily Summary (Quality Issues by Leader lives inside) */}
+            <div className="card p-3 mb-3">
+              <LeaderQualityBoard startDate={startDate} endDate={endDate} leaderFilter={selectedLeader} />
+            </div>
             <div className="card p-3 mb-3 dashboard-section">
               <DailySummaryTable
                 sessions={filteredSessions}
