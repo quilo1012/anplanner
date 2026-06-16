@@ -53,6 +53,8 @@ interface NewWorkOrderInput {
   priority: string;
   requesterName: string;
   operatorId: string;
+  notes?: string;
+  lineStopped?: boolean;
 }
 
 /**
@@ -115,6 +117,8 @@ export function useWorkOrders() {
           requester_name: input.requesterName,
           operator_id: input.operatorId,
           status: 'open',
+          notes: input.notes || null,
+          ...(input.lineStopped ? { line_stopped: true, line_stopped_at: new Date().toISOString(), line_stopped_by: input.operatorId } : {}),
         } as never);
       if (insertError) return { success: false, error: insertError.message };
       await fetchWorkOrders();
@@ -248,4 +252,44 @@ export function useWorkOrders() {
   const linesStoppedCount = workOrders.filter(wo => wo.line_stopped && OPEN_STATUSES.includes(wo.status)).length;
 
   return { workOrders, isLoading, error, refreshWorkOrders: fetchWorkOrders, updateWorkOrderStatus, createWorkOrder, advanceWorkOrder, stopLine, resumeLine, openCount, linesStoppedCount };
+}
+
+export interface WorkOrderLog {
+  id: string;
+  action: string;
+  engineer_name: string | null;
+  created_at: string;
+}
+
+/** Fetches one work order by id, plus its activity log (work_order_logs). */
+export function useWorkOrderDetail(id: string | undefined) {
+  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
+  const [logs, setLogs] = useState<WorkOrderLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDetail = useCallback(async () => {
+    if (!id) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [woResult, logsResult] = await Promise.all([
+        supabase.from('work_orders' as never).select('*').eq('id', id).maybeSingle(),
+        supabase.from('work_order_logs' as never).select('*').eq('work_order_id', id).order('created_at', { ascending: true }),
+      ]);
+      if (woResult.error) throw woResult.error;
+      setWorkOrder((woResult.data as unknown as WorkOrder) || null);
+      setLogs(((logsResult.data || []) as unknown as WorkOrderLog[]));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
+
+  return { workOrder, logs, isLoading, error, refreshDetail: fetchDetail };
 }
