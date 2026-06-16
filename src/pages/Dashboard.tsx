@@ -28,6 +28,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { aggregateLeaderQuality } from '@/utils/aggregateLeaderQuality';
 import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActionDialog';
+import { Link } from 'react-router-dom';
+import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
+import { Wrench } from 'lucide-react';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -51,6 +54,8 @@ export function Dashboard() {
   const [leaderQualityLoading, setLeaderQualityLoading] = useState(false);
   const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
   const [qualityRefreshTick, setQualityRefreshTick] = useState(0);
+  const { rows: openWoRows } = useOpenWorkOrdersDowntime();
+  const showOpenTickets = canEditSessions && openWoRows.length > 0;
 
   // Per-leader quality totals across the selected period+shift (all lines).
   useEffect(() => {
@@ -433,6 +438,55 @@ export function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* ═══ OPEN MAINTENANCE TICKETS ═══ */}
+        {showOpenTickets && (
+          <div className="card mb-3 overflow-hidden">
+            <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+              <Wrench size={16} className="text-primary" />
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Open Maintenance Tickets</h2>
+              <span className="text-xs text-muted-foreground">({openWoRows.length})</span>
+              <div className="flex-1" />
+              <Link to="/maintenance/work-orders" className="text-xs text-primary hover:underline">View all →</Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/30 text-muted-foreground">
+                  <tr>
+                    <th className="text-left font-semibold px-3 py-2">WO</th>
+                    <th className="text-left font-semibold px-3 py-2">Line</th>
+                    <th className="text-left font-semibold px-3 py-2">Description</th>
+                    <th className="text-right font-semibold px-3 py-2">Downtime</th>
+                    <th className="text-right font-semibold px-3 py-2">Events</th>
+                    <th className="text-left font-semibold px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openWoRows.map(({ wo, downtime, totalMinutes }) => (
+                    <tr key={wo.id} className="border-t border-border hover:bg-muted/20">
+                      <td className="px-3 py-2">
+                        <Link to={`/maintenance/work-orders/${wo.id}`} className="text-primary hover:underline font-mono">
+                          #{wo.wo_number}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2">{wo.line_at_time || '—'}</td>
+                      <td className="px-3 py-2 max-w-md truncate" title={wo.description}>{wo.description}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatDuration(totalMinutes)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{downtime?.events_count ?? 0}</td>
+                      <td className="px-3 py-2">
+                        {downtime?.downtime_status === 'active' ? (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-destructive/15 text-destructive">Line stopped</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{wo.status}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Trend Alerts */}
         {canViewCharts && trendAlerts.length > 0 && (

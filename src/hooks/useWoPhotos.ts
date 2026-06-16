@@ -38,18 +38,30 @@ async function compressImage(file: File, maxDim = 1920, quality = 0.7): Promise<
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(file); return; }
+      if (!ctx) {
+        console.error('[useWoPhotos] compressImage: canvas 2D context unavailable — uploading original file');
+        resolve(file);
+        return;
+      }
       ctx.drawImage(img, 0, 0, width, height);
       canvas.toBlob(
         (blob) => {
-          if (!blob) { resolve(file); return; }
+          if (!blob) {
+            console.error('[useWoPhotos] compressImage: canvas.toBlob returned null — uploading original file');
+            resolve(file);
+            return;
+          }
           resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
         },
         'image/jpeg',
         quality
       );
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      console.error('[useWoPhotos] compressImage: failed to load image', e);
+      reject(new Error('Failed to load image for compression'));
+    };
     img.src = url;
   });
 }
@@ -84,25 +96,45 @@ export function useWoPhotos(workOrderId: string | undefined) {
   }, [fetchPhotos]);
 
   const uploadPhoto = async (file: File, photoType: PhotoType, userId: string): Promise<OperationResult> => {
-    if (!workOrderId) return { success: false, error: 'Missing work order id' };
+    if (!workOrderId) {
+      console.error('[useWoPhotos] uploadPhoto: missing work order id');
+      return { success: false, error: 'Missing work order id' };
+    }
     setIsUploading(true);
     try {
-      const compressed = await compressImage(file);
+      let compressed: File;
+      try {
+        compressed = await compressImage(file);
+      } catch (err) {
+        const msg = getErrorMessage(err);
+        console.error('[useWoPhotos] uploadPhoto: compression failed', err);
+        return { success: false, error: `Image compression failed: ${msg}` };
+      }
       const ext = compressed.name.split('.').pop() || 'jpg';
       const path = `${workOrderId}/${photoType}_${Date.now()}.${ext}`;
 
-      const { error: uploadError } = await supabase.storage.from('wo-photos').upload(path, compressed, { upsert: true });
-      if (uploadError) return { success: false, error: uploadError.message };
+      const { error: uploadError } = await supabase.storage
+        .from('wo-photos')
+        .upload(path, compressed, { upsert: true });
+      if (uploadError) {
+        console.error('[useWoPhotos] uploadPhoto: storage upload failed', { path, error: uploadError });
+        return { success: false, error: `Upload failed: ${uploadError.message}` };
+      }
 
       const { error: dbError } = await supabase
         .from('wo_photos' as never)
         .insert({ work_order_id: workOrderId, photo_type: photoType, storage_path: path, uploaded_by: userId } as never);
-      if (dbError) return { success: false, error: dbError.message };
+      if (dbError) {
+        console.error('[useWoPhotos] uploadPhoto: DB insert failed', { workOrderId, path, error: dbError });
+        return { success: false, error: `Database insert failed: ${dbError.message}` };
+      }
 
       await fetchPhotos();
       return { success: true };
     } catch (err) {
-      return { success: false, error: getErrorMessage(err) };
+      const msg = getErrorMessage(err);
+      console.error('[useWoPhotos] uploadPhoto: unexpected error', err);
+      return { success: false, error: msg };
     } finally {
       setIsUploading(false);
     }
