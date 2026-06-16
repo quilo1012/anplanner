@@ -8,7 +8,26 @@ import { severityBadgeClass, severityLabel, SEVERITY_OPTIONS } from '@/utils/qua
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { ProductionSession } from '@/types/production';
-import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, X, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon, Pencil, Download } from 'lucide-react';
+
+function exportQualityActionsToCsv(rows: LogEntry[]) {
+  const headers = ['Date', 'Shift', 'Line', 'Leader', 'Issue', 'Severity', 'Points', 'Notes'];
+  const csv = [
+    headers.join(','),
+    ...rows.map(e => [
+      e.date, e.shift, e.line, e.leader, e.name, e.severity || '', `-${e.points}`, (e.notes || '').replace(/\n/g, ' '),
+    ].map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')),
+  ].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `quality_actions_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const SEVERITY_DOT: Record<string, string> = {
   low: 'bg-blue-500',
