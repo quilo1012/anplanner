@@ -18,15 +18,22 @@ interface OperationResult {
   error?: string;
 }
 
-/** Resizes/compresses an image client-side before upload, matching Anmaisys's
- * approach: skip if already <=1MB, otherwise downscale to max 1920px and
- * re-encode as JPEG at 70% quality. */
-async function compressImage(file: File, maxDim = 1920, quality = 0.7): Promise<File> {
-  if (file.size <= 1024 * 1024) return file;
+const MAX_BYTES = 1024 * 1024; // 1 MB cap for uploads
+
+/** Compresses an image client-side into a JPEG, iteratively lowering quality
+ * until the result is <= 1 MB (or quality bottoms out at 0.4). Logs the
+ * original and final sizes for debugging. Files already <= 1 MB are returned
+ * untouched. */
+async function compressImage(file: File, maxDim = 1920, initialQuality = 0.7): Promise<File> {
+  const originalKB = (file.size / 1024).toFixed(1);
+  if (file.size <= MAX_BYTES) {
+    console.info(`[useWoPhotos] compressImage: file ${originalKB} KB <= 1 MB — skipping compression`);
+    return file;
+  }
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
+    img.onload = async () => {
       URL.revokeObjectURL(url);
       let { width, height } = img;
       if (width > maxDim || height > maxDim) {
@@ -44,18 +51,27 @@ async function compressImage(file: File, maxDim = 1920, quality = 0.7): Promise<
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            console.error('[useWoPhotos] compressImage: canvas.toBlob returned null — uploading original file');
-            resolve(file);
-            return;
-          }
-          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
-        },
-        'image/jpeg',
-        quality
-      );
+
+      const toBlob = (q: number) => new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', q));
+      let quality = initialQuality;
+      let blob: Blob | null = null;
+      for (let i = 0; i < 5; i++) {
+        blob = await toBlob(quality);
+        if (!blob) break;
+        if (blob.size <= MAX_BYTES || quality <= 0.4) break;
+        quality = Math.max(0.4, quality - 0.15);
+      }
+      if (!blob) {
+        console.error('[useWoPhotos] compressImage: canvas.toBlob returned null — uploading original file');
+        resolve(file);
+        return;
+      }
+      const finalKB = (blob.size / 1024).toFixed(1);
+      console.info(`[useWoPhotos] compressImage: ${originalKB} KB → ${finalKB} KB (q=${quality.toFixed(2)}, ${width}x${height})`);
+      if (blob.size > MAX_BYTES) {
+        console.warn(`[useWoPhotos] compressImage: result still > 1 MB (${finalKB} KB) — uploading anyway`);
+      }
+      resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
     };
     img.onerror = (e) => {
       URL.revokeObjectURL(url);
