@@ -215,6 +215,16 @@ export function QualityActionsLog() {
             {filtered.length} occurrence(s) · -{totalPoints} pts
           </div>
           <div className="flex items-center gap-2">
+            {canOpenAction && (
+              <button
+                type="button"
+                onClick={() => setNewActionOpen(true)}
+                className="inline-flex items-center gap-1 rounded-md border border-primary bg-primary text-primary-foreground px-3 py-1.5 text-xs hover:opacity-90"
+                title="Open new quality action"
+              >
+                <Plus size={12} /> New Action
+              </button>
+            )}
             <button
               type="button"
               onClick={() => exportQualityActionsToXlsx(filtered)}
