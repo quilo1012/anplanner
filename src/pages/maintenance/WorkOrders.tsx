@@ -315,10 +315,6 @@ export function WorkOrders() {
                 {filteredOrders.length} ticket{filteredOrders.length !== 1 ? 's' : ''}
               </span>
             </div>
-              <span className="text-sm text-muted-foreground whitespace-nowrap">
-                {filteredOrders.length} ticket{filteredOrders.length !== 1 ? 's' : ''}
-              </span>
-            </div>
           </div>
 
           {isLoading ? (
