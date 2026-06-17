@@ -35,6 +35,15 @@ function PageLoader() {
   );
 }
 
+/** Engineers should land on Work Orders, not the production Dashboard. */
+function HomeRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'engineer') {
+    return <Navigate to="/maintenance/work-orders" replace />;
+  }
+  return <Suspense fallback={<PageLoader />}><Dashboard /></Suspense>;
+}
+
 const App = () => (
   <ErrorBoundary>
     <AuthProvider>
