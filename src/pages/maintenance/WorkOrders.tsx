@@ -262,6 +262,16 @@ export function WorkOrders() {
                 <p className="text-lg font-bold">⚠ PROBLEM, LINE STILL RUNNING</p>
                 <p className="text-sm text-amber-100">Open WO Request — Line in Operation (no downtime)</p>
               </button>
+              <button
+                onClick={() => setStatusFilter('OPEN')}
+                className="card p-4 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-muted"><Clock size={18} className="text-muted-foreground" /></div>
+                <div>
+                  <p className="font-medium text-foreground">My Work Orders</p>
+                  <p className="text-xs text-muted-foreground">Track your submitted orders</p>
+                </div>
+              </button>
             </div>
           </>
         )}
