@@ -78,20 +78,20 @@ export function useWorkOrderChecklist(workOrderId: string | undefined, problemNa
     fetchChecklist();
   }, [fetchChecklist]);
 
-  const toggleItem = async (checklistId: string, completed: boolean, userId: string | undefined): Promise<OperationResult> => {
+  const toggleItem = async (checklistId: string, completed: boolean, _userId: string | undefined): Promise<OperationResult> => {
     if (!workOrderId) return { success: false, error: 'Missing work order id' };
     try {
       const existing = responses.find(r => r.checklist_id === checklistId);
       if (existing) {
         const { error } = await supabase
           .from('checklist_responses' as never)
-          .update({ completed, completed_by: completed ? userId : null, completed_at: completed ? new Date().toISOString() : null } as never)
+          .update({ completed, completed_by: null, completed_at: completed ? new Date().toISOString() : null } as never)
           .eq('id', existing.id);
         if (error) return { success: false, error: error.message };
       } else {
         const { error } = await supabase
           .from('checklist_responses' as never)
-          .insert({ work_order_id: workOrderId, checklist_id: checklistId, completed, completed_by: completed ? userId : null, completed_at: completed ? new Date().toISOString() : null } as never);
+          .insert({ work_order_id: workOrderId, checklist_id: checklistId, completed, completed_by: null, completed_at: completed ? new Date().toISOString() : null } as never);
         if (error) return { success: false, error: error.message };
       }
       await fetchChecklist();
