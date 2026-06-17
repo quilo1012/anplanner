@@ -351,7 +351,7 @@ export function QualityActionsLog() {
       <QuickQualityActionDialog
         open={newActionOpen}
         onOpenChange={setNewActionOpen}
-        lines={uniqueLines}
+        
         leaders={uniqueLeaders}
         recordedBy={user?.id ?? null}
         onSaved={() => window.dispatchEvent(new Event('quality-actions-changed'))}
