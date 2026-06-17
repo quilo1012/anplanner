@@ -441,7 +441,7 @@ export function History() {
                       <th className="text-right">Actual</th>
                       <th>Perf</th>
                       <th className="text-right">Downtime</th>
-                       <th className="text-center">Staff</th>
+                       <th className="text-center">Quality</th>
                        
                        {!isOperator && <th>Last edited by</th>}
                        {(canEdit || canDelete) && <th className="w-24">Actions</th>}
