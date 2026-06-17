@@ -51,7 +51,7 @@ const App = () => (
               </ProtectedRoute>
             }
           >
-            <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+            <Route index element={<HomeRedirect />} />
             <Route path="planner" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Planner /></Suspense></ProtectedRoute>} />
             <Route path="products" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Products /></Suspense></ProtectedRoute>} />
             
