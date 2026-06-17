@@ -220,7 +220,7 @@ export function History() {
       <table class="summary"><tbody>
         <tr><td><strong>Total Production:</strong></td><td>${totalProduction.toLocaleString()} units</td><td><strong>Planned:</strong></td><td>${totalPlanned.toLocaleString()} units</td></tr>
         <tr class="zebra"><td><strong>Performance:</strong></td><td>${overallPerf}%</td><td><strong>Total Downtime:</strong></td><td>${formatDuration(totalDowntime)}</td></tr>
-        <tr><td><strong>Staff Planned:</strong></td><td>${totalStaffPlanned}</td><td><strong>Staff Actual:</strong></td><td>${totalStaffActual}</td></tr>
+        <tr><td><strong>Quality Actions:</strong></td><td>${totalQuality}</td><td></td><td></td></tr>
       </tbody></table>
 
       <h2>Production by Line</h2>
