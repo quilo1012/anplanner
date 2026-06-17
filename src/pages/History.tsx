@@ -158,8 +158,7 @@ export function History() {
     const totalProduction = sorted.reduce((sum, s) => sum + s.totalProduction, 0);
     const totalPlanned = sorted.reduce((sum, s) => sum + s.plannedQuantity, 0);
     const totalDowntime = sorted.reduce((sum, s) => sum + s.totalDowntime, 0);
-    const totalStaffPlanned = sorted.reduce((sum, s) => sum + s.staffPlanned, 0);
-    const totalStaffActual = sorted.reduce((sum, s) => sum + s.staffActual, 0);
+    const totalQuality = sorted.reduce((sum, s) => sum + (qualityBySession[s.id]?.length || 0), 0);
     const overallPerf = totalPlanned > 0 ? ((totalProduction / totalPlanned) * 100).toFixed(1) : '0';
 
     const lineRows = sorted.map((s, i) => `<tr class="${i % 2 === 1 ? 'zebra' : ''}">
@@ -169,7 +168,7 @@ export function History() {
       <td class="text-right">${s.totalProduction.toLocaleString()}</td>
       <td class="text-right ${s.performance >= 90 ? 'perf-green' : s.performance >= 75 ? 'perf-yellow' : 'perf-red'}">${s.performance.toFixed(1)}%</td>
       <td class="text-right">${formatDuration(s.totalDowntime)}</td>
-      <td class="text-center">${s.staffActual}/${s.staffPlanned}</td></tr>`).join('');
+      <td class="text-center">${qualityBySession[s.id]?.length || 0}</td></tr>`).join('');
 
     const itemRows = sorted.flatMap(s => s.items.map((item, j) => `<tr class="${j % 2 === 1 ? 'zebra' : ''}">
       <td class="font-medium">${escapeHtml(s.productionLine)}</td><td class="font-mono">${escapeHtml(item.sku)}</td><td>${escapeHtml(item.productName)}</td>
@@ -221,13 +220,13 @@ export function History() {
       <table class="summary"><tbody>
         <tr><td><strong>Total Production:</strong></td><td>${totalProduction.toLocaleString()} units</td><td><strong>Planned:</strong></td><td>${totalPlanned.toLocaleString()} units</td></tr>
         <tr class="zebra"><td><strong>Performance:</strong></td><td>${overallPerf}%</td><td><strong>Total Downtime:</strong></td><td>${formatDuration(totalDowntime)}</td></tr>
-        <tr><td><strong>Staff Planned:</strong></td><td>${totalStaffPlanned}</td><td><strong>Staff Actual:</strong></td><td>${totalStaffActual}</td></tr>
+        <tr><td><strong>Quality Actions:</strong></td><td>${totalQuality}</td><td></td><td></td></tr>
       </tbody></table>
 
       <h2>Production by Line</h2>
-      <table><thead><tr><th>Line</th><th>Leader</th><th>SKUs</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Perf.</th><th class="text-right">Downtime</th><th class="text-center">Staff</th></tr></thead>
+      <table><thead><tr><th>Line</th><th>Leader</th><th>SKUs</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Perf.</th><th class="text-right">Downtime</th><th class="text-center">Quality</th></tr></thead>
       <tbody>${lineRows}</tbody>
-      <tfoot><tr><td colspan="3">TOTALS</td><td class="text-right">${totalPlanned.toLocaleString()}</td><td class="text-right">${totalProduction.toLocaleString()}</td><td class="text-right">${overallPerf}%</td><td class="text-right">${formatDuration(totalDowntime)}</td><td class="text-center">${totalStaffActual}/${totalStaffPlanned}</td></tr></tfoot></table>
+      <tfoot><tr><td colspan="3">TOTALS</td><td class="text-right">${totalPlanned.toLocaleString()}</td><td class="text-right">${totalProduction.toLocaleString()}</td><td class="text-right">${overallPerf}%</td><td class="text-right">${formatDuration(totalDowntime)}</td><td class="text-center">${totalQuality}</td></tr></tfoot></table>
 
       <h2>Production Items Detail</h2>
       <table><thead><tr><th>Line</th><th>SKU</th><th>Product</th><th class="text-right">Target</th><th class="text-right">Actual</th><th class="text-right">Perf.</th></tr></thead>
@@ -441,7 +440,7 @@ export function History() {
                       <th className="text-right">Actual</th>
                       <th>Perf</th>
                       <th className="text-right">Downtime</th>
-                       <th className="text-center">Staff</th>
+                       <th className="text-center">Quality</th>
                        
                        {!isOperator && <th>Last edited by</th>}
                        {(canEdit || canDelete) && <th className="w-24">Actions</th>}
@@ -476,7 +475,7 @@ export function History() {
                             <td><span className={getPerformanceClass(session.performance)}>{session.performance.toFixed(0)}%</span></td>
                             <td className="text-right text-sm">{formatDuration(session.totalDowntime)}</td>
                             <td className="text-center text-sm">
-                              <span className={session.staffActual < session.staffPlanned ? 'text-destructive font-medium' : ''}>{session.staffActual}/{session.staffPlanned}</span>
+                              <span className={cn("px-2 py-0.5 rounded text-xs font-medium", qActions.length > 0 ? "bg-amber-500/15 text-amber-500" : "bg-muted text-muted-foreground")}>{qActions.length}</span>
                             </td>
                              {!isOperator && (
                                <td className="text-xs whitespace-nowrap">
