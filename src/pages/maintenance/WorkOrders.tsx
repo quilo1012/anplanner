@@ -311,11 +311,10 @@ export function WorkOrders() {
               </select>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              {canCreate && !formOpen.open && (
-                <button onClick={() => setFormOpen({ open: true, lineStopped: false })} className="btn-primary text-sm">
-                  <Plus size={14} /> New Work Order
-                </button>
-              )}
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {filteredOrders.length} ticket{filteredOrders.length !== 1 ? 's' : ''}
+              </span>
+            </div>
               <span className="text-sm text-muted-foreground whitespace-nowrap">
                 {filteredOrders.length} ticket{filteredOrders.length !== 1 ? 's' : ''}
               </span>
