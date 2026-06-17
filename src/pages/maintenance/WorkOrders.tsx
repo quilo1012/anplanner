@@ -190,7 +190,10 @@ export function WorkOrders() {
   const [advancingId, setAdvancingId] = useState<string | null>(null);
 
   const isEngineer = hasRole('engineer');
-  const canCreate = hasRole(['supervisor', 'admin', 'operator']);
+  // Leaders (operator) no longer create work orders from their personal
+  // login — that's now done exclusively via the fixed shop-floor tablet
+  // (Maintenance → Tablet Kiosk). They can still view this list.
+  const canCreate = hasRole(['supervisor', 'admin']);
 
   const filteredOrders = useMemo(() => {
     if (statusFilter === 'ALL') return workOrders;
