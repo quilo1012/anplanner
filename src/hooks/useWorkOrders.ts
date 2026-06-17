@@ -88,6 +88,11 @@ export function useWorkOrders() {
 
   useEffect(() => {
     fetchWorkOrders();
+    // Auto-refresh every 60s — work orders can be created from a different
+    // login entirely (a shop-floor tablet), so anyone with this list open
+    // needs it to update on its own rather than requiring a manual reload.
+    const interval = setInterval(fetchWorkOrders, 60000);
+    return () => clearInterval(interval);
   }, [fetchWorkOrders]);
 
   const updateWorkOrderStatus = async (id: string, status: WoStatus): Promise<OperationResult> => {
