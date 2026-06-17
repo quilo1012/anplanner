@@ -22,6 +22,8 @@ const WorkOrderDetail = lazy(() => import('@/pages/maintenance/WorkOrderDetail')
 const Engineers = lazy(() => import('@/pages/maintenance/Engineers').then(m => ({ default: m.Engineers })));
 const Machines = lazy(() => import('@/pages/maintenance/Machines').then(m => ({ default: m.Machines })));
 const SpareParts = lazy(() => import('@/pages/maintenance/SpareParts').then(m => ({ default: m.SpareParts })));
+const TabletKiosk = lazy(() => import('@/pages/maintenance/TabletKiosk').then(m => ({ default: m.TabletKiosk })));
+const DeviceSetup = lazy(() => import('@/pages/maintenance/DeviceSetup').then(m => ({ default: m.DeviceSetup })));
 
 
 function PageLoader() {
@@ -116,6 +118,22 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
                   <Suspense fallback={<PageLoader />}><SpareParts /></Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="maintenance/tablet"
+              element={
+                <ProtectedRoute allowedRoles={['supervisor', 'admin', 'engineer', 'operator']}>
+                  <Suspense fallback={<PageLoader />}><TabletKiosk /></Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="maintenance/device-setup"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <Suspense fallback={<PageLoader />}><DeviceSetup /></Suspense>
                 </ProtectedRoute>
               }
             />
