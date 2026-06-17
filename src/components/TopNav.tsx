@@ -46,7 +46,7 @@ const navEntries: NavEntry[] = [
     items: [
       { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
       { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-      { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
+      { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['operator', 'supervisor', 'admin'] },
     ],
   },
   {

@@ -24,7 +24,6 @@ const directItems: NavItem[] = [
 ];
 const maintenanceItems: NavItem[] = [
   { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin', 'engineer', 'operator'] },
-  { path: '/maintenance/tablet', label: 'Tablet Kiosk', icon: Wrench, roles: ['supervisor', 'admin', 'engineer', 'operator'] },
   { path: '/maintenance/engineers', label: 'Engineers', icon: Users, roles: ['supervisor', 'admin', 'engineer'] },
   { path: '/maintenance/machines', label: 'Machines', icon: Package, roles: ['supervisor', 'admin', 'engineer'] },
   { path: '/maintenance/spare-parts', label: 'Spare Parts', icon: Package, roles: ['supervisor', 'admin'] },
@@ -32,7 +31,7 @@ const maintenanceItems: NavItem[] = [
 const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-  { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
+  { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/leader-quality', label: 'Leader Quality Board', icon: Trophy, roles: ['supervisor', 'admin'] },
 ];
 const systemItems: NavItem[] = [
