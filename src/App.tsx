@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Layout } from '@/components/Layout';
 import { Login } from '@/pages/Login';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 // Lazy load heavy pages
@@ -34,6 +35,15 @@ function PageLoader() {
   );
 }
 
+/** Engineers should land on Work Orders, not the production Dashboard. */
+function HomeRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'engineer') {
+    return <Navigate to="/maintenance/work-orders" replace />;
+  }
+  return <Suspense fallback={<PageLoader />}><Dashboard /></Suspense>;
+}
+
 const App = () => (
   <ErrorBoundary>
     <AuthProvider>
@@ -50,7 +60,7 @@ const App = () => (
               </ProtectedRoute>
             }
           >
-            <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+            <Route index element={<HomeRedirect />} />
             <Route path="planner" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Planner /></Suspense></ProtectedRoute>} />
             <Route path="products" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><Products /></Suspense></ProtectedRoute>} />
             
