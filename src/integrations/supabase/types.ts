@@ -1980,6 +1980,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      lines_for_device_token: {
+        Args: { _token: string }
+        Returns: {
+          display_order: number
+          id: string
+          name: string
+        }[]
+      }
       list_active_profile_names: {
         Args: never
         Returns: {
@@ -1988,6 +1996,13 @@ export type Database = {
         }[]
       }
       list_engineer_names: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
+      list_leader_names: {
         Args: never
         Returns: {
           id: string
