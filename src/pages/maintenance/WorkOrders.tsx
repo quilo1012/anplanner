@@ -246,28 +246,6 @@ export function WorkOrders() {
       <div className="flex-1 overflow-auto p-4 sm:p-6">
         {canCreate && !formOpen.open && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              <button
-                onClick={() => setFormOpen({ open: true, lineStopped: false })}
-                className="card p-4 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-primary/10"><Plus size={18} className="text-primary" /></div>
-                <div>
-                  <p className="font-medium text-foreground">New Work Order</p>
-                  <p className="text-xs text-muted-foreground">Submit a maintenance request</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setStatusFilter('OPEN')}
-                className="card p-4 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-muted"><Clock size={18} className="text-muted-foreground" /></div>
-                <div>
-                  <p className="font-medium text-foreground">My Work Orders</p>
-                  <p className="text-xs text-muted-foreground">Track your submitted orders</p>
-                </div>
-              </button>
-            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <button
@@ -333,11 +311,6 @@ export function WorkOrders() {
               </select>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              {canCreate && !formOpen.open && (
-                <button onClick={() => setFormOpen({ open: true, lineStopped: false })} className="btn-primary text-sm">
-                  <Plus size={14} /> New Work Order
-                </button>
-              )}
               <span className="text-sm text-muted-foreground whitespace-nowrap">
                 {filteredOrders.length} ticket{filteredOrders.length !== 1 ? 's' : ''}
               </span>
