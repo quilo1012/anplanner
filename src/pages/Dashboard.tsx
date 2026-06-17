@@ -546,7 +546,7 @@ export function Dashboard() {
 
 
         {/* ═══ OPEN MAINTENANCE TICKETS ═══ */}
-        {showOpenTickets && (
+        {showOpenTickets && !isOperator && (
           <div className="card mb-3 overflow-hidden">
             <div className="px-3 py-2 border-b border-border flex items-center gap-2">
               <Wrench size={16} className="text-primary" />
