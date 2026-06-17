@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ShieldCheck, ShieldAlert, Calendar, AlertTriangle, ChevronRight, CheckCircle2 } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
@@ -36,7 +36,7 @@ interface HistoryRow {
 export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) {
   const leaderFilterNorm = normalizeName(leaderFilter);
 
-  const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
+  
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -96,16 +96,12 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
 
   const filtered = useMemo(() => {
     return rows.filter(r => {
-      if (shiftFilter !== 'ALL') {
-        const s = (r.shift_type || '').toUpperCase();
-        if (s !== shiftFilter) return false;
-      }
       if (leaderFilterNorm) {
         if (normalizeName(r.line_leader) !== leaderFilterNorm) return false;
       }
       return true;
     });
-  }, [rows, shiftFilter, leaderFilterNorm]);
+  }, [rows, leaderFilterNorm]);
 
   const stats: LeaderQualityStats[] = useMemo(() => {
     const map: Record<string, { points: number; count: number }> = {};
@@ -151,22 +147,9 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
   return (
     <div>
       <div className="space-y-2 mb-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-            <ShieldCheck size={16} className="text-amber-500" />Leader Quality Board
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Shift:</span>
-            <Select value={shiftFilter} onValueChange={(v) => setShiftFilter(v as typeof shiftFilter)}>
-              <SelectTrigger className="w-20 h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="DAY">Day</SelectItem>
-                <SelectItem value="NIGHT">Night</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+          <ShieldCheck size={16} className="text-amber-500" />Quality Board
+        </h3>
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar size={14} />{dateDisplay}</div>
       </div>
 
