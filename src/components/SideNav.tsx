@@ -43,6 +43,7 @@ const systemItems: NavItem[] = [
 export function SideNav() {
   const { user, logout, hasRole } = useAuth();
   const onlineUsers = useOnlineUsers();
+  const { stats } = useMySidebarStats(user?.name);
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { pathname } = useLocation();
