@@ -360,6 +360,7 @@ export function Dashboard() {
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="py-2 px-3">#</th>
+                    <th className="py-2 px-3">Date</th>
                     <th className="py-2 px-3">Line</th>
                     <th className="py-2 px-3">Description</th>
                     <th className="py-2 px-3">Status</th>
@@ -370,6 +371,9 @@ export function Dashboard() {
                   {myWorkOrders.map(wo => (
                     <tr key={wo.id} className="hover:bg-muted/50">
                       <td className="py-2 px-3 font-medium text-foreground">#{wo.wo_number}</td>
+                      <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                        {new Date(wo.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </td>
                       <td className="py-2 px-3">
                         {wo.line_at_time || '—'}
                         {wo.line_stopped && <span className="ml-1 text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-800">Stopped</span>}
