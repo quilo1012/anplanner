@@ -599,7 +599,7 @@ export function Dashboard() {
       <QuickQualityActionDialog
         open={qualityDialogOpen}
         onOpenChange={setQualityDialogOpen}
-        lines={uniqueLines}
+        
         leaders={uniqueLeaders}
         defaultLine={selectedLine}
         defaultLeader={selectedLeader}
