@@ -86,7 +86,8 @@ const App = () => (
             <Route
               path="quality-actions-log"
               element={
-                <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+                <ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}>
+
                   <Suspense fallback={<PageLoader />}><QualityActionsLog /></Suspense>
                 </ProtectedRoute>
               }
