@@ -399,46 +399,6 @@ export function Dashboard() {
           </div>
         </div>
 
-        {isOperator && myWorkOrders.length > 0 && (
-          <div className="card mb-3 overflow-hidden">
-            <div className="px-3 py-2 border-b border-border bg-amber-50">
-              <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
-                <Wrench size={16} className="text-amber-700" />My Maintenance Requests
-              </h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                    <th className="py-2 px-3">#</th>
-                    <th className="py-2 px-3">Date</th>
-                    <th className="py-2 px-3">Line</th>
-                    <th className="py-2 px-3">Description</th>
-                    <th className="py-2 px-3">Status</th>
-                    <th className="py-2 px-3">Engineer</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {myWorkOrders.map(wo => (
-                    <tr key={wo.id} className="hover:bg-muted/50">
-                      <td className="py-2 px-3 font-medium text-foreground">#{wo.wo_number}</td>
-                      <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
-                        {new Date(wo.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="py-2 px-3">
-                        {wo.line_at_time || '—'}
-                        {wo.line_stopped && <span className="ml-1 text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-800">Stopped</span>}
-                      </td>
-                      <td className="py-2 px-3 max-w-xs truncate" title={wo.description}>{wo.description}</td>
-                      <td className="py-2 px-3 capitalize">{wo.status.replace('_', ' ')}</td>
-                      <td className="py-2 px-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* Print Header */}
         <div className="hidden print:flex items-center gap-4 mb-4 border-b-2 border-black pb-4">
@@ -540,6 +500,87 @@ export function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* ═══ MY QUALITY (operator only) ═══ */}
+        {isOperator && (() => {
+          const myKey = (user?.name || '').trim().toLowerCase();
+          const mine = leaderQuality[myKey] ?? { occurrences: 0, points: 0 };
+          const pts = mine.points || 0;
+          const tone = pts >= HIGH_PENALTY_THRESHOLD
+            ? 'border-destructive/40 bg-destructive/5'
+            : pts > 0
+            ? 'border-amber-300/50 bg-amber-50/40'
+            : 'border-border bg-card';
+          return (
+            <div className={`mb-3 rounded-lg border ${tone} p-3 flex items-center justify-between`}>
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className={pts >= HIGH_PENALTY_THRESHOLD ? 'text-destructive' : pts > 0 ? 'text-amber-600' : 'text-muted-foreground'} />
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">My Quality — {dateRangeLabel}</h2>
+                {leaderQualityLoading && <span className="text-[10px] text-muted-foreground">loading…</span>}
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <p className="text-[10px] uppercase text-muted-foreground">Occurrences</p>
+                  <p className="text-lg font-bold tabular-nums text-foreground">{mine.occurrences || 0}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase text-muted-foreground">Penalty Points</p>
+                  <p className={`text-lg font-bold tabular-nums ${pts >= HIGH_PENALTY_THRESHOLD ? 'text-destructive' : pts > 0 ? 'text-amber-700' : 'text-foreground'}`}>{pts}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ═══ MY MAINTENANCE REQUESTS (operator only) ═══ */}
+        {isOperator && myWorkOrders.length > 0 && (
+          <div className="card mb-3 overflow-hidden">
+            <div className="px-3 py-2 border-b border-border bg-amber-50">
+              <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+                <Wrench size={16} className="text-amber-700" />My Maintenance Requests
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                    <th className="py-2 px-3">#</th>
+                    <th className="py-2 px-3">Date</th>
+                    <th className="py-2 px-3">Line</th>
+                    <th className="py-2 px-3">Description</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3">Engineer</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {myWorkOrders.map(wo => (
+                    <tr key={wo.id} className="hover:bg-muted/50">
+                      <td className="py-2 px-3 font-medium text-foreground">#{wo.wo_number}</td>
+                      <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                        {new Date(wo.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="py-2 px-3">
+                        {wo.line_at_time || '—'}
+                        {wo.line_stopped && <span className="ml-1 text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-800">Stopped</span>}
+                      </td>
+                      <td className="py-2 px-3 max-w-xs truncate" title={wo.description}>{wo.description}</td>
+                      <td className="py-2 px-3 capitalize">{wo.status.replace('_', ' ')}</td>
+                      <td className="py-2 px-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ LEADER QUALITY BOARD (operator scope) ═══ */}
+        {isOperator && (
+          <div className="card p-3 mb-3">
+            <LeaderQualityBoard startDate={startDate} endDate={endDate} leaderFilter={user?.name || ''} />
+          </div>
+        )}
+
 
         {/* ═══ OPEN MAINTENANCE TICKETS ═══ */}
         {showOpenTickets && (
