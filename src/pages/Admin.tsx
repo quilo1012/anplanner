@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RagThresholdsCard } from '@/components/admin/RagThresholdsCard';
+import { RolePermissionsCard } from '@/components/admin/RolePermissionsCard';
 
 
 export function Admin() {
