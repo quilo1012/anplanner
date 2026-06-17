@@ -64,22 +64,43 @@ async function renderPage() {
 }
 
 describe('WorkOrders — operator (leader) permissions', () => {
-  it('hides the "New Work Order" button and creation banners for operator', async () => {
+  it('hides every creation entry-point for operator', async () => {
     currentRole = 'operator';
     await renderPage();
 
+    // Toolbar "+ New Work Order" button
     expect(screen.queryByRole('button', { name: /new work order/i })).toBeNull();
-    expect(screen.queryByText(/machine stopped/i)).toBeNull();
-    expect(screen.queryByText(/problem, line still running/i)).toBeNull();
-    // List view is still rendered (empty state shown)
-    expect(screen.getByText(/no work orders for this filter/i)).toBeInTheDocument();
+    // Top shortcut cards
+    expect(screen.queryByText('New Work Order')).toBeNull();
+    expect(screen.queryByText('Submit a maintenance request')).toBeNull();
+    expect(screen.queryByText('My Work Orders')).toBeNull();
+    expect(screen.queryByText('Track your submitted orders')).toBeNull();
+    // Red / amber action banners (exact copy)
+    expect(screen.queryByText('● MACHINE STOPPED')).toBeNull();
+    expect(screen.queryByText('⚠ PROBLEM, LINE STILL RUNNING')).toBeNull();
+    expect(
+      screen.queryByText(/Open WO Request — Line Stopped/i),
+    ).toBeNull();
+    expect(
+      screen.queryByText(/Open WO Request — Line in Operation/i),
+    ).toBeNull();
+    // List is still rendered
+    expect(
+      screen.getByText(/no work orders for this filter/i),
+    ).toBeInTheDocument();
   });
 
-  it('shows the "New Work Order" button for supervisor', async () => {
+  it('shows the creation entry-points for supervisor', async () => {
     currentRole = 'supervisor';
     vi.resetModules();
     await renderPage();
 
-    expect(screen.getAllByText(/new work order/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: /new work order/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('● MACHINE STOPPED')).toBeInTheDocument();
+    expect(
+      screen.getByText('⚠ PROBLEM, LINE STILL RUNNING'),
+    ).toBeInTheDocument();
   });
 });
