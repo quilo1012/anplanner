@@ -16,6 +16,7 @@ import { LineRagBoard } from '@/components/charts/LineRagBoard';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
+import { OperatorPlanCard } from '@/components/dashboard/OperatorPlanCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy } from 'lucide-react';
