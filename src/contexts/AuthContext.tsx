@@ -419,7 +419,7 @@ export function useAuth() {
 export const ROLE_LABELS: Record<UserRole, string> = {
   operator: 'Lider',
   supervisor: 'Supervisor',
-  admin: 'Manager',
+  admin: 'Admin',
   engineer: 'Engineer',
   manager: 'Maintenance Manager',
   viewer: 'Viewer',
