@@ -96,8 +96,8 @@ describe('WorkOrders — operator (leader) permissions', () => {
     await renderPage();
 
     expect(
-      screen.getByRole('button', { name: /new work order/i }),
-    ).toBeInTheDocument();
+      screen.getAllByRole('button', { name: /new work order/i }).length,
+    ).toBeGreaterThanOrEqual(2); // shortcut card + toolbar button
     expect(screen.getByText('● MACHINE STOPPED')).toBeInTheDocument();
     expect(
       screen.getByText('⚠ PROBLEM, LINE STILL RUNNING'),
