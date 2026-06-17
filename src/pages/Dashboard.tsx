@@ -33,8 +33,20 @@ import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
 import { useMyWorkOrders } from '@/hooks/useMyWorkOrders';
 import { Wrench } from 'lucide-react';
 import { normalizeName, sameName } from '@/utils/normalizeName';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 const today = format(new Date(), 'yyyy-MM-dd');
+const LS_KEY = 'dashboard.filters.v1';
+type PersistedFilters = {
+  startDate: string;
+  endDate: string;
+  shift: ShiftType;
+  line: string;
+  leader: string;
+};
+const DEFAULT_FILTERS: PersistedFilters = {
+  startDate: today, endDate: today, shift: 'DAY', line: '', leader: '',
+};
 
 export function Dashboard() {
   const { sessions, isLoading } = useShifts();
@@ -44,11 +56,20 @@ export function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlDate = searchParams.get('date');
   const urlShift = searchParams.get('shift') as ShiftType | null;
-  const [selectedShift, setSelectedShift] = useState<ShiftType>(urlShift === 'NIGHT' || urlShift === 'DAY' ? urlShift : 'DAY');
-  const [startDate, setStartDate] = useState<string>(urlDate || today);
-  const [endDate, setEndDate] = useState<string>(urlDate || today);
-  const [selectedLine, setSelectedLine] = useState<string>('');
-  const [selectedLeader, setSelectedLeader] = useState<string>('');
+
+  const [persisted, setPersisted] = useLocalStorage<PersistedFilters>(LS_KEY, DEFAULT_FILTERS);
+  const [selectedShift, setSelectedShift] = useState<ShiftType>(
+    urlShift === 'NIGHT' || urlShift === 'DAY' ? urlShift : persisted.shift,
+  );
+  const [startDate, setStartDate] = useState<string>(urlDate || persisted.startDate);
+  const [endDate, setEndDate] = useState<string>(urlDate || persisted.endDate);
+  const [selectedLine, setSelectedLine] = useState<string>(persisted.line);
+  const [selectedLeader, setSelectedLeader] = useState<string>(persisted.leader);
+  // Persist filter changes so navigating away and back keeps the selection.
+  useEffect(() => {
+    setPersisted({ startDate, endDate, shift: selectedShift, line: selectedLine, leader: selectedLeader });
+  }, [startDate, endDate, selectedShift, selectedLine, selectedLeader, setPersisted]);
+
   const [showCharts, setShowCharts] = useState(true);
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
