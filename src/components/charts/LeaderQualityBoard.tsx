@@ -34,8 +34,9 @@ interface HistoryRow {
   severity: QualitySeverity | null;
 }
 
-export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) {
+export function LeaderQualityBoard({ startDate, endDate, leaderFilter, excludeLeader }: Props) {
   const leaderFilterNorm = normalizeName(leaderFilter);
+  const excludeLeaderNorm = normalizeName(excludeLeader);
 
   
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
