@@ -101,9 +101,12 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter, excludeLe
       if (leaderFilterNorm) {
         if (normalizeName(r.line_leader) !== leaderFilterNorm) return false;
       }
+      if (excludeLeaderNorm) {
+        if (normalizeName(r.line_leader) === excludeLeaderNorm) return false;
+      }
       return true;
     });
-  }, [rows, leaderFilterNorm]);
+  }, [rows, leaderFilterNorm, excludeLeaderNorm]);
 
   const stats: LeaderQualityStats[] = useMemo(() => {
     const map: Record<string, { points: number; count: number }> = {};
