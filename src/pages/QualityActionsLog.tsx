@@ -153,8 +153,11 @@ export function QualityActionsLog() {
   }, [sessions, qaMap]);
 
   const uniqueLeaders = useMemo(
-    () => Array.from(new Set(allEntries.map(e => e.leader).filter(Boolean))).sort(),
-    [allEntries]
+    () => Array.from(new Set([
+      ...allEntries.map(e => e.leader),
+      ...sessions.map(s => s.lineLeader),
+    ].map(v => (v || '').trim()).filter(Boolean))).sort(),
+    [allEntries, sessions]
   );
   const uniqueLines = useMemo(
     () => Array.from(new Set(allEntries.map(e => e.line).filter(Boolean))).sort(naturalLineSort),
