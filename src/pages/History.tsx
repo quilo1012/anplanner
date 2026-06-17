@@ -187,11 +187,13 @@ export function History() {
     win.document.write(`<!DOCTYPE html><html><head><title>Production Report</title>
       <style>
         body { font-family: 'Inter', system-ui, sans-serif; margin: 2rem; color: #1a1a1a; font-size: 0.8rem; }
-        h1 { font-size: 1.25rem; margin-bottom: 0; }
+        h1 { font-size: 1.5rem; margin: 0; letter-spacing: 0.05em; text-transform: uppercase; }
         h2 { font-size: 1rem; border-bottom: 2px solid #333; padding-bottom: 4px; margin-top: 1.5rem; }
-        .meta { font-size: 0.75rem; color: #666; margin-bottom: 1rem; }
-        .header { display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid #333; padding-bottom: 1rem; margin-bottom: 1.5rem; }
-        .header img { height: 60px; }
+        .meta { font-size: 0.75rem; color: #555; margin-top: 0.35rem; }
+        .header { border-bottom: 3px double #333; padding-bottom: 0.9rem; margin-bottom: 1.5rem; }
+        .header .top { display: flex; justify-content: space-between; align-items: baseline; }
+        .header .brand { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: #666; font-weight: 600; }
+        .header .doc { font-size: 0.65rem; color: #888; letter-spacing: 0.1em; text-transform: uppercase; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
         th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; font-weight: 600; color: #555; font-size: 0.75rem; }
         td { padding: 4px 8px; border-bottom: 1px solid #ddd; }
@@ -211,10 +213,11 @@ export function History() {
         @media print { body { margin: 1cm; } }
       </style></head><body>
       <div class="header">
-        <img src="${window.location.origin}/lovable-uploads/64131b92-9113-4e13-88d8-667e720cb54f.png" alt="Applied Nutrition" onerror="this.style.display='none'" />
-        <div><h1>PRODUCTION REPORT</h1>
-        <div class="meta">Date: ${new Date(pDate).toLocaleDateString()} | Shift: ${pShift} | Generated: ${new Date().toLocaleString()}</div></div>
+        <div class="top"><span class="brand">Applied Nutrition</span><span class="doc">Confidential</span></div>
+        <h1>Production Report</h1>
+        <div class="meta"><strong>Date:</strong> ${new Date(pDate).toLocaleDateString()} &nbsp;|&nbsp; <strong>Shift:</strong> ${pShift} &nbsp;|&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</div>
       </div>
+
 
       <h2>Summary</h2>
       <table class="summary"><tbody>
