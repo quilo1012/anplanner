@@ -224,9 +224,9 @@ export function History() {
       </tbody></table>
 
       <h2>Production by Line</h2>
-      <table><thead><tr><th>Line</th><th>Leader</th><th>SKUs</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Perf.</th><th class="text-right">Downtime</th><th class="text-center">Staff</th></tr></thead>
+      <table><thead><tr><th>Line</th><th>Leader</th><th>SKUs</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Perf.</th><th class="text-right">Downtime</th><th class="text-center">Quality</th></tr></thead>
       <tbody>${lineRows}</tbody>
-      <tfoot><tr><td colspan="3">TOTALS</td><td class="text-right">${totalPlanned.toLocaleString()}</td><td class="text-right">${totalProduction.toLocaleString()}</td><td class="text-right">${overallPerf}%</td><td class="text-right">${formatDuration(totalDowntime)}</td><td class="text-center">${totalStaffActual}/${totalStaffPlanned}</td></tr></tfoot></table>
+      <tfoot><tr><td colspan="3">TOTALS</td><td class="text-right">${totalPlanned.toLocaleString()}</td><td class="text-right">${totalProduction.toLocaleString()}</td><td class="text-right">${overallPerf}%</td><td class="text-right">${formatDuration(totalDowntime)}</td><td class="text-center">${totalQuality}</td></tr></tfoot></table>
 
       <h2>Production Items Detail</h2>
       <table><thead><tr><th>Line</th><th>SKU</th><th>Product</th><th class="text-right">Target</th><th class="text-right">Actual</th><th class="text-right">Perf.</th></tr></thead>
