@@ -476,7 +476,7 @@ export function History() {
                             <td><span className={getPerformanceClass(session.performance)}>{session.performance.toFixed(0)}%</span></td>
                             <td className="text-right text-sm">{formatDuration(session.totalDowntime)}</td>
                             <td className="text-center text-sm">
-                              <span className={session.staffActual < session.staffPlanned ? 'text-destructive font-medium' : ''}>{session.staffActual}/{session.staffPlanned}</span>
+                              <span className={cn("px-2 py-0.5 rounded text-xs font-medium", qActions.length > 0 ? "bg-amber-500/15 text-amber-500" : "bg-muted text-muted-foreground")}>{qActions.length}</span>
                             </td>
                              {!isOperator && (
                                <td className="text-xs whitespace-nowrap">
