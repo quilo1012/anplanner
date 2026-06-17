@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS, UserRole } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
+import { useMySidebarStats } from '@/hooks/useMySidebarStats';
 import { cn } from '@/lib/utils';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarHeader,
