@@ -360,6 +360,7 @@ export function Dashboard() {
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="py-2 px-3">#</th>
+                    <th className="py-2 px-3">Date</th>
                     <th className="py-2 px-3">Line</th>
                     <th className="py-2 px-3">Description</th>
                     <th className="py-2 px-3">Status</th>
