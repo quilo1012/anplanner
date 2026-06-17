@@ -33,8 +33,20 @@ import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
 import { useMyWorkOrders } from '@/hooks/useMyWorkOrders';
 import { Wrench } from 'lucide-react';
 import { normalizeName, sameName } from '@/utils/normalizeName';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 const today = format(new Date(), 'yyyy-MM-dd');
+const LS_KEY = 'dashboard.filters.v1';
+type PersistedFilters = {
+  startDate: string;
+  endDate: string;
+  shift: ShiftType;
+  line: string;
+  leader: string;
+};
+const DEFAULT_FILTERS: PersistedFilters = {
+  startDate: today, endDate: today, shift: 'DAY', line: '', leader: '',
+};
 
 export function Dashboard() {
   const { sessions, isLoading } = useShifts();
@@ -44,11 +56,20 @@ export function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlDate = searchParams.get('date');
   const urlShift = searchParams.get('shift') as ShiftType | null;
-  const [selectedShift, setSelectedShift] = useState<ShiftType>(urlShift === 'NIGHT' || urlShift === 'DAY' ? urlShift : 'DAY');
-  const [startDate, setStartDate] = useState<string>(urlDate || today);
-  const [endDate, setEndDate] = useState<string>(urlDate || today);
-  const [selectedLine, setSelectedLine] = useState<string>('');
-  const [selectedLeader, setSelectedLeader] = useState<string>('');
+
+  const [persisted, setPersisted] = useLocalStorage<PersistedFilters>(LS_KEY, DEFAULT_FILTERS);
+  const [selectedShift, setSelectedShift] = useState<ShiftType>(
+    urlShift === 'NIGHT' || urlShift === 'DAY' ? urlShift : persisted.shift,
+  );
+  const [startDate, setStartDate] = useState<string>(urlDate || persisted.startDate);
+  const [endDate, setEndDate] = useState<string>(urlDate || persisted.endDate);
+  const [selectedLine, setSelectedLine] = useState<string>(persisted.line);
+  const [selectedLeader, setSelectedLeader] = useState<string>(persisted.leader);
+  // Persist filter changes so navigating away and back keeps the selection.
+  useEffect(() => {
+    setPersisted({ startDate, endDate, shift: selectedShift, line: selectedLine, leader: selectedLeader });
+  }, [startDate, endDate, selectedShift, selectedLine, selectedLeader, setPersisted]);
+
   const [showCharts, setShowCharts] = useState(true);
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
@@ -271,15 +292,45 @@ export function Dashboard() {
         {/* ═══ INTEGRATED CONTROL STRIP ═══ */}
         <div className="no-print mb-3">
           <div className="flex flex-wrap items-center gap-1.5 bg-card border border-border p-1.5 rounded-xl ring-1 ring-white/5 shadow-lg">
-            {/* 1. Period + presets */}
-            <div className="flex items-center gap-2 bg-background/60 px-3 py-1.5 rounded-lg border border-border/60">
-              <Calendar size={14} className="text-primary shrink-0" />
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                className="bg-transparent text-xs font-mono text-foreground outline-none w-[110px]" />
-              <span className="text-[10px] text-muted-foreground">to</span>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                className="bg-transparent text-xs font-mono text-foreground outline-none w-[110px]" />
+            {/* 1. Period: presets + custom range */}
+            <div className="flex items-center gap-1 bg-background/60 px-2 py-1 rounded-lg border border-border/60">
+              <Calendar size={14} className="text-primary shrink-0 mr-1" />
+              {([
+                { key: 'today', label: 'Today' },
+                { key: '7d', label: '7D' },
+                { key: '30d', label: '30D' },
+                { key: 'month', label: 'MTD' },
+              ] as const).map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setPreset(p.key)}
+                  className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    activePreset === p.key
+                      ? 'bg-primary text-primary-foreground shadow-inner'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <div className="w-px h-5 bg-border/60 mx-1" />
+              <input
+                type="date"
+                value={startDate}
+                max={endDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-xs font-mono text-foreground outline-none w-[120px] hover:bg-muted/40 rounded px-1 py-0.5 transition-colors"
+              />
+              <span className="text-[10px] text-muted-foreground">→</span>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-xs font-mono text-foreground outline-none w-[120px] hover:bg-muted/40 rounded px-1 py-0.5 transition-colors"
+              />
             </div>
+
 
             {/* 2. Shift toggle */}
             <div className="flex items-center p-1 bg-background/60 rounded-lg border border-border/60">
