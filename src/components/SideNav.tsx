@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth, ROLE_LABELS, UserRole } from '@/contexts/AuthContext';
 import { useOnlineUsers } from '@/hooks/useOnlineUsers';
+import { useMySidebarStats } from '@/hooks/useMySidebarStats';
 import { cn } from '@/lib/utils';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarHeader,
@@ -42,6 +43,7 @@ const systemItems: NavItem[] = [
 export function SideNav() {
   const { user, logout, hasRole } = useAuth();
   const onlineUsers = useOnlineUsers();
+  const { stats } = useMySidebarStats(user?.name);
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { pathname } = useLocation();
@@ -94,6 +96,43 @@ export function SideNav() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
+        {!collapsed && user && (
+          <div className="px-2 py-1.5 space-y-1 border-b border-sidebar-border/60">
+            <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">My activity</p>
+            <NavLink
+              to={`/quality-actions-log?leader=${encodeURIComponent(user.name)}`}
+              className="flex items-center justify-between gap-2 text-xs px-1.5 py-1 rounded hover:bg-sidebar-accent"
+            >
+              <span className="flex items-center gap-1.5">
+                <ShieldAlert size={12} className="text-amber-500" />
+                Quality actions
+              </span>
+              <span className={cn(
+                'tabular-nums font-medium',
+                stats.qualityActions > 0 ? 'text-amber-500' : 'text-sidebar-foreground/60'
+              )}>
+                {stats.qualityActions}{stats.qualityPoints !== 0 && (
+                  <span className="ml-1 text-sidebar-foreground/50">({stats.qualityPoints > 0 ? '+' : ''}{stats.qualityPoints})</span>
+                )}
+              </span>
+            </NavLink>
+            <NavLink
+              to="/maintenance/work-orders"
+              className="flex items-center justify-between gap-2 text-xs px-1.5 py-1 rounded hover:bg-sidebar-accent"
+            >
+              <span className="flex items-center gap-1.5">
+                <Wrench size={12} className="text-red-500" />
+                Open WOs
+              </span>
+              <span className={cn(
+                'tabular-nums font-medium',
+                stats.openWorkOrders > 0 ? 'text-red-500' : 'text-sidebar-foreground/60'
+              )}>
+                {stats.openWorkOrders}
+              </span>
+            </NavLink>
+          </div>
+        )}
         {!collapsed && onlineUsers.length > 0 && (
           <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-sidebar-foreground/70">
             <Circle size={8} className="fill-green-500 text-green-500" />
