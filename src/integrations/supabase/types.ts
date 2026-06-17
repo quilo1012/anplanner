@@ -2009,8 +2009,19 @@ export type Database = {
           name: string
         }[]
       }
+      set_engineer_pin: {
+        Args: { _engineer_id: string; _new_pin: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      verify_pin_by_code: {
+        Args: { _pin: string }
+        Returns: {
+          engineer_id: string
+          engineer_name: string
+        }[]
+      }
     }
     Enums: {
       app_role:
