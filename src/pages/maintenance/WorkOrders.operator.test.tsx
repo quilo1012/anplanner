@@ -71,8 +71,8 @@ describe('WorkOrders — operator (leader) permissions', () => {
     expect(screen.queryByRole('button', { name: /new work order/i })).toBeNull();
     expect(screen.queryByText(/machine stopped/i)).toBeNull();
     expect(screen.queryByText(/problem, line still running/i)).toBeNull();
-    // List view is still rendered
-    expect(screen.getByText(/work orders/i)).toBeInTheDocument();
+    // List view is still rendered (empty state shown)
+    expect(screen.getByText(/no work orders for this filter/i)).toBeInTheDocument();
   });
 
   it('shows the "New Work Order" button for supervisor', async () => {
