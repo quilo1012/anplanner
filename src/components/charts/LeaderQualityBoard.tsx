@@ -13,6 +13,7 @@ interface Props {
   startDate: string;
   endDate: string;
   leaderFilter?: string;
+  excludeLeader?: string;
 }
 
 interface LeaderQualityStats {
