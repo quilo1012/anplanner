@@ -57,6 +57,7 @@ export function Dashboard() {
   const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
   const [qualityRefreshTick, setQualityRefreshTick] = useState(0);
   const { rows: allOpenWoRows } = useOpenWorkOrdersDowntime();
+  const { workOrders: myWorkOrders } = useMyWorkOrders();
   // Scope the "Open Maintenance Tickets" widget strictly to tickets the
   // logged-in user opened in their own name (matched by requester_name).
   const openWoRows = useMemo(() => {
