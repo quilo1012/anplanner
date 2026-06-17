@@ -24,7 +24,6 @@ const directItems: NavItem[] = [
 ];
 const maintenanceItems: NavItem[] = [
   { path: '/maintenance/work-orders', label: 'Work Orders', icon: Wrench, roles: ['supervisor', 'admin', 'engineer', 'operator'] },
-  { path: '/maintenance/tablet', label: 'Tablet Kiosk', icon: Wrench, roles: ['supervisor', 'admin', 'engineer', 'operator'] },
   { path: '/maintenance/engineers', label: 'Engineers', icon: Users, roles: ['supervisor', 'admin', 'engineer'] },
   { path: '/maintenance/machines', label: 'Machines', icon: Package, roles: ['supervisor', 'admin', 'engineer'] },
   { path: '/maintenance/spare-parts', label: 'Spare Parts', icon: Package, roles: ['supervisor', 'admin'] },
