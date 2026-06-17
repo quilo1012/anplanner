@@ -380,32 +380,42 @@ export function Admin() {
               <Shield size={20} className="text-[hsl(var(--primary))]" />
               Role Permissions
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 text-sm sm:text-base">Leader</h4>
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 text-sm sm:text-base">Leader (Operator)</h4>
                 <ul className="text-xs sm:text-sm text-blue-700 dark:text-blue-400 space-y-1">
-                  <li>• Dashboard access only</li>
-                  <li>• Can only view data/shifts linked to their own name</li>
+                  <li>• Dashboard access (own data only)</li>
+                  <li>• View own shifts and history</li>
+                  <li>• Open maintenance work orders (Tablet Kiosk)</li>
+                  <li>• View own maintenance requests</li>
+                </ul>
+              </div>
+              <div className="p-3 sm:p-4 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                <h4 className="font-medium text-orange-800 dark:text-orange-300 mb-2 text-sm sm:text-base">Engineer</h4>
+                <ul className="text-xs sm:text-sm text-orange-700 dark:text-orange-400 space-y-1">
+                  <li>• Work Orders: accept, work, resolve</li>
+                  <li>• Engineers and Machines pages</li>
+                  <li>• Log maintenance downtime, parts used</li>
                 </ul>
               </div>
               <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
                 <h4 className="font-medium text-purple-800 dark:text-purple-300 mb-2 text-sm sm:text-base">Supervisor</h4>
                 <ul className="text-xs sm:text-sm text-purple-700 dark:text-purple-400 space-y-1">
-                  <li>• Full system access</li>
-                  <li>• Create, review, and complete shifts</li>
-                  <li>• Add production results</li>
-                  <li>• Upload monitoring photos</li>
-                  <li>• Edit and delete shifts</li>
-                  <li>• View history and dashboards</li>
+                  <li>• Full production access (all lines)</li>
+                  <li>• Create, edit, and delete shifts</li>
+                  <li>• Add production results and photos</li>
+                  <li>• Planner, Products, Weekly Report</li>
+                  <li>• Quality Actions Log, Spare Parts</li>
+                  <li>• Triage and assign work orders</li>
                 </ul>
               </div>
               <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                <h4 className="font-medium text-red-800 dark:text-red-300 mb-2 text-sm sm:text-base">Manager</h4>
+                <h4 className="font-medium text-red-800 dark:text-red-300 mb-2 text-sm sm:text-base">Manager (Admin)</h4>
                 <ul className="text-xs sm:text-sm text-red-700 dark:text-red-400 space-y-1">
                   <li>• All Supervisor permissions</li>
-                  <li>• Manage users</li>
-                  <li>• Assign roles</li>
-                  <li>• System settings</li>
+                  <li>• Manage users and assign roles</li>
+                  <li>• Quality Action Types, Tablet Setup</li>
+                  <li>• System settings (RAG thresholds, etc.)</li>
                 </ul>
               </div>
             </div>
