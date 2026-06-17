@@ -34,6 +34,7 @@ import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
 import { Wrench, ClipboardList } from 'lucide-react';
 import { normalizeName, sameName } from '@/utils/normalizeName';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useMyWorkOrders } from '@/hooks/useMyWorkOrders';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 const LS_KEY = 'dashboard.filters.v1';
@@ -53,6 +54,7 @@ export function Dashboard() {
   const { user } = useAuth();
   const isOperator = user?.role === 'operator';
   const canViewCharts = !isOperator;
+  const { workOrders: myWorkOrders } = useMyWorkOrders();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlDate = searchParams.get('date');
   const urlShift = searchParams.get('shift') as ShiftType | null;
@@ -535,6 +537,50 @@ export function Dashboard() {
         {isOperator && (
           <OperatorPlanCard date={startDate} shift={selectedShift} />
         )}
+
+        {/* ═══ MY MAINTENANCE REQUESTS (operator/leader) ═══ */}
+        {isOperator && myWorkOrders.length > 0 && (
+          <div className="card mb-3 overflow-hidden">
+            <div className="px-3 py-2 border-b border-border bg-amber-50">
+              <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+                <Wrench size={16} className="text-amber-700" />My Maintenance Requests
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                    <th className="py-2 px-3">#</th>
+                    <th className="py-2 px-3">Date</th>
+                    <th className="py-2 px-3">Line</th>
+                    <th className="py-2 px-3">Description</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3">Engineer</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {myWorkOrders.map(wo => (
+                    <tr key={wo.id} className="hover:bg-muted/50">
+                      <td className="py-2 px-3 font-medium text-foreground">#{wo.wo_number}</td>
+                      <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                        {new Date(wo.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="py-2 px-3">
+                        {wo.line_at_time || '—'}
+                        {wo.line_stopped && <span className="ml-1 text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-800">Stopped</span>}
+                      </td>
+                      <td className="py-2 px-3 max-w-xs truncate" title={wo.description}>{wo.description}</td>
+                      <td className="py-2 px-3 capitalize">{wo.status.replace('_', ' ')}</td>
+                      <td className="py-2 px-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
 
 
         {/* ═══ LEADER QUALITY BOARD (operator scope) ═══ */}
