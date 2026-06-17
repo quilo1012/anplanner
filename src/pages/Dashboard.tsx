@@ -30,6 +30,7 @@ import { aggregateLeaderQuality } from '@/utils/aggregateLeaderQuality';
 import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActionDialog';
 import { Link } from 'react-router-dom';
 import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
+import { useMyWorkOrders } from '@/hooks/useMyWorkOrders';
 import { Wrench } from 'lucide-react';
 import { normalizeName, sameName } from '@/utils/normalizeName';
 
