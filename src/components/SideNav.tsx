@@ -31,7 +31,7 @@ const maintenanceItems: NavItem[] = [
 const reportsItems: NavItem[] = [
   { path: '/history', label: 'History', icon: History, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/weekly-report', label: 'Weekly Report', icon: FileBarChart, roles: ['supervisor', 'admin'] },
-  { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['supervisor', 'admin'] },
+  { path: '/quality-actions-log', label: 'Quality Actions Log', icon: ShieldAlert, roles: ['operator', 'supervisor', 'admin'] },
   { path: '/leader-quality', label: 'Leader Quality Board', icon: Trophy, roles: ['supervisor', 'admin'] },
 ];
 const systemItems: NavItem[] = [
