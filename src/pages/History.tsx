@@ -158,8 +158,7 @@ export function History() {
     const totalProduction = sorted.reduce((sum, s) => sum + s.totalProduction, 0);
     const totalPlanned = sorted.reduce((sum, s) => sum + s.plannedQuantity, 0);
     const totalDowntime = sorted.reduce((sum, s) => sum + s.totalDowntime, 0);
-    const totalStaffPlanned = sorted.reduce((sum, s) => sum + s.staffPlanned, 0);
-    const totalStaffActual = sorted.reduce((sum, s) => sum + s.staffActual, 0);
+    const totalQuality = sorted.reduce((sum, s) => sum + (qualityBySession[s.id]?.length || 0), 0);
     const overallPerf = totalPlanned > 0 ? ((totalProduction / totalPlanned) * 100).toFixed(1) : '0';
 
     const lineRows = sorted.map((s, i) => `<tr class="${i % 2 === 1 ? 'zebra' : ''}">
@@ -169,7 +168,7 @@ export function History() {
       <td class="text-right">${s.totalProduction.toLocaleString()}</td>
       <td class="text-right ${s.performance >= 90 ? 'perf-green' : s.performance >= 75 ? 'perf-yellow' : 'perf-red'}">${s.performance.toFixed(1)}%</td>
       <td class="text-right">${formatDuration(s.totalDowntime)}</td>
-      <td class="text-center">${s.staffActual}/${s.staffPlanned}</td></tr>`).join('');
+      <td class="text-center">${qualityBySession[s.id]?.length || 0}</td></tr>`).join('');
 
     const itemRows = sorted.flatMap(s => s.items.map((item, j) => `<tr class="${j % 2 === 1 ? 'zebra' : ''}">
       <td class="font-medium">${escapeHtml(s.productionLine)}</td><td class="font-mono">${escapeHtml(item.sku)}</td><td>${escapeHtml(item.productName)}</td>
