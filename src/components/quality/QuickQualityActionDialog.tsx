@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  lines: string[];
+  
   leaders: string[];
   defaultLine?: string;
   defaultLeader?: string;
