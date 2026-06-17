@@ -13,6 +13,7 @@ interface Props {
   startDate: string;
   endDate: string;
   leaderFilter?: string;
+  excludeLeader?: string;
 }
 
 interface LeaderQualityStats {
@@ -33,8 +34,9 @@ interface HistoryRow {
   severity: QualitySeverity | null;
 }
 
-export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) {
+export function LeaderQualityBoard({ startDate, endDate, leaderFilter, excludeLeader }: Props) {
   const leaderFilterNorm = normalizeName(leaderFilter);
+  const excludeLeaderNorm = normalizeName(excludeLeader);
 
   
   const [rows, setRows] = useState<{ line_leader: string | null; points: number; shift_type: string | null; date: string | null }[]>([]);
@@ -99,9 +101,12 @@ export function LeaderQualityBoard({ startDate, endDate, leaderFilter }: Props) 
       if (leaderFilterNorm) {
         if (normalizeName(r.line_leader) !== leaderFilterNorm) return false;
       }
+      if (excludeLeaderNorm) {
+        if (normalizeName(r.line_leader) === excludeLeaderNorm) return false;
+      }
       return true;
     });
-  }, [rows, leaderFilterNorm]);
+  }, [rows, leaderFilterNorm, excludeLeaderNorm]);
 
   const stats: LeaderQualityStats[] = useMemo(() => {
     const map: Record<string, { points: number; count: number }> = {};
