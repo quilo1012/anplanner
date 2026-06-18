@@ -16,6 +16,7 @@ const Admin = lazy(() => import('@/pages/Admin').then(m => ({ default: m.Admin }
 const QualityActionTypes = lazy(() => import('@/pages/QualityActionTypes').then(m => ({ default: m.QualityActionTypes })));
 const QualityActionsLog = lazy(() => import('@/pages/QualityActionsLog').then(m => ({ default: m.QualityActionsLog })));
 const WeeklyReport = lazy(() => import('@/pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
+const DowntimeSummary = lazy(() => import('@/pages/DowntimeSummary').then(m => ({ default: m.DowntimeSummary })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
 const Products = lazy(() => import('@/pages/Products').then(m => ({ default: m.Products })));
 const WorkOrders = lazy(() => import('@/pages/maintenance/WorkOrders').then(m => ({ default: m.WorkOrders })));
