@@ -67,6 +67,7 @@ const App = () => (
             
             <Route path="history" element={<ProtectedRoute allowedRoles={['operator', 'supervisor', 'admin']}><Suspense fallback={<PageLoader />}><History /></Suspense></ProtectedRoute>} />
             <Route path="weekly-report" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><WeeklyReport /></Suspense></ProtectedRoute>} />
+            <Route path="downtime-summary" element={<ProtectedRoute allowedRoles={['supervisor', 'admin']}><Suspense fallback={<PageLoader />}><DowntimeSummary /></Suspense></ProtectedRoute>} />
             
             <Route
               path="admin"
