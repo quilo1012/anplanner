@@ -241,6 +241,21 @@ export function Dashboard() {
     }).sort((a, b) => naturalLineSort(a.line, b.line));
   }, [filteredSessions]);
 
+  const emptyStateHints = useMemo(() => {
+    const visible = sessions.filter(s => {
+      if (isOperator && user?.name && s.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()) return false;
+      if (selectedLine && s.productionLine.trim() !== selectedLine) return false;
+      if (selectedLeader && s.lineLeader.trim() !== selectedLeader) return false;
+      return true;
+    });
+    const forShift = visible.filter(s => s.shift === selectedShift);
+    const mostRecentForSelectedShift = forShift.reduce<string | null>((acc, s) => (!acc || s.date > acc) ? s.date : acc, null);
+    const otherShift: ShiftType = selectedShift === 'DAY' ? 'NIGHT' : 'DAY';
+    const hasOtherShiftInRange = visible.some(s => s.shift === otherShift && s.date >= startDate && s.date <= endDate);
+    return { mostRecentForSelectedShift, otherShift, hasOtherShiftInRange };
+  }, [sessions, selectedShift, selectedLine, selectedLeader, isOperator, user?.name, startDate, endDate]);
+
+
 
   const trendAlerts = useMemo(() => {
     const alerts: { productionLine: string; consecutiveCount: number; avgPerformance: number }[] = [];
@@ -489,7 +504,30 @@ export function Dashboard() {
                 <div className="card p-6 text-center">
                   <Factory size={40} className="mx-auto text-muted-foreground mb-3" />
                   <h3 className="text-base font-medium text-foreground mb-1">No Lines Active</h3>
-                  <p className="text-muted-foreground text-sm">No production data for {dateRangeLabel} - {selectedShift} shift</p>
+                  <p className="text-muted-foreground text-sm">No production data for {dateRangeLabel} — {selectedShift} shift</p>
+                  {(emptyStateHints.mostRecentForSelectedShift || emptyStateHints.hasOtherShiftInRange) && (
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                      {emptyStateHints.mostRecentForSelectedShift && emptyStateHints.mostRecentForSelectedShift !== startDate && (
+                        <button
+                          className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:opacity-90"
+                          onClick={() => {
+                            setStartDate(emptyStateHints.mostRecentForSelectedShift!);
+                            setEndDate(emptyStateHints.mostRecentForSelectedShift!);
+                          }}
+                        >
+                          Jump to {format(new Date(emptyStateHints.mostRecentForSelectedShift + 'T00:00:00'), 'dd/MM/yyyy')}
+                        </button>
+                      )}
+                      {emptyStateHints.hasOtherShiftInRange && (
+                        <button
+                          className="px-3 py-1.5 text-xs rounded-md border border-border text-foreground hover:bg-muted"
+                          onClick={() => setSelectedShift(emptyStateHints.otherShift)}
+                        >
+                          Switch to {emptyStateHints.otherShift} shift
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
