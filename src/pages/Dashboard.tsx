@@ -504,7 +504,30 @@ export function Dashboard() {
                 <div className="card p-6 text-center">
                   <Factory size={40} className="mx-auto text-muted-foreground mb-3" />
                   <h3 className="text-base font-medium text-foreground mb-1">No Lines Active</h3>
-                  <p className="text-muted-foreground text-sm">No production data for {dateRangeLabel} - {selectedShift} shift</p>
+                  <p className="text-muted-foreground text-sm">No production data for {dateRangeLabel} — {selectedShift} shift</p>
+                  {(emptyStateHints.mostRecentForSelectedShift || emptyStateHints.hasOtherShiftInRange) && (
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                      {emptyStateHints.mostRecentForSelectedShift && emptyStateHints.mostRecentForSelectedShift !== startDate && (
+                        <button
+                          className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:opacity-90"
+                          onClick={() => {
+                            setStartDate(emptyStateHints.mostRecentForSelectedShift!);
+                            setEndDate(emptyStateHints.mostRecentForSelectedShift!);
+                          }}
+                        >
+                          Jump to {format(new Date(emptyStateHints.mostRecentForSelectedShift + 'T00:00:00'), 'dd/MM/yyyy')}
+                        </button>
+                      )}
+                      {emptyStateHints.hasOtherShiftInRange && (
+                        <button
+                          className="px-3 py-1.5 text-xs rounded-md border border-border text-foreground hover:bg-muted"
+                          onClick={() => setSelectedShift(emptyStateHints.otherShift)}
+                        >
+                          Switch to {emptyStateHints.otherShift} shift
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
