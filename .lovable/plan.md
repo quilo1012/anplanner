@@ -1,45 +1,62 @@
+## Objetivo
 
+Manter o filtro padrão do Dashboard em "Hoje", mas quando não houver nenhuma session para o intervalo/turno selecionado, mostrar um empty state útil que aponte para a data mais recente com dados — em vez do atual "No Lines Active" silencioso que esconde os jobs recém-importados pelo Planner.
 
-# Fix: Planner Manual Save Not Persisting to History
+## Causa raiz (confirmada)
 
-## Root Cause
+- `src/pages/Dashboard.tsx` linha 39: `const today = format(new Date(), 'yyyy-MM-dd')`
+- Linha 49: estado inicial `startDate: today, endDate: today, shift: 'DAY'`
+- Linhas 186-190: filtra `s.date >= startDate && s.date <= endDate && s.shift === selectedShift`
+- Hoje no servidor é `2026-06-21`. Todas as sessions importadas têm `date = 2026-06-20`. Filtro elimina todas → "No Lines Active".
 
-In `src/pages/Planner.tsx` lines 258-267, the code navigates to `/history` **before** calling `saveSession`:
+## Mudanças
 
-```typescript
-// Navigate optimistically — session save continues in background
-toast.success('Production session saved!');
-navigate('/history');  // ← unmounts Planner + ShiftProvider
+### 1. Computar fallback da sessão mais recente
 
-let result = await saveSession(sessionData);  // ← never completes
+Em `src/pages/Dashboard.tsx`, adicionar `useMemo` que, a partir de `sessions` (já carregadas pelo `ShiftContext`), calcula:
+
+- `mostRecentSessionDate`: maior `s.date` em qualquer turno
+- `mostRecentForSelectedShift`: maior `s.date` com `s.shift === selectedShift` (respeitando filtro de operador, se aplicável)
+
+### 2. Substituir o empty state existente
+
+Hoje (linha ~492) o card mostra apenas: `No production data for {dateRangeLabel} - {selectedShift} shift`.
+
+Substituir por um bloco que, quando `filteredSessions.length === 0`:
+
+- Mantém a mensagem principal "Nenhuma sessão para {dateRangeLabel} — turno {selectedShift}".
+- Se `mostRecentForSelectedShift` existir e for diferente do `startDate`: mostra linha secundária "A sessão mais recente deste turno é de {data formatada DD/MM/YYYY}" + botão **"Ver {data}"** que chama `setStartDate(maisRecente); setEndDate(maisRecente)`.
+- Se não houver sessão para o turno atual mas houver para o outro turno na mesma data: mostra botão secundário "Trocar para turno {outro}" que chama `setSelectedShift`.
+- Se não houver nenhuma sessão em lugar nenhum: manter mensagem atual sem botões.
+
+### 3. Nada mais muda
+
+- Comportamento padrão continua "Hoje / DAY".
+- Filtros, queries, contexto, e dados continuam idênticos.
+- Mudança é puramente de UI/UX no card de empty state.
+
+## Detalhes técnicos
+
+Arquivo único alterado: `src/pages/Dashboard.tsx`.
+
+Pseudocódigo do empty state:
+
+```text
+if filteredSessions.length === 0:
+  render Card:
+    "Nenhuma sessão para {dateRangeLabel} — turno {selectedShift}"
+    if mostRecentForSelectedShift && mostRecentForSelectedShift !== startDate:
+      Button "Ver {format(mostRecentForSelectedShift, 'dd/MM/yyyy')}"
+        onClick: setStartDate + setEndDate = mostRecentForSelectedShift
+    if hasOtherShiftToday:
+      Button outline "Trocar para turno {otherShift}"
+        onClick: setSelectedShift(otherShift)
 ```
 
-When `navigate('/history')` runs, the Planner component unmounts. Since `saveSession` comes from the `ShiftContext` provider (which may also unmount or lose its closure), the database write is killed mid-flight. The toast says "saved" but nothing actually persists.
+Usa apenas `sessions` já em memória — sem novas queries.
 
-## Fix
+## Fora do escopo
 
-**`src/pages/Planner.tsx`** — Move `navigate('/history')` to AFTER the save completes:
-
-```typescript
-let result;
-if (editId) {
-  result = await updateSession(editId, sessionData);
-} else {
-  result = await saveSession(sessionData);
-}
-
-if (!result.success) {
-  toast.error(`Save failed: ${result.error}`);
-} else {
-  toast.success(editId ? 'Session updated!' : 'Production session saved!');
-  navigate('/history');
-}
-```
-
-Remove the premature toast and navigate that currently sit above the save call.
-
-## Files
-| File | Change |
-|------|--------|
-| `src/pages/Planner.tsx` | Move navigate + toast after await saveSession/updateSession |
-
+- Não mudar o intervalo padrão de "Hoje".
+- Não tocar em ShiftContext, Planner, ou queries de Supabase.
+- Não alterar timezone nem lógica de import.
