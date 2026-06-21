@@ -241,6 +241,21 @@ export function Dashboard() {
     }).sort((a, b) => naturalLineSort(a.line, b.line));
   }, [filteredSessions]);
 
+  const emptyStateHints = useMemo(() => {
+    const visible = sessions.filter(s => {
+      if (isOperator && user?.name && s.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()) return false;
+      if (selectedLine && s.productionLine.trim() !== selectedLine) return false;
+      if (selectedLeader && s.lineLeader.trim() !== selectedLeader) return false;
+      return true;
+    });
+    const forShift = visible.filter(s => s.shift === selectedShift);
+    const mostRecentForSelectedShift = forShift.reduce<string | null>((acc, s) => (!acc || s.date > acc) ? s.date : acc, null);
+    const otherShift: ShiftType = selectedShift === 'DAY' ? 'NIGHT' : 'DAY';
+    const hasOtherShiftInRange = visible.some(s => s.shift === otherShift && s.date >= startDate && s.date <= endDate);
+    return { mostRecentForSelectedShift, otherShift, hasOtherShiftInRange };
+  }, [sessions, selectedShift, selectedLine, selectedLeader, isOperator, user?.name, startDate, endDate]);
+
+
 
   const trendAlerts = useMemo(() => {
     const alerts: { productionLine: string; consecutiveCount: number; avgPerformance: number }[] = [];
