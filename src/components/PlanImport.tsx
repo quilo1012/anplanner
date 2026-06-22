@@ -128,6 +128,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
           start_time: startTime,
           finish_time: finishTime,
           shift_type: shift || 'DAY',
+          target_upm: targetUpm,
           errors,
         });
       });
