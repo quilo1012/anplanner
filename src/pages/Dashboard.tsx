@@ -72,6 +72,34 @@ export function Dashboard() {
     setPersisted({ startDate, endDate, shift: selectedShift, line: selectedLine, leader: selectedLeader });
   }, [startDate, endDate, selectedShift, selectedLine, selectedLeader, setPersisted]);
 
+  // On mount: if today has no production sessions, jump filter to the most
+  // recent date that does — so the Dashboard opens on real data, not empty.
+  useEffect(() => {
+    if (urlDate) return; // respect explicit URL date
+    if (startDate !== today || endDate !== today) return; // respect persisted/custom range
+    let cancelled = false;
+    (async () => {
+      const { data: todayRows } = await supabase
+        .from('production_sessions')
+        .select('id')
+        .eq('date', today)
+        .limit(1);
+      if (cancelled || (todayRows && todayRows.length > 0)) return;
+      const { data: lastRows } = await supabase
+        .from('production_sessions')
+        .select('date')
+        .order('date', { ascending: false })
+        .limit(1);
+      const lastDate = lastRows?.[0]?.date;
+      if (cancelled || !lastDate || lastDate === today) return;
+      setStartDate(lastDate);
+      setEndDate(lastDate);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   const [showCharts, setShowCharts] = useState(true);
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
