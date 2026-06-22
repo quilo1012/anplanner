@@ -14,6 +14,7 @@ const TEMPLATE_COLUMNS = [
   { header: 'Start Time', key: 'start_time', width: 14 },
   { header: 'Finish Time', key: 'finish_time', width: 14 },
   { header: 'Shift', key: 'shift', width: 10 },
+  { header: 'Target (units/min)', key: 'target_upm', width: 18 },
 ];
 
 const EXAMPLE_ROWS = [

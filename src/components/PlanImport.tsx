@@ -18,6 +18,7 @@ interface PlanRow {
   start_time: string;
   finish_time: string;
   shift_type: string;
+  target_upm: number;
   errors: string[];
 }
 
@@ -94,6 +95,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         const startTime = parseTime(vals[7]);
         const finishTime = parseTime(vals[8]);
         const shift = String(vals[9] || '').trim().toUpperCase();
+        const targetUpm = Number(vals[10]) || 0; // Target (units/min) — optional, falls back to calculated
 
         if (!dateVal && !productCode && !qty) return;
 
@@ -126,6 +128,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
           start_time: startTime,
           finish_time: finishTime,
           shift_type: shift || 'DAY',
+          target_upm: targetUpm,
           errors,
         });
       });
@@ -154,7 +157,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         if (startH !== null && endH !== null) {
           production_hours = endH >= startH ? endH - startH : (24 - startH) + endH;
         }
-        const units_per_min_expected = production_hours > 0 ? r.qty / (production_hours * 60) : 0;
+        const units_per_min_expected = r.target_upm > 0 ? r.target_upm : (production_hours > 0 ? r.qty / (production_hours * 60) : 0);
 
         return {
           date: r.date,
