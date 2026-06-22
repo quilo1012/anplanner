@@ -18,6 +18,7 @@ interface PlanRow {
   start_time: string;
   finish_time: string;
   shift_type: string;
+  target_upm: number;
   errors: string[];
 }
 
