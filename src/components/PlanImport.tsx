@@ -94,6 +94,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         const startTime = parseTime(vals[7]);
         const finishTime = parseTime(vals[8]);
         const shift = String(vals[9] || '').trim().toUpperCase();
+        const targetUpm = Number(vals[10]) || 0; // Target (units/min) — optional, falls back to calculated
 
         if (!dateVal && !productCode && !qty) return;
 
