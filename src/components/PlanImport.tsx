@@ -65,6 +65,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number; batch: number; batches: number } | null>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
