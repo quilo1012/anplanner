@@ -200,6 +200,38 @@ export function PlanImport({ open, onClose, onImported }: Props) {
       const failures: string[] = [];
       setProgress({ done: 0, total: inserts.length, batch: 0, batches: batches.length });
 
+      type ErrKind = 'timeout' | 'network' | 'supabase' | 'unknown';
+      const classify = (err: unknown): { kind: ErrKind; message: string; hint: string } => {
+        const e = (err ?? {}) as { name?: string; message?: string; code?: string; details?: string };
+        const raw = (e.message || String(err) || '').toLowerCase();
+        if (e.name === 'AbortError' || raw.includes('abort') || raw.includes('timeout')) {
+          return {
+            kind: 'timeout',
+            message: `Request timed out after ${TIMEOUT_MS / 1000}s`,
+            hint: 'The server took too long to respond. Try again — if it keeps failing, split the file in smaller parts.',
+          };
+        }
+        if (raw.includes('failed to fetch') || raw.includes('network') || raw.includes('load failed')) {
+          return {
+            kind: 'network',
+            message: 'Network error — could not reach the server',
+            hint: 'Check your internet connection and try again.',
+          };
+        }
+        if (e.code || e.details) {
+          return {
+            kind: 'supabase',
+            message: `Database error: ${e.message || 'unknown'}${e.code ? ` (code ${e.code})` : ''}`,
+            hint: e.details || 'Check the data in your file. If the issue persists, contact support.',
+          };
+        }
+        return {
+          kind: 'unknown',
+          message: e.message || 'Unexpected error',
+          hint: 'Please try again. If the problem persists, contact support.',
+        };
+      };
+
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
         setProgress({ done, total: inserts.length, batch: i + 1, batches: batches.length });
@@ -213,13 +245,14 @@ export function PlanImport({ open, onClose, onImported }: Props) {
             .abortSignal(controller.signal)
             .select('id');
           if (error) {
-            failures.push(`Batch ${i + 1}/${batches.length}: ${error.message}`);
+            const c = classify(error);
+            failures.push(`Batch ${i + 1}/${batches.length} [${c.kind}]: ${c.message}`);
           } else {
             done += batch.length;
           }
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          failures.push(`Batch ${i + 1}/${batches.length}: ${msg.includes('abort') ? `timeout after ${TIMEOUT_MS / 1000}s` : msg}`);
+          const c = classify(err);
+          failures.push(`Batch ${i + 1}/${batches.length} [${c.kind}]: ${c.message}`);
         } finally {
           clearTimeout(timeoutId);
         }
@@ -229,16 +262,44 @@ export function PlanImport({ open, onClose, onImported }: Props) {
       if (failures.length === 0) {
         toast.success(`Imported ${done} plan row(s) successfully!`);
       } else if (done > 0) {
-        toast.warning(`Imported ${done}/${inserts.length} rows. ${failures.length} batch(es) failed.`);
+        toast.warning(`Imported ${done}/${inserts.length} rows. ${failures.length} batch(es) failed.`, {
+          description: failures[0],
+          duration: 10000,
+        });
         console.error('Plan import failures:', failures);
       } else {
-        throw new Error(failures[0] || 'All batches failed');
+        const c = classify(new Error(failures[0] || 'All batches failed'));
+        toast.error(c.message, { description: c.hint, duration: 10000 });
+        console.error('Plan import failures:', failures);
+        return;
       }
       onImported();
       onClose();
       setRows([]);
     } catch (err) {
-      toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      const e = (err ?? {}) as { name?: string; message?: string; code?: string; details?: string };
+      const raw = (e.message || '').toLowerCase();
+      if (e.name === 'AbortError' || raw.includes('abort') || raw.includes('timeout')) {
+        toast.error('Request timed out', {
+          description: 'The server took too long. Try again or split the file in smaller parts.',
+          duration: 10000,
+        });
+      } else if (raw.includes('failed to fetch') || raw.includes('network')) {
+        toast.error('Network error', {
+          description: 'Check your internet connection and try again.',
+          duration: 10000,
+        });
+      } else if (e.code || e.details) {
+        toast.error(`Database error${e.code ? ` (${e.code})` : ''}`, {
+          description: `${e.message || ''} ${e.details || ''}`.trim() || 'Check the data and try again.',
+          duration: 10000,
+        });
+      } else {
+        toast.error('Import failed', {
+          description: `${e.message || 'Unexpected error'}. Try again or contact support if it persists.`,
+          duration: 10000,
+        });
+      }
     } finally {
       setSaving(false);
       setProgress(null);
