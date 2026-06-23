@@ -346,7 +346,11 @@ export function PlanImport({ open, onClose, onImported }: Props) {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { onClose(); setRows([]); }}>Cancel</Button>
               <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving}>
-                {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
+                {saving ? (
+                  <><Loader2 size={16} className="animate-spin mr-2" />
+                    {progress ? `Batch ${progress.batch}/${progress.batches} — ${progress.done}/${progress.total}` : 'Importing...'}
+                  </>
+                ) : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>
           </div>
