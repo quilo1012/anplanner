@@ -65,6 +65,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number; batch: number; batches: number } | null>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -148,6 +149,8 @@ export function PlanImport({ open, onClose, onImported }: Props) {
   const handleConfirm = async () => {
     if (validRows.length === 0) { toast.error('No valid rows to import'); return; }
     setSaving(true);
+    const BATCH_SIZE = 50;
+    const TIMEOUT_MS = 30000;
     try {
       const inserts = validRows.map(r => {
         const total_kg = r.qty * r.weight_kg;
@@ -188,10 +191,49 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         };
       });
 
-      const { error } = await supabase.from('production_plans').insert(inserts);
-      if (error) throw error;
+      const batches: typeof inserts[] = [];
+      for (let i = 0; i < inserts.length; i += BATCH_SIZE) {
+        batches.push(inserts.slice(i, i + BATCH_SIZE));
+      }
 
-      toast.success(`Imported ${validRows.length} plan row(s) successfully!`);
+      let done = 0;
+      const failures: string[] = [];
+      setProgress({ done: 0, total: inserts.length, batch: 0, batches: batches.length });
+
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        setProgress({ done, total: inserts.length, batch: i + 1, batches: batches.length });
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        try {
+          const { error } = await supabase
+            .from('production_plans')
+            .insert(batch)
+            .abortSignal(controller.signal)
+            .select('id');
+          if (error) {
+            failures.push(`Batch ${i + 1}/${batches.length}: ${error.message}`);
+          } else {
+            done += batch.length;
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          failures.push(`Batch ${i + 1}/${batches.length}: ${msg.includes('abort') ? `timeout after ${TIMEOUT_MS / 1000}s` : msg}`);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+        setProgress({ done, total: inserts.length, batch: i + 1, batches: batches.length });
+      }
+
+      if (failures.length === 0) {
+        toast.success(`Imported ${done} plan row(s) successfully!`);
+      } else if (done > 0) {
+        toast.warning(`Imported ${done}/${inserts.length} rows. ${failures.length} batch(es) failed.`);
+        console.error('Plan import failures:', failures);
+      } else {
+        throw new Error(failures[0] || 'All batches failed');
+      }
       onImported();
       onClose();
       setRows([]);
@@ -199,6 +241,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
       toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
+      setProgress(null);
     }
   };
 
@@ -303,7 +346,11 @@ export function PlanImport({ open, onClose, onImported }: Props) {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { onClose(); setRows([]); }}>Cancel</Button>
               <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving}>
-                {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
+                {saving ? (
+                  <><Loader2 size={16} className="animate-spin mr-2" />
+                    {progress ? `Batch ${progress.batch}/${progress.batches} — ${progress.done}/${progress.total}` : 'Importing...'}
+                  </>
+                ) : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>
           </div>
