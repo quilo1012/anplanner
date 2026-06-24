@@ -12,7 +12,7 @@ import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
 import { LeaderPerformanceBoard } from '@/components/charts/LeaderPerformanceBoard';
-import { LeaderQualityBoard } from '@/components/charts/LeaderQualityBoard';
+
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
 import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
@@ -25,9 +25,7 @@ import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import appliedLogo from '@/assets/applied-logo-mono.jpg';
 import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
-import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -61,33 +59,6 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlDate, urlShift]);
 
-  // Watch today's quality penalty totals per leader; warn once/day when threshold is reached.
-  useEffect(() => {
-    if (isOperator) return;
-    let cancelled = false;
-    const check = async () => {
-      const { data, error } = await supabase
-        .from('quality_actions')
-        .select('line_leader, points')
-        .eq('date', today);
-      if (cancelled || error || !data) return;
-      const totals: Record<string, number> = {};
-      for (const r of data) {
-        const name = (r.line_leader || '').trim();
-        if (!name) continue;
-        totals[name] = (totals[name] || 0) + (Number(r.points) || 0);
-      }
-      for (const [name, pts] of Object.entries(totals)) {
-        if (pts < HIGH_PENALTY_THRESHOLD) continue;
-        const key = `qualityToastShown:${today}:${name}`;
-        if (sessionStorage.getItem(key)) continue;
-        sessionStorage.setItem(key, '1');
-        toast.warning(`${name} reached ${pts} quality penalty points today — threshold is ${HIGH_PENALTY_THRESHOLD} pts, see the Leader Quality Board for details`);
-      }
-    };
-    check();
-    return () => { cancelled = true; };
-  }, [sessions, isOperator]);
 
   const setPreset = (preset: string) => {
     const now = new Date();
@@ -445,9 +416,6 @@ export function Dashboard() {
               <div className="card p-3">
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Trophy size={16} />Leader Board</h3>
                 <LeaderPerformanceBoard sessions={filteredSessions} currentDate={startDate} />
-              </div>
-              <div className="card p-3">
-                <LeaderQualityBoard currentDate={startDate} />
               </div>
             </div>
 
