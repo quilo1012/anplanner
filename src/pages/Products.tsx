@@ -92,9 +92,24 @@ export function Products() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await supabase.from('products').delete().eq('product_code', deleteTarget);
+    // Guard: prevent deleting SKUs referenced in historical/plan data
+    const [items, targets, plans] = await Promise.all([
+      supabase.from('production_items').select('id', { count: 'exact', head: true }).eq('sku', deleteTarget),
+      supabase.from('production_targets').select('id', { count: 'exact', head: true }).eq('product_code', deleteTarget),
+      supabase.from('production_plans').select('id', { count: 'exact', head: true }).eq('product_code', deleteTarget),
+    ]);
+    const refs = (items.count || 0) + (targets.count || 0) + (plans.count || 0);
+    if (refs > 0) {
+      toast.error(
+        `Cannot delete ${deleteTarget}: still referenced by ${refs} record(s) (sessions, targets or plans). Remove those first.`,
+        { duration: 6000 }
+      );
+      setDeleteTarget(null);
+      return;
+    }
+    const { error } = await supabase.from('products').delete().eq('product_code', deleteTarget).select('product_code');
     if (error) {
-      toast.error('Failed to delete product');
+      toast.error(`Failed to delete product: ${error.message}`);
     } else {
       toast.success('Product deleted');
       setProducts(prev => prev.filter(p => p.product_code !== deleteTarget));
