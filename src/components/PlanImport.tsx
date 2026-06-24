@@ -18,7 +18,6 @@ interface PlanRow {
   start_time: string;
   finish_time: string;
   shift_type: string;
-  target_upm: number;
   errors: string[];
 }
 
@@ -65,7 +64,6 @@ export function PlanImport({ open, onClose, onImported }: Props) {
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number; batch: number; batches: number } | null>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -96,7 +94,6 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         const startTime = parseTime(vals[7]);
         const finishTime = parseTime(vals[8]);
         const shift = String(vals[9] || '').trim().toUpperCase();
-        const targetUpm = Number(vals[10]) || 0; // Target (units/min) — optional, falls back to calculated
 
         if (!dateVal && !productCode && !qty) return;
 
@@ -129,7 +126,6 @@ export function PlanImport({ open, onClose, onImported }: Props) {
           start_time: startTime,
           finish_time: finishTime,
           shift_type: shift || 'DAY',
-          target_upm: targetUpm,
           errors,
         });
       });
@@ -149,8 +145,6 @@ export function PlanImport({ open, onClose, onImported }: Props) {
   const handleConfirm = async () => {
     if (validRows.length === 0) { toast.error('No valid rows to import'); return; }
     setSaving(true);
-    const BATCH_SIZE = 50;
-    const TIMEOUT_MS = 30000;
     try {
       const inserts = validRows.map(r => {
         const total_kg = r.qty * r.weight_kg;
@@ -160,7 +154,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         if (startH !== null && endH !== null) {
           production_hours = endH >= startH ? endH - startH : (24 - startH) + endH;
         }
-        const units_per_min_expected = r.target_upm > 0 ? r.target_upm : (production_hours > 0 ? r.qty / (production_hours * 60) : 0);
+        const units_per_min_expected = production_hours > 0 ? r.qty / (production_hours * 60) : 0;
 
         return {
           date: r.date,
@@ -191,118 +185,17 @@ export function PlanImport({ open, onClose, onImported }: Props) {
         };
       });
 
-      const batches: typeof inserts[] = [];
-      for (let i = 0; i < inserts.length; i += BATCH_SIZE) {
-        batches.push(inserts.slice(i, i + BATCH_SIZE));
-      }
+      const { error } = await supabase.from('production_plans').insert(inserts);
+      if (error) throw error;
 
-      let done = 0;
-      const failures: string[] = [];
-      setProgress({ done: 0, total: inserts.length, batch: 0, batches: batches.length });
-
-      type ErrKind = 'timeout' | 'network' | 'supabase' | 'unknown';
-      const classify = (err: unknown): { kind: ErrKind; message: string; hint: string } => {
-        const e = (err ?? {}) as { name?: string; message?: string; code?: string; details?: string };
-        const raw = (e.message || String(err) || '').toLowerCase();
-        if (e.name === 'AbortError' || raw.includes('abort') || raw.includes('timeout')) {
-          return {
-            kind: 'timeout',
-            message: `Request timed out after ${TIMEOUT_MS / 1000}s`,
-            hint: 'The server took too long to respond. Try again — if it keeps failing, split the file in smaller parts.',
-          };
-        }
-        if (raw.includes('failed to fetch') || raw.includes('network') || raw.includes('load failed')) {
-          return {
-            kind: 'network',
-            message: 'Network error — could not reach the server',
-            hint: 'Check your internet connection and try again.',
-          };
-        }
-        if (e.code || e.details) {
-          return {
-            kind: 'supabase',
-            message: `Database error: ${e.message || 'unknown'}${e.code ? ` (code ${e.code})` : ''}`,
-            hint: e.details || 'Check the data in your file. If the issue persists, contact support.',
-          };
-        }
-        return {
-          kind: 'unknown',
-          message: e.message || 'Unexpected error',
-          hint: 'Please try again. If the problem persists, contact support.',
-        };
-      };
-
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        setProgress({ done, total: inserts.length, batch: i + 1, batches: batches.length });
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-        try {
-          const { error } = await supabase
-            .from('production_plans')
-            .insert(batch)
-            .abortSignal(controller.signal)
-            .select('id');
-          if (error) {
-            const c = classify(error);
-            failures.push(`Batch ${i + 1}/${batches.length} [${c.kind}]: ${c.message}`);
-          } else {
-            done += batch.length;
-          }
-        } catch (err: unknown) {
-          const c = classify(err);
-          failures.push(`Batch ${i + 1}/${batches.length} [${c.kind}]: ${c.message}`);
-        } finally {
-          clearTimeout(timeoutId);
-        }
-        setProgress({ done, total: inserts.length, batch: i + 1, batches: batches.length });
-      }
-
-      if (failures.length === 0) {
-        toast.success(`Imported ${done} plan row(s) successfully!`);
-      } else if (done > 0) {
-        toast.warning(`Imported ${done}/${inserts.length} rows. ${failures.length} batch(es) failed.`, {
-          description: failures[0],
-          duration: 10000,
-        });
-        console.error('Plan import failures:', failures);
-      } else {
-        const c = classify(new Error(failures[0] || 'All batches failed'));
-        toast.error(c.message, { description: c.hint, duration: 10000 });
-        console.error('Plan import failures:', failures);
-        return;
-      }
+      toast.success(`Imported ${validRows.length} plan row(s) successfully!`);
       onImported();
       onClose();
       setRows([]);
     } catch (err) {
-      const e = (err ?? {}) as { name?: string; message?: string; code?: string; details?: string };
-      const raw = (e.message || '').toLowerCase();
-      if (e.name === 'AbortError' || raw.includes('abort') || raw.includes('timeout')) {
-        toast.error('Request timed out', {
-          description: 'The server took too long. Try again or split the file in smaller parts.',
-          duration: 10000,
-        });
-      } else if (raw.includes('failed to fetch') || raw.includes('network')) {
-        toast.error('Network error', {
-          description: 'Check your internet connection and try again.',
-          duration: 10000,
-        });
-      } else if (e.code || e.details) {
-        toast.error(`Database error${e.code ? ` (${e.code})` : ''}`, {
-          description: `${e.message || ''} ${e.details || ''}`.trim() || 'Check the data and try again.',
-          duration: 10000,
-        });
-      } else {
-        toast.error('Import failed', {
-          description: `${e.message || 'Unexpected error'}. Try again or contact support if it persists.`,
-          duration: 10000,
-        });
-      }
+      toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
-      setProgress(null);
     }
   };
 
@@ -407,11 +300,7 @@ export function PlanImport({ open, onClose, onImported }: Props) {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { onClose(); setRows([]); }}>Cancel</Button>
               <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving}>
-                {saving ? (
-                  <><Loader2 size={16} className="animate-spin mr-2" />
-                    {progress ? `Batch ${progress.batch}/${progress.batches} — ${progress.done}/${progress.total}` : 'Importing...'}
-                  </>
-                ) : `Import ${validRows.length} Row(s)`}
+                {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>
           </div>

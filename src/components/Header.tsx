@@ -15,8 +15,8 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   return (
     <header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
-      <div className="h-12 sm:h-14 pl-12 pr-3 sm:pr-4 flex items-center justify-between border-l-4 border-primary">
-        {/* Left: Back + Title (logo lives in the sidebar to avoid duplication) */}
+      <div className="h-12 sm:h-14 px-3 sm:px-4 flex items-center justify-between border-l-4 border-primary">
+        {/* Left: Back + Logo & Title */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {canGoBack && (
             <button
@@ -27,6 +27,11 @@ export function Header({ title, subtitle }: HeaderProps) {
               <ArrowLeft size={18} className="text-muted-foreground" />
             </button>
           )}
+          <img
+            alt="Applied Nutrition"
+            className="h-7 sm:h-8 w-auto rounded bg-white p-0.5 shrink-0"
+            src="/lovable-uploads/30acb027-2373-44c6-beeb-e940da9f52c7.jpg"
+          />
           <div className="min-w-0">
             <h1 className="text-sm sm:text-base font-bold text-foreground uppercase tracking-wide truncate">
               {title}
@@ -36,7 +41,6 @@ export function Header({ title, subtitle }: HeaderProps) {
             )}
           </div>
         </div>
-
 
         {/* Right: Status + Clock + Theme */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">

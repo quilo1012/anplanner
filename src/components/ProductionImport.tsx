@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeLineName } from '@/utils/normalizeLineName';
 import { normalizeSku, isValidSku } from '@/utils/normalizeSku';
-import { assertMutationSucceeded, formatSupabaseError, runSupabaseQuery } from '@/utils/supabaseSafeQuery';
 
 interface ImportRow {
   rowNum: number;
@@ -97,7 +96,7 @@ export function ProductionImport({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [planMap, setPlanMap] = useState<Map<string, number>>(new Map());
-  const [lineLeaders, setLineLeaders] = useState<Record<string, string>>({});
+  const [leaderName, setLeaderName] = useState('');
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -203,27 +202,12 @@ export function ProductionImport({ open, onClose }: Props) {
   // Only rows with no errors AND no warnings (i.e. SKU exists in catalog) are eligible to save
   const validRows = rows.filter(r => r.errors.length === 0 && r.warnings.length === 0);
   const matchedRows = validRows.filter(r => r.plannedQty !== undefined);
-  const distinctLines = [...new Set(validRows.map(r => r.work_centre))].sort();
-  const missingLeaderLines = distinctLines.filter(l => !lineLeaders[l]?.trim());
-  const allLeadersFilled = distinctLines.length > 0 && missingLeaderLines.length === 0;
 
   const handleConfirm = async () => {
     if (validRows.length === 0) { toast.error('No valid rows to import'); return; }
-    if (!allLeadersFilled) { toast.error(`Leader name required for: ${missingLeaderLines.join(', ')}`); return; }
     setSaving(true);
 
-    // Safety net: guarantee the button never stays in "Importing..." state forever.
-    // If something hangs (network, RLS, etc.) for >30s, force-release the loading state
-    // and surface a clear error toast.
-    const safetyTimer = setTimeout(() => {
-      console.error('[ProductionImport] Safety timeout fired — import took >30s');
-      setSaving(false);
-      toast.error('Import timed out after 30s. Check the console/network tab for details.');
-    }, 30_000);
-
     try {
-      console.log('[ProductionImport] Starting import of', validRows.length, 'row(s)');
-
       // Group by (work_centre, date, shift)
       const groups = new Map<string, ImportRow[]>();
       for (const row of validRows) {
@@ -231,25 +215,16 @@ export function ProductionImport({ open, onClose }: Props) {
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(row);
       }
-      console.log('[ProductionImport] Grouped into', groups.size, 'session(s)');
 
       // Fetch existing sessions for all matching groups
       const dates = [...new Set(validRows.map(r => r.date))];
       const lines = [...new Set(validRows.map(r => r.work_centre))];
-
-      const { data: existingSessions, error: sessionsFetchErr } = await runSupabaseQuery(
-        supabase
-          .from('production_sessions')
-          .select('id, production_line, date, shift_type')
-          .in('date', dates)
-          .in('production_line', lines),
-        'Load existing production sessions'
-      );
-
-      if (sessionsFetchErr) {
-        console.error('[ProductionImport] Failed to fetch existing sessions:', sessionsFetchErr);
-          throw new Error(`Failed to load existing sessions: ${formatSupabaseError(sessionsFetchErr)}`);
-      }
+      
+      const { data: existingSessions } = await supabase
+        .from('production_sessions')
+        .select('id, production_line, date, shift_type')
+        .in('date', dates)
+        .in('production_line', lines);
 
       // Build lookup: "line|date|shift" → session id
       const sessionLookup = new Map<string, string>();
@@ -261,21 +236,13 @@ export function ProductionImport({ open, onClose }: Props) {
       // Fetch existing items for those sessions
       const existingSessionIds = [...new Set([...(existingSessions || []).map(s => s.id)])];
       const existingItemsMap = new Map<string, { id: string; sku: string; quantity_actual: number }[]>();
-
+      
       if (existingSessionIds.length > 0) {
-        const { data: existingItems, error: itemsFetchErr } = await runSupabaseQuery(
-          supabase
-            .from('production_items')
-            .select('id, session_id, sku, quantity_actual')
-            .in('session_id', existingSessionIds),
-          'Load existing production items'
-        );
-
-        if (itemsFetchErr) {
-          console.error('[ProductionImport] Failed to fetch existing items:', itemsFetchErr);
-          throw new Error(`Failed to load existing items: ${formatSupabaseError(itemsFetchErr)}`);
-        }
-
+        const { data: existingItems } = await supabase
+          .from('production_items')
+          .select('id, session_id, sku, quantity_actual')
+          .in('session_id', existingSessionIds);
+        
         existingItems?.forEach(item => {
           const list = existingItemsMap.get(item.session_id) || [];
           list.push(item);
@@ -286,7 +253,8 @@ export function ProductionImport({ open, onClose }: Props) {
       const entries = [...groups.entries()];
       let updatedCount = 0;
       let createdCount = 0;
-      const failures: { key: string; reason: string }[] = [];
+
+      const failures: string[] = [];
 
       for (const [key, groupRows] of entries) {
         try {
@@ -313,50 +281,41 @@ export function ProductionImport({ open, onClose }: Props) {
           }
 
           if (existingSessionId) {
-            // SYNC MODE: update quantity_actual on existing items, insert new SKUs.
-            // NEVER touch quantity_target on existing items, and NEVER recompute the
-            // session's planned_quantity — those are owned by the Planner.
+            // SYNC MODE: update quantity_actual on existing items, insert new SKUs
             const existingItems = existingItemsMap.get(existingSessionId) || [];
             const existingSkuMap = new Map(existingItems.map(i => [i.sku, i]));
 
             for (const [sku, agg] of skuAgg) {
               const existingItem = existingSkuMap.get(sku);
               if (existingItem) {
-                const updateResult = await runSupabaseQuery(
-                  supabase
-                    .from('production_items')
-                    .update({ quantity_actual: agg.actualQty })
-                    .eq('id', existingItem.id)
-                    .select('id'),
-                  `Update imported item ${sku}`
-                );
-                assertMutationSucceeded(updateResult, `Update item ${sku}`);
+                const { error } = await supabase
+                  .from('production_items')
+                  .update({ quantity_actual: agg.actualQty })
+                  .eq('id', existingItem.id);
+                if (error) console.error('Failed to update item:', sku, error);
               } else {
-                // New SKU not present in the existing shift.
-                // target = matching plan qty if any, else 0 (do NOT default to imported qty).
-                const planKey = `${first.work_centre}|${first.date}|${sku}|${first.shift_type}`;
-                const plannedQty = planMap.get(planKey);
-                const insertResult = await runSupabaseQuery(
-                  supabase
-                    .from('production_items')
-                    .insert({
-                      session_id: existingSessionId,
-                      sku,
-                      product_name: agg.productName,
-                      quantity_target: plannedQty ?? 0,
-                      quantity_actual: agg.actualQty,
-                    })
-                    .select('id'),
-                  `Insert imported item ${sku}`
-                );
-                assertMutationSucceeded(insertResult, `Insert item ${sku}`);
+                const { error: insertErr } = await supabase.from('production_items').insert({
+                  session_id: existingSessionId,
+                  sku,
+                  product_name: agg.productName,
+                  quantity_target: agg.targetQty,
+                  quantity_actual: agg.actualQty,
+                });
+                if (insertErr) console.error('Failed to insert new item:', sku, insertErr);
               }
             }
 
-            // Do NOT update planned_quantity — leave the Planner-defined value untouched.
+            // Update planned_quantity on the session
+            const allItems = await supabase.from('production_items').select('quantity_target').eq('session_id', existingSessionId);
+            const newTotalPlanned = allItems.data?.reduce((s, i) => s + (i.quantity_target || 0), 0) || 0;
+            
+            await supabase
+              .from('production_sessions')
+              .update({ planned_quantity: newTotalPlanned, line_leader: leaderName.trim(), updated_at: new Date().toISOString() })
+              .eq('id', existingSessionId);
+
             updatedCount++;
           } else {
-
             // CREATE MODE: new session via saveSession
             const items = [...skuAgg.entries()].map(([sku, agg]) => ({
               sku,
@@ -367,11 +326,11 @@ export function ProductionImport({ open, onClose }: Props) {
 
             const totalPlanned = items.reduce((s, i) => s + i.quantityTarget, 0);
 
-            const result = await saveSession({
+            await saveSession({
               date: first.date,
               shift: first.shift_type as 'DAY' | 'NIGHT',
               productionLine: first.work_centre,
-              lineLeader: (lineLeaders[first.work_centre] || '').trim(),
+              lineLeader: leaderName.trim(),
               plannedQuantity: totalPlanned,
               items,
               comments: '',
@@ -379,23 +338,15 @@ export function ProductionImport({ open, onClose }: Props) {
               staffActual: 0,
             }, { skipRefresh: true });
 
-            if (!result.success) {
-              throw new Error(result.error || 'saveSession returned failure');
-            }
-
             createdCount++;
           }
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error('[ProductionImport] Group failed:', key, msg);
-          failures.push({ key, reason: msg });
+          failures.push(key);
         }
       }
 
-      console.log('[ProductionImport] Done. created=', createdCount, 'updated=', updatedCount, 'failures=', failures.length);
-
       if (failures.length > 0) {
-        toast.error(`Failed to import ${failures.length} session(s). First error: ${failures[0].reason}`);
+        toast.error(`Failed to import ${failures.length} session(s)`);
       } else {
         const parts: string[] = [];
         if (createdCount > 0) parts.push(`${createdCount} sessão(ões) criada(s)`);
@@ -403,25 +354,18 @@ export function ProductionImport({ open, onClose }: Props) {
         toast.success(`Registos de produção guardados com sucesso! ${parts.join(', ')} com ${validRows.length} produto(s).`);
       }
 
-      try {
-        await runSupabaseQuery(refreshSessions(), 'Refresh production history after import');
-      } catch (refreshErr) {
-        console.error('[ProductionImport] refreshSessions failed (non-fatal):', refreshErr);
-      }
+      await refreshSessions();
       onClose();
       setRows([]);
       setPlanMap(new Map());
-      setLineLeaders({});
-      if (failures.length === 0) navigate('/history');
+      setLeaderName('');
+      navigate('/history');
     } catch (err) {
-      console.error('[ProductionImport] Import failed:', err);
       toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      clearTimeout(safetyTimer);
       setSaving(false);
     }
   };
-
 
   if (!open) return null;
 
@@ -436,7 +380,7 @@ export function ProductionImport({ open, onClose }: Props) {
       <div className="bg-background rounded-xl shadow-2xl w-[95vw] max-w-5xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Import Production Data</h2>
-          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); }} className="p-2 hover:bg-muted rounded-lg">
+          <button onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }} className="p-2 hover:bg-muted rounded-lg">
             <X size={20} />
           </button>
         </div>
@@ -470,7 +414,7 @@ export function ProductionImport({ open, onClose }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); navigate('/products'); }}
+                    onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); navigate('/products'); }}
                     className="shrink-0"
                   >
                     Go to Products
@@ -506,25 +450,18 @@ export function ProductionImport({ open, onClose }: Props) {
                 </div>
               </div>
 
-              {distinctLines.length > 0 && (
-                <div className="border border-border rounded-lg p-3 space-y-2">
-                  <div className="text-sm font-medium text-foreground">Leader name per production line</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {distinctLines.map(line => (
-                      <div key={line}>
-                        <label className="text-xs font-medium text-muted-foreground mb-1 block">{line}</label>
-                        <input
-                          type="text"
-                          value={lineLeaders[line] || ''}
-                          onChange={e => setLineLeaders(prev => ({ ...prev, [line]: e.target.value }))}
-                          placeholder="Leader name..."
-                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        />
-                      </div>
-                    ))}
-                  </div>
+              <div className="flex items-end gap-3 mb-2">
+                <div className="flex-1 max-w-xs">
+                  <label className="text-sm font-medium text-foreground mb-1 block">Nome do Líder</label>
+                  <input
+                    type="text"
+                    value={leaderName}
+                    onChange={e => setLeaderName(e.target.value)}
+                    placeholder="Introduza o nome do líder..."
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
                 </div>
-              )}
+              </div>
 
               <div className="border border-border rounded-lg overflow-auto max-h-[55vh]">
                 <Table>
@@ -587,15 +524,15 @@ export function ProductionImport({ open, onClose }: Props) {
 
         {rows.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
-            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLineLeaders({}); }}>Choose Different File</Button>
+            <Button variant="outline" onClick={() => { setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Choose Different File</Button>
             <div className="flex items-center gap-3">
-              {missingLeaderLines.length > 0 && validRows.length > 0 && (
+              {!leaderName.trim() && validRows.length > 0 && (
                 <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                  <AlertCircle size={14} /> Please enter a leader name for: {missingLeaderLines.join(', ')}
+                  <AlertCircle size={14} /> Please enter the leader name to continue
                 </span>
               )}
-              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLineLeaders({}); }}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !allLeadersFilled}>
+              <Button variant="outline" onClick={() => { onClose(); setRows([]); setPlanMap(new Map()); setLeaderName(''); }}>Cancel</Button>
+              <Button onClick={handleConfirm} disabled={validRows.length === 0 || saving || !leaderName.trim()}>
                 {saving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : `Import ${validRows.length} Row(s)`}
               </Button>
             </div>

@@ -5,9 +5,7 @@ import { Plus, Edit, Trash2, Save, X, Users, Shield, Loader2, KeyRound } from 'l
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { RagThresholdsCard } from '@/components/admin/RagThresholdsCard';
-import { RolePermissionsCard } from '@/components/admin/RolePermissionsCard';
-
+import { QualityActionTypesAdmin } from '@/components/admin/QualityActionTypesAdmin';
 
 export function Admin() {
   const { users, user: currentUser, addUser, updateUser, deleteUser } = useAuth();
@@ -236,7 +234,6 @@ export function Admin() {
                     >
                       <option value="operator">Leader</option>
                       <option value="supervisor">Supervisor</option>
-                      <option value="engineer">Engineer (Maintenance)</option>
                       <option value="admin">Manager</option>
                     </select>
                   </div>
@@ -375,10 +372,44 @@ export function Admin() {
             </div>
           </div>
 
-          <RolePermissionsCard />
+          {/* Role Permissions Info */}
+          <div className="card p-4 sm:p-6 mt-4 sm:mt-6">
+            <h3 className="font-semibold text-[hsl(var(--foreground))] mb-4 flex items-center gap-2">
+              <Shield size={20} className="text-[hsl(var(--primary))]" />
+              Role Permissions
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 text-sm sm:text-base">Leader</h4>
+                <ul className="text-xs sm:text-sm text-blue-700 dark:text-blue-400 space-y-1">
+                  <li>• Dashboard access only</li>
+                  <li>• Can only view data/shifts linked to their own name</li>
+                </ul>
+              </div>
+              <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                <h4 className="font-medium text-purple-800 dark:text-purple-300 mb-2 text-sm sm:text-base">Supervisor</h4>
+                <ul className="text-xs sm:text-sm text-purple-700 dark:text-purple-400 space-y-1">
+                  <li>• Full system access</li>
+                  <li>• Create, review, and complete shifts</li>
+                  <li>• Add production results</li>
+                  <li>• Upload monitoring photos</li>
+                  <li>• Edit and delete shifts</li>
+                  <li>• View history and dashboards</li>
+                </ul>
+              </div>
+              <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                <h4 className="font-medium text-red-800 dark:text-red-300 mb-2 text-sm sm:text-base">Manager</h4>
+                <ul className="text-xs sm:text-sm text-red-700 dark:text-red-400 space-y-1">
+                  <li>• All Supervisor permissions</li>
+                  <li>• Manage users</li>
+                  <li>• Assign roles</li>
+                  <li>• System settings</li>
+                </ul>
+              </div>
+            </div>
+          </div>
 
-
-          {isAdmin && <RagThresholdsCard />}
+          {isAdmin && <QualityActionTypesAdmin />}
         </div>
       </div>
       <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>

@@ -16,6 +16,6 @@ export function normalizeSku(raw: unknown): string {
 export function isValidSku(sku: string): boolean {
   if (!sku) return false;
   if (sku.length > 64) return false;
-  // Allow letters, digits, dashes, underscores, dots, slashes, spaces, plus
-  return /^[A-Z0-9][A-Z0-9 _\-./+]*$/i.test(sku);
+  // Allow letters, digits, dashes, underscores, dots, slashes, spaces
+  return /^[A-Z0-9][A-Z0-9 _\-./]*$/i.test(sku);
 }

@@ -7,19 +7,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProductionSession, ShiftType, SHIFT_TYPES } from '@/types/production';
 import { exportSessionsToCsv, formatDate } from '@/utils/exportCsv';
 import { PerformanceTrendChart } from '@/components/PerformanceTrendChart';
+import { DowntimeTrendChart } from '@/components/charts/DowntimeTrendChart';
 import { PerformanceBySKU } from '@/components/charts/PerformanceBySKU';
 import { PerformanceByLine } from '@/components/charts/PerformanceByLine';
 import { PerformanceByLeader } from '@/components/charts/PerformanceByLeader';
 import { LeaderPerformanceBoard } from '@/components/charts/LeaderPerformanceBoard';
 import { LeaderQualityBoard } from '@/components/charts/LeaderQualityBoard';
-import { LineRagBoard } from '@/components/charts/LineRagBoard';
 import { DailyProductionSummary } from '@/components/charts/DailyProductionSummary';
 import { DailySummaryTable } from '@/components/charts/DailySummaryTable';
+import { DowntimeByCategory } from '@/components/charts/DowntimeByCategory';
+import { DowntimeByReason } from '@/components/charts/DowntimeByReason';
 import { LineStatusCard } from '@/components/dashboard/LineStatusCard';
-import { OperatorPlanCard } from '@/components/dashboard/OperatorPlanCard';
 import { OEEPanel } from '@/components/dashboard/OEEPanel';
-import { EditShiftDialog } from '@/components/history/EditShiftDialog';
-import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy } from 'lucide-react';
+import { DOWNTIME_CATEGORIES, DOWNTIME_REASONS_BY_CATEGORY } from '@/types/downtime';
+import { AlertTriangle, Clock, Users, Factory, Package, BarChart3, Printer, Calendar, Filter, X, Table, TrendingUp, Activity, Trophy, List } from 'lucide-react';
 import { formatDuration } from '@/utils/formatDuration';
 import { naturalLineSort } from '@/utils/naturalLineSort';
 import appliedLogo from '@/assets/applied-logo-mono.jpg';
@@ -27,120 +28,25 @@ import { NET_SHIFT_MINUTES } from '@/utils/shiftConstants';
 import { HIGH_PENALTY_THRESHOLD } from '@/config/quality';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { aggregateLeaderQuality } from '@/utils/aggregateLeaderQuality';
-import { QuickQualityActionDialog } from '@/components/quality/QuickQualityActionDialog';
-import { Link } from 'react-router-dom';
-import { useOpenWorkOrdersDowntime } from '@/hooks/useOpenWorkOrdersDowntime';
-import { Wrench, ClipboardList } from 'lucide-react';
-import { normalizeName, sameName } from '@/utils/normalizeName';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useMyWorkOrders } from '@/hooks/useMyWorkOrders';
 
 const today = format(new Date(), 'yyyy-MM-dd');
-const LS_KEY = 'dashboard.filters.v1';
-type PersistedFilters = {
-  startDate: string;
-  endDate: string;
-  shift: ShiftType;
-  line: string;
-  leader: string;
-};
-const DEFAULT_FILTERS: PersistedFilters = {
-  startDate: today, endDate: today, shift: 'DAY', line: '', leader: '',
-};
 
 export function Dashboard() {
   const { sessions, isLoading } = useShifts();
   const { user } = useAuth();
   const isOperator = user?.role === 'operator';
   const canViewCharts = !isOperator;
-  const { workOrders: myWorkOrders } = useMyWorkOrders();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlDate = searchParams.get('date');
   const urlShift = searchParams.get('shift') as ShiftType | null;
-
-  const [persisted, setPersisted] = useLocalStorage<PersistedFilters>(LS_KEY, DEFAULT_FILTERS);
-  const [selectedShift, setSelectedShift] = useState<ShiftType>(
-    urlShift === 'NIGHT' || urlShift === 'DAY' ? urlShift : persisted.shift,
-  );
-  const [startDate, setStartDate] = useState<string>(urlDate || persisted.startDate);
-  const [endDate, setEndDate] = useState<string>(urlDate || persisted.endDate);
-  const [selectedLine, setSelectedLine] = useState<string>(persisted.line);
-  const [selectedLeader, setSelectedLeader] = useState<string>(persisted.leader);
-  // Persist filter changes so navigating away and back keeps the selection.
-  useEffect(() => {
-    setPersisted({ startDate, endDate, shift: selectedShift, line: selectedLine, leader: selectedLeader });
-  }, [startDate, endDate, selectedShift, selectedLine, selectedLeader, setPersisted]);
-
-  // On mount: if today has no production sessions, jump filter to the most
-  // recent date that does — so the Dashboard opens on real data, not empty.
-  useEffect(() => {
-    if (urlDate) return; // respect explicit URL date
-    if (startDate !== today || endDate !== today) return; // respect persisted/custom range
-    let cancelled = false;
-    (async () => {
-      const { data: todayRows } = await supabase
-        .from('production_sessions')
-        .select('id')
-        .eq('date', today)
-        .limit(1);
-      if (cancelled || (todayRows && todayRows.length > 0)) return;
-      const { data: lastRows } = await supabase
-        .from('production_sessions')
-        .select('date')
-        .order('date', { ascending: false })
-        .limit(1);
-      const lastDate = lastRows?.[0]?.date;
-      if (cancelled || !lastDate || lastDate === today) return;
-      setStartDate(lastDate);
-      setEndDate(lastDate);
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-
+  const [selectedShift, setSelectedShift] = useState<ShiftType>(urlShift === 'NIGHT' || urlShift === 'DAY' ? urlShift : 'DAY');
+  const [startDate, setStartDate] = useState<string>(urlDate || today);
+  const [endDate, setEndDate] = useState<string>(urlDate || today);
+  const [selectedLine, setSelectedLine] = useState<string>('');
+  const [selectedLeader, setSelectedLeader] = useState<string>('');
   const [showCharts, setShowCharts] = useState(true);
-  const [editSession, setEditSession] = useState<ProductionSession | null>(null);
-  const canEditSessions = user?.role === 'supervisor' || user?.role === 'admin';
-  const [leaderQuality, setLeaderQuality] = useState<Record<string, { occurrences: number; points: number }>>({});
-  const [leaderQualityLoading, setLeaderQualityLoading] = useState(false);
-  const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
-  const [qualityRefreshTick, setQualityRefreshTick] = useState(0);
-  const { rows: allOpenWoRows } = useOpenWorkOrdersDowntime();
-  // Scope the "Open Maintenance Tickets" widget strictly to tickets the
-  // logged-in user opened in their own name (matched by requester_name).
-  const openWoRows = useMemo(() => {
-    const me = normalizeName(user?.name);
-    if (!me) return [];
-    return allOpenWoRows.filter(r => sameName(r.wo.requester_name, user?.name));
-  }, [allOpenWoRows, user?.name]);
-  const showOpenTickets = openWoRows.length > 0;
-
-  // Per-leader quality totals across the selected period+shift (all lines).
-  useEffect(() => {
-    let cancelled = false;
-    setLeaderQualityLoading(true);
-    (async () => {
-      const { data, error } = await supabase
-        .from('quality_actions')
-        .select('line_leader, points, shift_type, date')
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .eq('shift_type', selectedShift);
-      if (cancelled) return;
-      if (error) {
-        toast.error(`Failed to load leader quality totals: ${error.message}`);
-        setLeaderQuality({});
-        setLeaderQualityLoading(false);
-        return;
-      }
-      setLeaderQuality(aggregateLeaderQuality(data ?? []));
-      setLeaderQualityLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [startDate, endDate, selectedShift, sessions, qualityRefreshTick]);
-
+  const [downtimeCategory, setDowntimeCategory] = useState<string>('');
+  const [downtimeReason, setDowntimeReason] = useState<string>('');
 
   // Apply URL params on mount / when they change (e.g. after iTouching import redirect)
   useEffect(() => {
@@ -219,6 +125,26 @@ export function Dashboard() {
     });
   }, [sessions, startDate, endDate, selectedShift, selectedLine, selectedLeader, isOperator, user?.name]);
 
+  // Available downtime reasons based on selected category
+  const availableReasons = useMemo(() => {
+    if (!downtimeCategory) return [];
+    return DOWNTIME_REASONS_BY_CATEGORY[downtimeCategory] || [];
+  }, [downtimeCategory]);
+
+  // Downtime history entries
+  const downtimeHistory = useMemo(() => {
+    const entries: { date: string; shift: ShiftType; line: string; category: string; reason: string; duration: number; comment?: string }[] = [];
+    filteredSessions.forEach(s => {
+      if (s.structuredDowntimes) {
+        s.structuredDowntimes.forEach(dt => {
+          if (downtimeCategory && dt.category !== downtimeCategory) return;
+          if (downtimeReason && dt.reason !== downtimeReason) return;
+          entries.push({ date: s.date, shift: s.shift, line: s.productionLine, category: dt.category, reason: dt.reason, duration: dt.duration, comment: dt.comment });
+        });
+      }
+    });
+    return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [filteredSessions, downtimeCategory, downtimeReason]);
 
   const stats = useMemo(() => {
     const totalSessions = filteredSessions.length;
@@ -248,7 +174,6 @@ export function Dashboard() {
       const firstProduct = session.items[0]?.productName || '-';
       
       return {
-        session,
         line: session.productionLine,
         date: session.date,
         shift: session.shift,
@@ -268,22 +193,6 @@ export function Dashboard() {
       };
     }).sort((a, b) => naturalLineSort(a.line, b.line));
   }, [filteredSessions]);
-
-  const emptyStateHints = useMemo(() => {
-    const visible = sessions.filter(s => {
-      if (isOperator && user?.name && s.lineLeader.trim().toLowerCase() !== user.name.trim().toLowerCase()) return false;
-      if (selectedLine && s.productionLine.trim() !== selectedLine) return false;
-      if (selectedLeader && s.lineLeader.trim() !== selectedLeader) return false;
-      return true;
-    });
-    const forShift = visible.filter(s => s.shift === selectedShift);
-    const mostRecentForSelectedShift = forShift.reduce<string | null>((acc, s) => (!acc || s.date > acc) ? s.date : acc, null);
-    const otherShift: ShiftType = selectedShift === 'DAY' ? 'NIGHT' : 'DAY';
-    const hasOtherShiftInRange = visible.some(s => s.shift === otherShift && s.date >= startDate && s.date <= endDate);
-    return { mostRecentForSelectedShift, otherShift, hasOtherShiftInRange };
-  }, [sessions, selectedShift, selectedLine, selectedLeader, isOperator, user?.name, startDate, endDate]);
-
-
 
   const trendAlerts = useMemo(() => {
     const alerts: { productionLine: string; consecutiveCount: number; avgPerformance: number }[] = [];
@@ -311,12 +220,18 @@ export function Dashboard() {
   }, [filteredSessions]);
 
   const handlePrint = () => window.print();
-  const clearFilters = () => { setSelectedLine(''); setSelectedLeader(''); };
-  const hasOptionalFilters = selectedLine || selectedLeader;
+  const clearFilters = () => { setSelectedLine(''); setSelectedLeader(''); setDowntimeCategory(''); setDowntimeReason(''); };
+  const hasOptionalFilters = selectedLine || selectedLeader || downtimeCategory || downtimeReason;
 
   const dateRangeLabel = startDate === endDate
     ? formatDate(startDate)
     : `${formatDate(startDate)} — ${formatDate(endDate)}`;
+
+  const getCategoryLabel = (val: string) => DOWNTIME_CATEGORIES.find(c => c.value === val)?.label || val;
+  const getReasonLabel = (cat: string, val: string) => {
+    const reasons = DOWNTIME_REASONS_BY_CATEGORY[cat];
+    return reasons?.find(r => r.value === val)?.label || val;
+  };
 
   if (isLoading) {
     return (
@@ -333,116 +248,75 @@ export function Dashboard() {
     <>
       <Header title="Production Dashboard" subtitle={`${selectedShift} Shift — ${dateRangeLabel}`} />
       <div className="flex-1 overflow-auto p-3 sm:p-4 print:p-0">
-        {/* ═══ INTEGRATED CONTROL STRIP ═══ */}
-        <div className="no-print mb-3">
-          <div className="flex flex-wrap items-center gap-1.5 bg-card border border-border p-1.5 rounded-xl ring-1 ring-white/5 shadow-lg">
-            {/* 1. Period: presets + custom range */}
-            <div className="flex items-center gap-1 bg-background/60 px-2 py-1 rounded-lg border border-border/60">
-              <Calendar size={14} className="text-primary shrink-0 mr-1" />
-              {([
-                { key: 'today', label: 'Today' },
-                { key: '7d', label: '7D' },
-                { key: '30d', label: '30D' },
-                { key: 'month', label: 'MTD' },
-              ] as const).map(p => (
-                <button
-                  key={p.key}
-                  onClick={() => setPreset(p.key)}
-                  className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                    activePreset === p.key
-                      ? 'bg-primary text-primary-foreground shadow-inner'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                  }`}
-                >
+        {/* ═══ FILTER BAR ═══ */}
+        <div className="card p-3 mb-3 no-print space-y-2">
+          {/* Row 1: Date range + presets + shift */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-primary shrink-0" />
+              <span className="text-xs font-semibold text-foreground hidden sm:inline">Period:</span>
+            </div>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field text-sm py-1.5 px-2 w-auto" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input-field text-sm py-1.5 px-2 w-auto" />
+            <div className="flex rounded-md border border-border overflow-hidden">
+              {[{ key: 'today', label: 'Today' }, { key: '7d', label: '7D' }, { key: '30d', label: '30D' }, { key: 'month', label: 'Month' }].map(p => (
+                <button key={p.key} onClick={() => setPreset(p.key)}
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors ${activePreset === p.key ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
                   {p.label}
                 </button>
               ))}
-              <div className="w-px h-5 bg-border/60 mx-1" />
-              <input
-                type="date"
-                value={startDate}
-                max={endDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="bg-transparent text-xs font-mono text-foreground outline-none w-[120px] hover:bg-muted/40 rounded px-1 py-0.5 transition-colors"
-              />
-              <span className="text-[10px] text-muted-foreground">→</span>
-              <input
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="bg-transparent text-xs font-mono text-foreground outline-none w-[120px] hover:bg-muted/40 rounded px-1 py-0.5 transition-colors"
-              />
             </div>
-
-
-            {/* 2. Shift toggle */}
-            <div className="flex items-center p-1 bg-background/60 rounded-lg border border-border/60">
+            <div className="flex rounded-lg border border-border overflow-hidden">
               {SHIFT_TYPES.map(shift => (
                 <button key={shift} onClick={() => setSelectedShift(shift)}
-                  className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                    selectedShift === shift
-                      ? 'bg-primary text-primary-foreground shadow-inner'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}>
+                  className={`px-3 py-1.5 font-medium text-sm transition-colors ${selectedShift === shift ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted text-foreground'}`}>
                   {shift}
                 </button>
               ))}
             </div>
-
-            {/* 3. Contextual filters */}
-            {canViewCharts && (
-              <>
-                <div className="flex-1 min-w-[160px] relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-[9px] font-bold uppercase tracking-tighter text-muted-foreground pointer-events-none">Line</span>
-                  <select value={selectedLine} onChange={(e) => setSelectedLine(e.target.value)}
-                    className="w-full appearance-none bg-background/60 border border-border/60 rounded-lg pl-10 pr-7 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 hover:bg-muted/40 cursor-pointer transition-all">
-                    <option value="">All Lines</option>
-                    {uniqueLines.map(line => <option key={line} value={line}>{line}</option>)}
-                  </select>
-                  <span className="absolute inset-y-0 right-2 flex items-center text-muted-foreground pointer-events-none">▾</span>
-                </div>
-
-                <div className="flex-1 min-w-[160px] relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-[9px] font-bold uppercase tracking-tighter text-muted-foreground pointer-events-none">Lead</span>
-                  <select value={selectedLeader} onChange={(e) => setSelectedLeader(e.target.value)}
-                    className="w-full appearance-none bg-background/60 border border-border/60 rounded-lg pl-10 pr-7 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 hover:bg-muted/40 cursor-pointer transition-all">
-                    <option value="">All Leaders</option>
-                    {uniqueLeaders.map(leader => <option key={leader} value={leader}>{leader}</option>)}
-                  </select>
-                  <span className="absolute inset-y-0 right-2 flex items-center text-muted-foreground pointer-events-none">▾</span>
-                </div>
-
-                {hasOptionalFilters && (
-                  <button onClick={clearFilters}
-                    className="p-2 rounded-lg border border-border/60 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                    title="Clear filters">
-                    <X size={14} />
-                  </button>
-                )}
-
-                {/* 4. Actions */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <button onClick={() => setShowCharts(!showCharts)}
-                    className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-border/60 transition-all ${
-                      showCharts
-                        ? 'bg-background/60 text-foreground hover:bg-muted/40'
-                        : 'bg-background/60 text-muted-foreground hover:text-foreground'
-                    }`}>
-                    <BarChart3 size={14} className="text-primary" />
-                    <span className="hidden sm:inline">Charts</span>
-                  </button>
-                  <button onClick={handlePrint}
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground bg-background/60 rounded-lg border border-border/60 hover:bg-muted/40 transition-all">
-                    <Printer size={14} />
-                    <span className="hidden sm:inline">Print</span>
-                  </button>
-                </div>
-              </>
-            )}
           </div>
+          {/* Row 2: Line, Leader, Downtime filters */}
+          {canViewCharts && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground hidden sm:inline">Filters:</span>
+            </div>
+            <select value={selectedLine} onChange={(e) => setSelectedLine(e.target.value)} className="select-field text-sm py-1.5 px-2 w-auto min-w-[100px]">
+              <option value="">All Lines</option>
+              {uniqueLines.map(line => <option key={line} value={line}>{line}</option>)}
+            </select>
+            <select value={selectedLeader} onChange={(e) => setSelectedLeader(e.target.value)} className="select-field text-sm py-1.5 px-2 w-auto min-w-[100px]">
+              <option value="">All Leaders</option>
+              {uniqueLeaders.map(leader => <option key={leader} value={leader}>{leader}</option>)}
+            </select>
+            <select value={downtimeCategory} onChange={(e) => { setDowntimeCategory(e.target.value); setDowntimeReason(''); }} className="select-field text-sm py-1.5 px-2 w-auto min-w-[120px]">
+              <option value="">All DT Categories</option>
+              {DOWNTIME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+            {downtimeCategory && availableReasons.length > 0 && (
+              <select value={downtimeReason} onChange={(e) => setDowntimeReason(e.target.value)} className="select-field text-sm py-1.5 px-2 w-auto min-w-[120px]">
+                <option value="">All Reasons</option>
+                {availableReasons.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            )}
+            {hasOptionalFilters && (
+              <button onClick={clearFilters} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Clear filters">
+                <X size={16} />
+              </button>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={() => setShowCharts(!showCharts)} className={`btn-secondary text-xs px-2 py-1.5 ${showCharts ? '' : 'opacity-60'}`}>
+                <BarChart3 size={14} /><span className="hidden sm:inline">Charts</span>
+              </button>
+              <button onClick={handlePrint} className="btn-secondary text-xs px-2 py-1.5">
+                <Printer size={14} /><span className="hidden sm:inline">Print</span>
+              </button>
+            </div>
+          </div>
+          )}
         </div>
-
 
         {/* Print Header */}
         <div className="hidden print:flex items-center gap-4 mb-4 border-b-2 border-black pb-4">
@@ -472,24 +346,9 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground uppercase mb-1">OEE</p>
             <p className="text-xl font-bold text-foreground tabular-nums">{stats.oee.toFixed(1)}%</p>
           </div>
-          <div className="bg-card border border-border rounded-lg p-3 text-center relative">
-            <p className="text-xs text-muted-foreground uppercase mb-1">Quality Actions</p>
-            <p className="text-xl font-bold text-foreground tabular-nums">
-              {(() => {
-                const key = selectedLeader.trim().toLowerCase();
-                if (key) return leaderQuality[key]?.occurrences || 0;
-                return Object.values(leaderQuality).reduce((sum, q) => sum + (q.occurrences || 0), 0);
-              })()}
-            </p>
-            {canEditSessions && (
-              <button
-                onClick={() => setQualityDialogOpen(true)}
-                className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-primary text-primary-foreground hover:opacity-90"
-                title="Open quality occurrence"
-              >
-                + Open
-              </button>
-            )}
+          <div className="bg-card border border-border rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground uppercase mb-1">Staff</p>
+            <p className="text-xl font-bold text-foreground tabular-nums">{stats.totalActualStaff}<span className="text-sm font-normal text-muted-foreground">/{stats.totalPlannedStaff}</span></p>
           </div>
         </div>
         )}
@@ -504,58 +363,29 @@ export function Dashboard() {
           <div className="flex gap-2">
             <div className="flex-1 space-y-1.5 min-w-0">
               {lineStats.length > 0 ? (
-                lineStats.map((line) => {
-                  const lq = leaderQuality[(line.currentLeader || '').trim().toLowerCase()];
-                  return (
-                    <LineStatusCard
-                      key={`${line.line}-${line.date}-${line.shift}`}
-                      lineName={line.line}
-                      sku={line.currentSku}
-                      product={line.currentProduct}
-                      leader={line.currentLeader}
-                      shift={selectedShift}
-                      performance={line.avgPerformance}
-                      availability={line.availability}
-                      staffActual={line.staffActual}
-                      staffPlanned={line.staffPlanned}
-                      status={line.status as 'running' | 'stopped' | 'warning'}
-                      colorClass={line.colorClass}
-                      realProduction={line.realProduction}
-                      productionTarget={line.productionTarget}
-                      leaderQuality={lq ?? { occurrences: 0, points: 0 }}
-                      leaderQualityLoading={leaderQualityLoading}
-                      onClick={isOperator ? undefined : () => setEditSession(line.session)}
-                    />
-                  );
-                })
+                lineStats.map((line) => (
+                  <LineStatusCard
+                    key={`${line.line}-${line.date}-${line.shift}`}
+                    lineName={line.line}
+                    sku={line.currentSku}
+                    product={line.currentProduct}
+                    leader={line.currentLeader}
+                    shift={selectedShift}
+                    performance={line.avgPerformance}
+                    availability={line.availability}
+                    staffActual={line.staffActual}
+                    staffPlanned={line.staffPlanned}
+                    status={line.status as 'running' | 'stopped' | 'warning'}
+                    colorClass={line.colorClass}
+                    realProduction={line.realProduction}
+                    productionTarget={line.productionTarget}
+                  />
+                ))
               ) : (
                 <div className="card p-6 text-center">
                   <Factory size={40} className="mx-auto text-muted-foreground mb-3" />
                   <h3 className="text-base font-medium text-foreground mb-1">No Lines Active</h3>
-                  <p className="text-muted-foreground text-sm">No production data for {dateRangeLabel} — {selectedShift} shift</p>
-                  {(emptyStateHints.mostRecentForSelectedShift || emptyStateHints.hasOtherShiftInRange) && (
-                    <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                      {emptyStateHints.mostRecentForSelectedShift && emptyStateHints.mostRecentForSelectedShift !== startDate && (
-                        <button
-                          className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:opacity-90"
-                          onClick={() => {
-                            setStartDate(emptyStateHints.mostRecentForSelectedShift!);
-                            setEndDate(emptyStateHints.mostRecentForSelectedShift!);
-                          }}
-                        >
-                          Jump to {format(new Date(emptyStateHints.mostRecentForSelectedShift + 'T00:00:00'), 'dd/MM/yyyy')}
-                        </button>
-                      )}
-                      {emptyStateHints.hasOtherShiftInRange && (
-                        <button
-                          className="px-3 py-1.5 text-xs rounded-md border border-border text-foreground hover:bg-muted"
-                          onClick={() => setSelectedShift(emptyStateHints.otherShift)}
-                        >
-                          Switch to {emptyStateHints.otherShift} shift
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <p className="text-muted-foreground text-sm">No production data for {dateRangeLabel} - {selectedShift} shift</p>
                 </div>
               )}
             </div>
@@ -567,144 +397,6 @@ export function Dashboard() {
             )}
           </div>
         </div>
-
-        {/* ═══ MY QUALITY (operator only) ═══ */}
-        {isOperator && (() => {
-          const myKey = (user?.name || '').trim().toLowerCase();
-          const mine = leaderQuality[myKey] ?? { occurrences: 0, points: 0 };
-          const pts = mine.points || 0;
-          const tone = pts >= HIGH_PENALTY_THRESHOLD
-            ? 'border-destructive/40 bg-destructive/5'
-            : pts > 0
-            ? 'border-amber-300/50 bg-amber-50/40'
-            : 'border-border bg-card';
-          return (
-            <div className={`mb-3 rounded-lg border ${tone} p-3 flex items-center justify-between`}>
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={16} className={pts >= HIGH_PENALTY_THRESHOLD ? 'text-destructive' : pts > 0 ? 'text-amber-600' : 'text-muted-foreground'} />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">My Quality — {dateRangeLabel}</h2>
-                {leaderQualityLoading && <span className="text-[10px] text-muted-foreground">loading…</span>}
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="text-right">
-                  <p className="text-[10px] uppercase text-muted-foreground">Occurrences</p>
-                  <p className="text-lg font-bold tabular-nums text-foreground">{mine.occurrences || 0}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] uppercase text-muted-foreground">Penalty Points</p>
-                  <p className={`text-lg font-bold tabular-nums ${pts >= HIGH_PENALTY_THRESHOLD ? 'text-destructive' : pts > 0 ? 'text-amber-700' : 'text-foreground'}`}>{pts}</p>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ═══ MY PRODUCTION PLAN (operator only) ═══ */}
-        {isOperator && (
-          <OperatorPlanCard date={startDate} shift={selectedShift} />
-        )}
-
-        {/* ═══ MY MAINTENANCE REQUESTS (operator/leader) ═══ */}
-        {isOperator && myWorkOrders.length > 0 && (
-          <div className="card mb-3 overflow-hidden">
-            <div className="px-3 py-2 border-b border-border bg-amber-50">
-              <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
-                <Wrench size={16} className="text-amber-700" />My Maintenance Requests
-              </h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                    <th className="py-2 px-3">#</th>
-                    <th className="py-2 px-3">Date</th>
-                    <th className="py-2 px-3">Line</th>
-                    <th className="py-2 px-3">Description</th>
-                    <th className="py-2 px-3">Status</th>
-                    <th className="py-2 px-3">Engineer</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {myWorkOrders.map(wo => (
-                    <tr key={wo.id} className="hover:bg-muted/50">
-                      <td className="py-2 px-3 font-medium text-foreground">#{wo.wo_number}</td>
-                      <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
-                        {new Date(wo.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="py-2 px-3">
-                        {wo.line_at_time || '—'}
-                        {wo.line_stopped && <span className="ml-1 text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-800">Stopped</span>}
-                      </td>
-                      <td className="py-2 px-3 max-w-xs truncate" title={wo.description}>{wo.description}</td>
-                      <td className="py-2 px-3 capitalize">{wo.status.replace('_', ' ')}</td>
-                      <td className="py-2 px-3 text-muted-foreground">{wo.engineer_name || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-
-
-
-        {/* ═══ LEADER QUALITY BOARD (operator scope) ═══ */}
-        {isOperator && (
-          <div className="card p-3 mb-3">
-            <LeaderQualityBoard startDate={startDate} endDate={endDate} leaderFilter={user?.name || ''} />
-          </div>
-        )}
-
-
-        {/* ═══ OPEN MAINTENANCE TICKETS ═══ */}
-        {showOpenTickets && !isOperator && (
-          <div className="card mb-3 overflow-hidden">
-            <div className="px-3 py-2 border-b border-border flex items-center gap-2">
-              <Wrench size={16} className="text-primary" />
-              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Open Maintenance Tickets</h2>
-              <span className="text-xs text-muted-foreground">({openWoRows.length})</span>
-              <div className="flex-1" />
-              <Link to="/maintenance/work-orders" className="text-xs text-primary hover:underline">View all →</Link>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/30 text-muted-foreground">
-                  <tr>
-                    <th className="text-left font-semibold px-3 py-2">WO</th>
-                    <th className="text-left font-semibold px-3 py-2">Line</th>
-                    <th className="text-left font-semibold px-3 py-2">Description</th>
-                    <th className="text-right font-semibold px-3 py-2">Downtime</th>
-                    <th className="text-right font-semibold px-3 py-2">Events</th>
-                    <th className="text-left font-semibold px-3 py-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {openWoRows.map(({ wo, downtime, totalMinutes }) => (
-                    <tr key={wo.id} className="border-t border-border hover:bg-muted/20">
-                      <td className="px-3 py-2">
-                        <Link to={`/maintenance/work-orders/${wo.id}`} className="text-primary hover:underline font-mono">
-                          #{wo.wo_number}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2">{wo.line_at_time || '—'}</td>
-                      <td className="px-3 py-2 max-w-md truncate" title={wo.description}>{wo.description}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatDuration(totalMinutes)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{downtime?.events_count ?? 0}</td>
-                      <td className="px-3 py-2">
-                        {downtime?.downtime_status === 'active' ? (
-                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-destructive/15 text-destructive">Line stopped</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{wo.status}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* Trend Alerts */}
         {canViewCharts && trendAlerts.length > 0 && (
@@ -737,10 +429,6 @@ export function Dashboard() {
               <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Performance Analytics</h2>
               <div className="flex-1 h-px bg-border" />
             </div>
-            <div className="card p-3 mb-3">
-              <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Factory size={16} />Line RAG Board (Plan vs Actual)</h3>
-              <LineRagBoard sessions={filteredSessions} />
-            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-3">
               <div className="card p-3">
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Package size={16} />Performance by SKU</h3>
@@ -755,11 +443,63 @@ export function Dashboard() {
                 <PerformanceByLeader sessions={filteredSessions} />
               </div>
               <div className="card p-3">
-                <LeaderPerformanceBoard sessions={filteredSessions} startDate={startDate} endDate={endDate} />
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Trophy size={16} />Leader Board</h3>
+                <LeaderPerformanceBoard sessions={filteredSessions} currentDate={startDate} />
+              </div>
+              <div className="card p-3">
+                <LeaderQualityBoard currentDate={startDate} />
               </div>
             </div>
 
+            {/* Section: Downtime */}
+            <div className="flex items-center gap-2 mb-2">
+              <Clock size={16} className="text-primary" />
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Downtime Analytics</h2>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-2">
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Clock size={16} />Downtime by Category</h3>
+                <DowntimeByCategory sessions={filteredSessions} filterCategory={downtimeCategory} />
+              </div>
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><AlertTriangle size={16} />Downtime by Reason</h3>
+                <DowntimeByReason sessions={filteredSessions} filterCategory={downtimeCategory} filterReason={downtimeReason} />
+              </div>
+              <div className="card p-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><Activity size={16} />Downtime Trend</h3>
+                <DowntimeTrendChart sessions={filteredSessions} />
+              </div>
+            </div>
 
+            {/* Downtime History Table */}
+            {downtimeHistory.length > 0 && (
+              <div className="card p-3 mb-3">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 text-sm"><List size={16} />Downtime History ({downtimeHistory.length} entries)</h3>
+                <div className="overflow-x-auto">
+                  <table className="table text-sm">
+                    <thead>
+                      <tr>
+                        <th>Date</th><th>Shift</th><th>Line</th><th>Category</th><th>Reason</th><th className="text-right">Duration</th><th>Comment</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {downtimeHistory.map((dt, idx) => (
+                        <tr key={idx}>
+                          <td className="whitespace-nowrap">{new Date(dt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                          <td><span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{dt.shift}</span></td>
+                          <td className="font-medium">{dt.line}</td>
+                          <td>{getCategoryLabel(dt.category)}</td>
+                          <td>{getReasonLabel(dt.category, dt.reason)}</td>
+                          <td className="text-right font-medium">{formatDuration(dt.duration)}</td>
+                          <td className="text-muted-foreground text-xs max-w-[150px] truncate">{dt.comment || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Section: Trends */}
             <div className="flex items-center gap-2 mb-2">
@@ -778,47 +518,13 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Leader Quality Board + Daily Summary (Quality Issues by Leader lives inside) */}
-            <div className="card p-3 mb-3">
-              <LeaderQualityBoard startDate={startDate} endDate={endDate} leaderFilter={selectedLeader} />
-            </div>
+            {/* Daily Summary Table */}
             <div className="card p-3 mb-3 dashboard-section">
-              <DailySummaryTable
-                sessions={filteredSessions}
-                dateRange={`${formatDate(startDate)} — ${formatDate(endDate)}`}
-                shift={selectedShift}
-                onEditSession={(s) => setEditSession(s)}
-                canEditSession={(s) =>
-                  !isOperator ||
-                  (!!user?.name && s.lineLeader.trim().toLowerCase() === user.name.trim().toLowerCase())
-                }
-              />
+              <DailySummaryTable sessions={filteredSessions} dateRange={`${formatDate(startDate)} — ${formatDate(endDate)}`} shift={selectedShift} />
             </div>
           </>
         )}
       </div>
-
-      {/* Edit Shift Dialog (from Dashboard) */}
-      <EditShiftDialog
-        session={editSession}
-        open={!!editSession}
-        onOpenChange={(open) => { if (!open) setEditSession(null); }}
-        isOperator={isOperator}
-      />
-
-      <QuickQualityActionDialog
-        open={qualityDialogOpen}
-        onOpenChange={setQualityDialogOpen}
-        
-        leaders={uniqueLeaders}
-        defaultLine={selectedLine}
-        defaultLeader={selectedLeader}
-        defaultShift={selectedShift}
-        defaultDate={endDate}
-        recordedBy={user?.id ?? null}
-        onSaved={() => setQualityRefreshTick(t => t + 1)}
-      />
     </>
   );
 }
-

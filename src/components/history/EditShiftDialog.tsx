@@ -12,14 +12,13 @@ import { useShifts } from '@/contexts/ShiftContext';
 
 import { SkuRowForm } from '@/components/SkuRowForm';
 import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
-import { Loader2, Save, Target, TrendingUp, Wrench, ExternalLink } from 'lucide-react';
+import { Loader2, Save, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { QualityActionsForm } from '@/components/QualityActionsForm';
 import { QualityActionRow } from '@/types/quality';
 import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
 import { useAuth } from '@/contexts/AuthContext';
-import { DOWNTIME_REASONS_FALLBACK } from '@/types/downtime';
 
 interface EditShiftDialogProps {
   session: ProductionSession | null;
@@ -45,64 +44,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
   const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
   const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
   const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
-  const [creatingOrderId, setCreatingOrderId] = useState<string | null>(null);
-  const [createdOrders, setCreatedOrders] = useState<Record<string, number>>({});
-
-  const maintenanceDowntimes = useMemo(
-    () => structuredDowntimes.filter(dt => dt.category === 'maintenance'),
-    [structuredDowntimes]
-  );
-
-  const reasonLabel = (value: string) => {
-    const found = DOWNTIME_REASONS_FALLBACK.maintenance?.find(r => r.value === value);
-    return found?.label ?? value;
-  };
-
-  const handleCreateOrder = async (dt: StructuredDowntime) => {
-    if (!user?.id) {
-      toast.error('You must be signed in to open a maintenance order');
-      return;
-    }
-    setCreatingOrderId(dt.id);
-    try {
-      // Look up the line_id by exact name (post-fusion: same names on both sides)
-      const { data: lineRow, error: lineErr } = await supabase
-        .from('lines')
-        .select('id')
-        .eq('name', productionLine)
-        .maybeSingle();
-      if (lineErr) throw lineErr;
-      if (!lineRow?.id) throw new Error(`Line "${productionLine}" not found`);
-
-      // Priority by downtime length
-      const priority = dt.duration >= 60 ? 'high' : dt.duration >= 20 ? 'medium' : 'low';
-
-      const { data, error: insertErr } = await supabase
-        .from('work_orders' as never)
-        .insert({
-          description: `${reasonLabel(dt.reason)} on ${productionLine}${dt.comment ? ` — ${dt.comment}` : ''}`,
-          priority,
-          machine: null,
-          requester_name: `${user.email ?? lineLeader ?? 'Anplanner'} (via Anplanner)`,
-          operator_id: user.id,
-          line_id: lineRow.id,
-          line_at_time: productionLine,
-          notes: `From shift ${date} ${shiftType} (${dt.duration} min downtime)`,
-          status: 'open',
-        } as never)
-        .select('wo_number')
-        .single();
-      if (insertErr) throw insertErr;
-
-      const orderNumber = (data as { wo_number: number } | null)?.wo_number ?? 0;
-      setCreatedOrders(prev => ({ ...prev, [dt.id]: orderNumber }));
-      toast.success(`Order #${orderNumber} created`);
-    } catch (err) {
-      toast.error((err as Error).message || 'Failed to create order');
-    } finally {
-      setCreatingOrderId(null);
-    }
-  };
 
   const { totalProduction, performance } = useMemo(() => {
     const total = skuRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
@@ -188,13 +129,22 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
     if (!session) return;
 
     const validRows = skuRows.filter(row => row.sku.trim());
+    if (validRows.length === 0) { toast.error('At least one SKU is required'); return; }
+    if (!isOperator && lineTarget <= 0) { toast.error('Line Production Target is required'); return; }
+
+    // Check for duplicate SKUs
+    const skuCounts = new Map<string, number>();
+    validRows.forEach(row => {
+      const key = row.sku.trim().toLowerCase();
+      if (key) skuCounts.set(key, (skuCounts.get(key) || 0) + 1);
+    });
+    const duplicates = [...skuCounts.entries()].filter(([, c]) => c > 1).map(([k]) => k);
+    if (duplicates.length > 0) {
+      toast.error(`Duplicate SKUs: ${duplicates.join(', ')}. Each SKU can only appear once per session.`);
+      return;
+    }
 
     setIsSubmitting(true);
-    const safetyTimer = setTimeout(() => {
-      console.error('[EditShiftDialog] Safety timeout fired — save took >30s');
-      setIsSubmitting(false);
-      toast.error('Save timed out after 30s. Check the console/network tab for details.');
-    }, 30_000);
     try {
       // Operator path: only send item IDs + quantity_actual
       if (isOperator) {
@@ -250,25 +200,17 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
       }
 
       // Save quality actions (supervisor/admin only)
-      try {
-        const qr = await saveQualityActionsForSession({
-          sessionId: session.id,
-          productionLine: productionLine.trim(),
-          lineLeader: lineLeader.trim(),
-          date,
-          shiftType,
-          rows: qualityRows,
-          recordedBy: user?.id ?? null,
-        });
-        if (!qr.success) {
-          toast.error(`Quality save failed: ${qr.error}`);
-        } else {
-          // Notify any open views (e.g. /quality-actions-log) to refetch
-          window.dispatchEvent(new CustomEvent('quality-actions-changed', { detail: { sessionId: session.id } }));
-        }
-      } catch (qErr) {
-        console.error('Quality save threw:', qErr);
-        toast.error(`Quality save failed: ${qErr instanceof Error ? qErr.message : String(qErr)}`);
+      const qr = await saveQualityActionsForSession({
+        sessionId: session.id,
+        productionLine: productionLine.trim(),
+        lineLeader: lineLeader.trim(),
+        date,
+        shiftType,
+        rows: qualityRows,
+        recordedBy: user?.id ?? null,
+      });
+      if (!qr.success) {
+        toast.error(`Quality save failed: ${qr.error}`);
       }
 
       toast.success('Session updated successfully');
@@ -276,13 +218,11 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
       onSuccess?.();
     } catch (error) {
       console.error('Error updating session:', error);
-      toast.error(`Failed to update session: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error('Failed to update session');
     } finally {
-      clearTimeout(safetyTimer);
       setIsSubmitting(false);
     }
   };
-
 
   if (!session) return null;
 
@@ -296,7 +236,7 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isOperator && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="h-9" /></div>
             <div className="space-y-1"><Label className="text-xs">Shift</Label>
               <Select value={shiftType} onValueChange={(v) => setShiftType(v as ShiftType)}>
@@ -306,14 +246,60 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             </div>
             <div className="space-y-1"><Label className="text-xs">Production Line</Label><Input value={productionLine} onChange={(e) => setProductionLine(e.target.value)} required className="h-9" /></div>
             <div className="space-y-1"><Label className="text-xs">Leader</Label><Input value={lineLeader} onChange={(e) => setLineLeader(e.target.value)} required className="h-9" /></div>
+            <div className="space-y-1"><Label className="text-xs">Staff Planned</Label><Input type="number" min={0} value={staffPlanned} onChange={(e) => setStaffPlanned(parseInt(e.target.value) || 0)} className="h-9" /></div>
+            <div className="space-y-1"><Label className="text-xs">Staff Actual</Label><Input type="number" min={0} value={staffActual} onChange={(e) => setStaffActual(parseInt(e.target.value) || 0)} className="h-9" /></div>
           </div>
           )}
+
+          {!isOperator && (
+          <div className="border-t pt-4">
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+              <Label className="text-sm flex items-center gap-2 font-medium"><Target size={16} className="text-primary" />Line Production Target</Label>
+              <div className="relative max-w-xs mt-1">
+                <Input type="number" value={lineTarget || ''} onChange={(e) => setLineTarget(parseInt(e.target.value) || 0)} min={0} className="h-10 pr-14 text-lg font-semibold" required />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">units</span>
+              </div>
+            </div>
+          </div>
+          )}
+
+          <div className="border-t pt-4">
+            <SkuRowForm skuRows={skuRows} onChange={setSkuRows} canReview={!isOperator} errors={{}} showTarget={false} />
+          </div>
+
+          <div className="p-4 bg-muted rounded-lg border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className="text-xs text-muted-foreground">Total Production</div>
+                  <div className="text-xl font-bold flex items-center gap-2"><TrendingUp size={18} className="text-primary" />{totalProduction.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">units</span></div>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div>
+                  <div className="text-xs text-muted-foreground">Target</div>
+                  <div className="text-lg font-semibold">{lineTarget.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">units</span></div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Performance</div>
+                <div className={`text-2xl font-bold ${performance >= 100 ? 'text-green-600' : performance >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>{performance.toFixed(1)}%</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1 border-t pt-4">
+            <Label className="text-xs">Comments / Observations</Label>
+            <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
+          </div>
 
           {!isOperator && (
             <div className="border-t pt-4">
               <QualityActionsForm rows={qualityRows} onChange={setQualityRows} />
             </div>
           )}
+
+
+
 
           <DialogFooter className="pt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>

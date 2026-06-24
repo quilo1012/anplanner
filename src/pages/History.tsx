@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { Header } from '@/components/Header';
 import { EditShiftDialog } from '@/components/history/EditShiftDialog';
 import { DeleteConfirmDialog } from '@/components/history/DeleteConfirmDialog';
-import { BulkDeleteConfirmDialog } from '@/components/history/BulkDeleteConfirmDialog';
 
 import { useShifts } from '@/contexts/ShiftContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,8 +40,6 @@ export function History() {
   const [deleteSessionState, setDeleteSessionState] = useState<ProductionSession | null>(null);
   const [qualityBySession, setQualityBySession] = useState<Record<string, QualityActionRow[]>>({});
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
   const canDelete = hasRole(['supervisor', 'admin']);
@@ -158,7 +155,8 @@ export function History() {
     const totalProduction = sorted.reduce((sum, s) => sum + s.totalProduction, 0);
     const totalPlanned = sorted.reduce((sum, s) => sum + s.plannedQuantity, 0);
     const totalDowntime = sorted.reduce((sum, s) => sum + s.totalDowntime, 0);
-    const totalQuality = sorted.reduce((sum, s) => sum + (qualityBySession[s.id]?.length || 0), 0);
+    const totalStaffPlanned = sorted.reduce((sum, s) => sum + s.staffPlanned, 0);
+    const totalStaffActual = sorted.reduce((sum, s) => sum + s.staffActual, 0);
     const overallPerf = totalPlanned > 0 ? ((totalProduction / totalPlanned) * 100).toFixed(1) : '0';
 
     const lineRows = sorted.map((s, i) => `<tr class="${i % 2 === 1 ? 'zebra' : ''}">
@@ -168,7 +166,7 @@ export function History() {
       <td class="text-right">${s.totalProduction.toLocaleString()}</td>
       <td class="text-right ${s.performance >= 90 ? 'perf-green' : s.performance >= 75 ? 'perf-yellow' : 'perf-red'}">${s.performance.toFixed(1)}%</td>
       <td class="text-right">${formatDuration(s.totalDowntime)}</td>
-      <td class="text-center">${qualityBySession[s.id]?.length || 0}</td></tr>`).join('');
+      <td class="text-center">${s.staffActual}/${s.staffPlanned}</td></tr>`).join('');
 
     const itemRows = sorted.flatMap(s => s.items.map((item, j) => `<tr class="${j % 2 === 1 ? 'zebra' : ''}">
       <td class="font-medium">${escapeHtml(s.productionLine)}</td><td class="font-mono">${escapeHtml(item.sku)}</td><td>${escapeHtml(item.productName)}</td>
@@ -187,13 +185,11 @@ export function History() {
     win.document.write(`<!DOCTYPE html><html><head><title>Production Report</title>
       <style>
         body { font-family: 'Inter', system-ui, sans-serif; margin: 2rem; color: #1a1a1a; font-size: 0.8rem; }
-        h1 { font-size: 1.5rem; margin: 0; letter-spacing: 0.05em; text-transform: uppercase; }
+        h1 { font-size: 1.25rem; margin-bottom: 0; }
         h2 { font-size: 1rem; border-bottom: 2px solid #333; padding-bottom: 4px; margin-top: 1.5rem; }
-        .meta { font-size: 0.75rem; color: #555; margin-top: 0.35rem; }
-        .header { border-bottom: 3px double #333; padding-bottom: 0.9rem; margin-bottom: 1.5rem; }
-        .header .top { display: flex; justify-content: space-between; align-items: baseline; }
-        .header .brand { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: #666; font-weight: 600; }
-        .header .doc { font-size: 0.65rem; color: #888; letter-spacing: 0.1em; text-transform: uppercase; }
+        .meta { font-size: 0.75rem; color: #666; margin-bottom: 1rem; }
+        .header { display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid #333; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        .header img { height: 60px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
         th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; font-weight: 600; color: #555; font-size: 0.75rem; }
         td { padding: 4px 8px; border-bottom: 1px solid #ddd; }
@@ -213,23 +209,22 @@ export function History() {
         @media print { body { margin: 1cm; } }
       </style></head><body>
       <div class="header">
-        <div class="top"><span class="brand">Applied Nutrition</span><span class="doc">Confidential</span></div>
-        <h1>Production Report</h1>
-        <div class="meta"><strong>Date:</strong> ${new Date(pDate).toLocaleDateString()} &nbsp;|&nbsp; <strong>Shift:</strong> ${pShift} &nbsp;|&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</div>
+        <img src="${window.location.origin}/lovable-uploads/64131b92-9113-4e13-88d8-667e720cb54f.png" alt="Applied Nutrition" onerror="this.style.display='none'" />
+        <div><h1>PRODUCTION REPORT</h1>
+        <div class="meta">Date: ${new Date(pDate).toLocaleDateString()} | Shift: ${pShift} | Generated: ${new Date().toLocaleString()}</div></div>
       </div>
-
 
       <h2>Summary</h2>
       <table class="summary"><tbody>
         <tr><td><strong>Total Production:</strong></td><td>${totalProduction.toLocaleString()} units</td><td><strong>Planned:</strong></td><td>${totalPlanned.toLocaleString()} units</td></tr>
         <tr class="zebra"><td><strong>Performance:</strong></td><td>${overallPerf}%</td><td><strong>Total Downtime:</strong></td><td>${formatDuration(totalDowntime)}</td></tr>
-        <tr><td><strong>Quality Actions:</strong></td><td>${totalQuality}</td><td></td><td></td></tr>
+        <tr><td><strong>Staff Planned:</strong></td><td>${totalStaffPlanned}</td><td><strong>Staff Actual:</strong></td><td>${totalStaffActual}</td></tr>
       </tbody></table>
 
       <h2>Production by Line</h2>
-      <table><thead><tr><th>Line</th><th>Leader</th><th>SKUs</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Perf.</th><th class="text-right">Downtime</th><th class="text-center">Quality</th></tr></thead>
+      <table><thead><tr><th>Line</th><th>Leader</th><th>SKUs</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Perf.</th><th class="text-right">Downtime</th><th class="text-center">Staff</th></tr></thead>
       <tbody>${lineRows}</tbody>
-      <tfoot><tr><td colspan="3">TOTALS</td><td class="text-right">${totalPlanned.toLocaleString()}</td><td class="text-right">${totalProduction.toLocaleString()}</td><td class="text-right">${overallPerf}%</td><td class="text-right">${formatDuration(totalDowntime)}</td><td class="text-center">${totalQuality}</td></tr></tfoot></table>
+      <tfoot><tr><td colspan="3">TOTALS</td><td class="text-right">${totalPlanned.toLocaleString()}</td><td class="text-right">${totalProduction.toLocaleString()}</td><td class="text-right">${overallPerf}%</td><td class="text-right">${formatDuration(totalDowntime)}</td><td class="text-center">${totalStaffActual}/${totalStaffPlanned}</td></tr></tfoot></table>
 
       <h2>Production Items Detail</h2>
       <table><thead><tr><th>Line</th><th>SKU</th><th>Product</th><th class="text-right">Target</th><th class="text-right">Actual</th><th class="text-right">Perf.</th></tr></thead>
@@ -257,36 +252,6 @@ export function History() {
   };
 
   const hasFilters = filterFromDate || filterToDate || filterShift || filterLine || filterLeader || filterSku || searchQuery;
-
-  // Prune selection to only include currently filtered sessions
-  useEffect(() => {
-    const visible = new Set(filteredSessions.map(s => s.id));
-    setSelectedIds(prev => {
-      const next = new Set<string>();
-      prev.forEach(id => { if (visible.has(id)) next.add(id); });
-      return next.size === prev.size ? prev : next;
-    });
-  }, [filteredSessions]);
-
-  const allFilteredSelected = filteredSessions.length > 0 && filteredSessions.every(s => selectedIds.has(s.id));
-  const toggleSelectAll = () => {
-    setSelectedIds(prev => {
-      if (allFilteredSelected) return new Set();
-      const next = new Set(prev);
-      filteredSessions.forEach(s => next.add(s.id));
-      return next;
-    });
-  };
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-  const clearSelection = () => setSelectedIds(new Set());
-  const selectedSessions = useMemo(() => filteredSessions.filter(s => selectedIds.has(s.id)), [filteredSessions, selectedIds]);
-  const handleExportSelected = () => exportSessionsToCsv(selectedSessions, 'session_history_selected');
 
   const handleDialogSuccess = () => { /* updateSession already triggers refreshSessions internally */ };
 
@@ -363,24 +328,6 @@ export function History() {
           </div>
         )}
 
-        {selectedIds.size > 0 && (
-          <div className="mb-3 p-2 sm:p-3 card flex flex-wrap items-center gap-2 sm:gap-3 border-primary/40 bg-primary/5">
-            <span className="text-sm font-medium">{selectedIds.size} selected</span>
-            <div className="flex-1" />
-            <button onClick={handleExportSelected} className="btn-success text-xs py-1.5 px-2 inline-flex items-center gap-1">
-              <Download size={14} /> Export selected
-            </button>
-            {canDelete && (
-              <button onClick={() => setBulkDeleteOpen(true)} className="text-xs py-1.5 px-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 inline-flex items-center gap-1">
-                <Trash2 size={14} /> Delete selected
-              </button>
-            )}
-            <button onClick={clearSelection} className="btn-secondary text-xs py-1.5 px-2 inline-flex items-center gap-1" title="Clear selection">
-              <X size={14} /> Clear
-            </button>
-          </div>
-        )}
-
         {filteredSessions.length === 0 ? (
           <div className="card p-8 sm:p-12 text-center">
             <div className="text-4xl sm:text-6xl mb-4">📋</div>
@@ -393,12 +340,9 @@ export function History() {
               {filteredSessions.map(session => (
                 <div key={session.id} className="card p-4">
                   <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-start gap-2">
-                      <input type="checkbox" checked={selectedIds.has(session.id)} onChange={() => toggleSelect(session.id)} className="mt-1 h-4 w-4" />
-                      <div>
-                        <p className="font-medium">{formatDate(session.date)}</p>
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{session.shift}</span>
-                      </div>
+                    <div>
+                      <p className="font-medium">{formatDate(session.date)}</p>
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">{session.shift}</span>
                     </div>
                     <span className={getPerformanceClass(session.performance)}>{session.performance.toFixed(0)}%</span>
                   </div>
@@ -430,9 +374,6 @@ export function History() {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th className="w-8 text-center">
-                        <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="h-4 w-4" title="Select all" />
-                      </th>
                       <th className="w-8"></th>
                       <th>Date</th>
                       <th>Shift</th>
@@ -443,7 +384,7 @@ export function History() {
                       <th className="text-right">Actual</th>
                       <th>Perf</th>
                       <th className="text-right">Downtime</th>
-                       <th className="text-center">Quality</th>
+                       <th className="text-center">Staff</th>
                        
                        {!isOperator && <th>Last edited by</th>}
                        {(canEdit || canDelete) && <th className="w-24">Actions</th>}
@@ -457,10 +398,7 @@ export function History() {
                       
                       return (
                         <React.Fragment key={session.id}>
-                          <tr className={cn("hover:bg-muted/50 border-l-4", getLineBorderClass(session.productionLine), selectedIds.has(session.id) && "bg-primary/5")}>
-                            <td className="text-center">
-                              <input type="checkbox" checked={selectedIds.has(session.id)} onChange={() => toggleSelect(session.id)} className="h-4 w-4" />
-                            </td>
+                          <tr className={cn("hover:bg-muted/50 border-l-4", getLineBorderClass(session.productionLine))}>
                             <td className="text-center">
                               <button onClick={() => toggleRow(session.id)} className={`p-1 hover:bg-muted rounded transition-colors ${hasDetails ? '' : 'opacity-30'}`} disabled={!hasDetails}>
                                 {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -478,7 +416,7 @@ export function History() {
                             <td><span className={getPerformanceClass(session.performance)}>{session.performance.toFixed(0)}%</span></td>
                             <td className="text-right text-sm">{formatDuration(session.totalDowntime)}</td>
                             <td className="text-center text-sm">
-                              <span className={cn("px-2 py-0.5 rounded text-xs font-medium", qActions.length > 0 ? "bg-amber-500/15 text-amber-500" : "bg-muted text-muted-foreground")}>{qActions.length}</span>
+                              <span className={session.staffActual < session.staffPlanned ? 'text-destructive font-medium' : ''}>{session.staffActual}/{session.staffPlanned}</span>
                             </td>
                              {!isOperator && (
                                <td className="text-xs whitespace-nowrap">
@@ -502,7 +440,7 @@ export function History() {
                           {/* Expanded Row: Items + Downtimes + Comments */}
                           {isExpanded && (
                             <tr>
-                              <td colSpan={14} className="bg-muted/30 p-3">
+                              <td colSpan={13} className="bg-muted/30 p-3">
                                 <div className="space-y-3">
                                   {/* SKU Items */}
                                   {session.items.length > 0 && (
@@ -608,19 +546,6 @@ export function History() {
           open={!!deleteSessionState}
           onOpenChange={(open) => { if (!open) setDeleteSessionState(null); }}
           onSuccess={handleDialogSuccess}
-        />
-
-        <BulkDeleteConfirmDialog
-          sessions={selectedSessions}
-          open={bulkDeleteOpen}
-          onOpenChange={setBulkDeleteOpen}
-          onComplete={(deleted) => {
-            setSelectedIds(prev => {
-              const next = new Set(prev);
-              deleted.forEach(id => next.delete(id));
-              return next;
-            });
-          }}
         />
       </div>
     </>
