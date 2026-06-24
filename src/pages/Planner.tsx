@@ -21,9 +21,6 @@ import { Save, RotateCcw, FileSpreadsheet, Users, User, ClipboardCheck, Lock } f
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { naturalLineSort } from '@/utils/naturalLineSort';
-import { QualityActionsForm } from '@/components/QualityActionsForm';
-import { QualityActionRow } from '@/types/quality';
-import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
 
 
 interface PlannerFormState {
@@ -71,7 +68,7 @@ export function Planner() {
   const [showIntouchImport, setShowIntouchImport] = useState(false);
   const [showPlanImport, setShowPlanImport] = useState(false);
   const [showProductionImport, setShowProductionImport] = useState(false);
-  const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
+  
   
 
   // Alert when user picks a low-score line for a product
@@ -118,10 +115,6 @@ export function Planner() {
           observations: session.comments,
           staffPlanned: session.staffPlanned || 0,
           staffActual: session.staffActual || 0,
-        });
-        // load existing quality actions
-        fetchQualityActionsForSessions([editId]).then(map => {
-          setQualityRows(map[editId] || []);
         });
       }
     }
@@ -279,18 +272,6 @@ export function Planner() {
       if (!result.success) {
         toast.error(`Save failed: ${result.error}`);
       } else {
-        if (canReview && savedSessionId) {
-          const qr = await saveQualityActionsForSession({
-            sessionId: savedSessionId,
-            productionLine: formState.productionLine.trim(),
-            lineLeader: formState.lineLeader.trim(),
-            date: formState.date,
-            shiftType: formState.shift,
-            rows: qualityRows,
-            recordedBy: user?.id ?? null,
-          });
-          if (!qr.success) toast.error(`Quality save failed: ${qr.error}`);
-        }
         toast.success(editId ? 'Session updated successfully!' : 'Production session saved!');
         navigate('/history');
       }
@@ -452,9 +433,6 @@ export function Planner() {
               </div>
             )}
 
-            {canReview && (
-              <QualityActionsForm rows={qualityRows} onChange={setQualityRows} />
-            )}
 
             {/* Review Section */}
             <div className={`card p-4 sm:p-6 border-l-4 ${canReview ? 'border-l-primary' : 'border-l-muted'}`}>

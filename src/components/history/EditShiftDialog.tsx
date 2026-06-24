@@ -15,10 +15,6 @@ import { StructuredDowntimeForm } from '@/components/StructuredDowntimeForm';
 import { Loader2, Save, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { QualityActionsForm } from '@/components/QualityActionsForm';
-import { QualityActionRow } from '@/types/quality';
-import { saveQualityActionsForSession, fetchQualityActionsForSessions } from '@/utils/qualityActions';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface EditShiftDialogProps {
   session: ProductionSession | null;
@@ -30,7 +26,6 @@ interface EditShiftDialogProps {
 
 export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOperator = false }: EditShiftDialogProps) {
   const { updateSession } = useShifts();
-  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [date, setDate] = useState('');
@@ -43,7 +38,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
   const [lineTarget, setLineTarget] = useState(0);
   const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
   const [structuredDowntimes, setStructuredDowntimes] = useState<StructuredDowntime[]>([]);
-  const [qualityRows, setQualityRows] = useState<QualityActionRow[]>([]);
 
   const { totalProduction, performance } = useMemo(() => {
     const total = skuRows.reduce((sum, row) => sum + (row.realProduction || 0), 0);
@@ -82,10 +76,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
       duration: dt.duration,
       comment: dt.comment || '',
     })));
-    // load quality actions
-    fetchQualityActionsForSessions([session.id]).then(map => {
-      setQualityRows(map[session.id] || []);
-    });
 
 
 
@@ -199,19 +189,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
         return;
       }
 
-      // Save quality actions (supervisor/admin only)
-      const qr = await saveQualityActionsForSession({
-        sessionId: session.id,
-        productionLine: productionLine.trim(),
-        lineLeader: lineLeader.trim(),
-        date,
-        shiftType,
-        rows: qualityRows,
-        recordedBy: user?.id ?? null,
-      });
-      if (!qr.success) {
-        toast.error(`Quality save failed: ${qr.error}`);
-      }
 
       toast.success('Session updated successfully');
       onOpenChange(false);
@@ -292,11 +269,6 @@ export function EditShiftDialog({ session, open, onOpenChange, onSuccess, isOper
             <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Additional notes..." rows={2} />
           </div>
 
-          {!isOperator && (
-            <div className="border-t pt-4">
-              <QualityActionsForm rows={qualityRows} onChange={setQualityRows} />
-            </div>
-          )}
 
 
 

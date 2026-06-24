@@ -14,9 +14,6 @@ import { naturalLineSort } from '@/utils/naturalLineSort';
 import { formatDuration } from '@/utils/formatDuration';
 import { getLineBorderClass } from '@/utils/lineColors';
 import { cn } from '@/lib/utils';
-import { fetchQualityActionsForSessions } from '@/utils/qualityActions';
-import { QualityActionRow } from '@/types/quality';
-import { ShieldAlert } from 'lucide-react';
 
 export function History() {
   const { sessions, refreshSessions, loadMoreHistory, hasMoreHistory, isLoadingMore, historyDaysLoaded } = useShifts();
@@ -38,7 +35,7 @@ export function History() {
 
   const [editSession, setEditSession] = useState<ProductionSession | null>(null);
   const [deleteSessionState, setDeleteSessionState] = useState<ProductionSession | null>(null);
-  const [qualityBySession, setQualityBySession] = useState<Record<string, QualityActionRow[]>>({});
+  
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const canEdit = hasRole(['supervisor', 'admin']) || isOperator;
@@ -94,14 +91,6 @@ export function History() {
       return true;
     }).sort((a, b) => naturalLineSort(a.productionLine, b.productionLine));
   }, [sessions, filterFromDate, filterToDate, filterShift, filterLine, filterLeader, filterSku, searchQuery, isOperator, user?.name]);
-  // Load quality actions for visible sessions
-  useEffect(() => {
-    const ids = filteredSessions.map(s => s.id);
-    if (ids.length === 0) { setQualityBySession({}); return; }
-    let cancel = false;
-    fetchQualityActionsForSessions(ids).then(map => { if (!cancel) setQualityBySession(map); });
-    return () => { cancel = true; };
-  }, [filteredSessions]);
 
 
   // Handle ?edit=<sessionId> from URL — block operators from accessing other leaders' sessions
@@ -392,8 +381,7 @@ export function History() {
                   </thead>
                   <tbody>
                     {filteredSessions.map(session => {
-                      const qActions = qualityBySession[session.id] || [];
-                      const hasDetails = session.comments || session.items.length > 0 || (session.structuredDowntimes && session.structuredDowntimes.length > 0) || qActions.length > 0;
+                      const hasDetails = session.comments || session.items.length > 0 || (session.structuredDowntimes && session.structuredDowntimes.length > 0);
                       const isExpanded = expandedRows.has(session.id);
                       
                       return (
@@ -472,21 +460,6 @@ export function History() {
                                             <span className="text-muted-foreground">{dt.reason}</span>
                                             <span className="font-medium">{formatDuration(dt.duration)}</span>
                                             {dt.comment && <span className="text-muted-foreground italic">"{dt.comment}"</span>}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                  {/* Quality Actions */}
-                                  {qActions.length > 0 && (
-                                    <div>
-                                      <h4 className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1"><ShieldAlert size={12} className="text-amber-500" /> Quality Issues</h4>
-                                      <div className="grid gap-1">
-                                        {qActions.map(q => (
-                                          <div key={q.tempId} className="flex items-center gap-3 text-xs bg-card p-2 rounded border border-border">
-                                            <span className="font-medium flex-1">{q.name}</span>
-                                            <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">-{q.points} pts</span>
-                                            {q.notes && <span className="text-muted-foreground italic">"{q.notes}"</span>}
                                           </div>
                                         ))}
                                       </div>
